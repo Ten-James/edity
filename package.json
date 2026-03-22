@@ -1,0 +1,69 @@
+{
+  "name": "edity",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:1420 && VITE_DEV_SERVER_URL=http://localhost:1420 electron .",
+    "build": "tsc && vite build",
+    "package": "npm run build && electron-builder",
+    "rebuild": "electron-rebuild"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Edity",
+  "build": {
+    "appId": "com.edity.app",
+    "productName": "Edity",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "icon.png"
+    ],
+    "mac": {
+      "icon": "icon.png",
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "dmg": {
+      "title": "Edity",
+      "icon": "icon.png"
+    }
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "concurrently": "^9.1.2",
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1",
+    "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@tabler/icons-react": "^3.40.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "node-pty": "^1.0.0",
+    "radix-ui": "^1.4.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "shadcn": "^4.1.0",
+    "shiki": "^4.0.2",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2",
+    "tw-animate-css": "^1.4.0"
+  }
+}

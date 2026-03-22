@@ -1,0 +1,6 @@
+{
+  "acronym": "E",
+  "color": "red",
+  "runCommand": "npm run dev",
+  "runMode": "background"
+}
