@@ -1,9 +1,16 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, systemPreferences, protocol, net } = require("electron");
 const { spawn, spawnSync, execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const pty = require("node-pty");
+
+// --- Custom Protocol ---
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: "edity-file",
+  privileges: { secure: true, supportFetchAPI: true, stream: true },
+}]);
 
 // --- Git Helper ---
 
@@ -411,6 +418,9 @@ ipcMain.handle("get_all_claude_statuses", () => {
   return result;
 });
 
+// System
+ipcMain.handle("get_homedir", () => os.homedir());
+
 // Projects
 ipcMain.handle("get_projects", () => loadProjects());
 
@@ -483,9 +493,8 @@ ipcMain.handle("read_file_content", (_event, { path: filePath }) => {
     const mime = detectMime(filePath);
     if (mime) {
       if (size > MAX_IMAGE_SIZE) return { type: "TooLarge", size };
-      const bytes = fs.readFileSync(filePath);
-      const data_url = `data:${mime};base64,${bytes.toString("base64")}`;
-      return { type: "Image", data_url, mime, size };
+      const url = `edity-file://${encodeURI(filePath)}`;
+      return { type: "Image", url, mime, size };
     }
 
     if (size > MAX_TEXT_SIZE) return { type: "TooLarge", size };
@@ -498,6 +507,103 @@ ipcMain.handle("read_file_content", (_event, { path: filePath }) => {
     return { type: "Text", content: text, size };
   } catch (err) {
     throw new Error(String(err));
+  }
+});
+
+ipcMain.handle("get_project_types", (_event, { projectPath }) => {
+  const result = { compilerOptions: null, libs: [] };
+
+  // Read tsconfig.json or jsconfig.json
+  for (const configName of ["tsconfig.json", "jsconfig.json"]) {
+    const configPath = path.join(projectPath, configName);
+    if (fs.existsSync(configPath)) {
+      try {
+        const raw = fs.readFileSync(configPath, "utf-8");
+        const parsed = JSON.parse(raw);
+        result.compilerOptions = parsed.compilerOptions ?? null;
+      } catch {}
+      break;
+    }
+  }
+
+  // Read package.json dependencies
+  const pkgPath = path.join(projectPath, "package.json");
+  if (!fs.existsSync(pkgPath)) return result;
+
+  let deps = [];
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+    deps = [
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.devDependencies ?? {}),
+    ];
+  } catch {
+    return result;
+  }
+
+  const MAX_DTS_SIZE = 500 * 1024;
+  const nodeModules = path.join(projectPath, "node_modules");
+
+  for (const dep of deps) {
+    let dtsPath = null;
+
+    // Check package.json "types" or "typings" field
+    const depPkgPath = path.join(nodeModules, dep, "package.json");
+    if (fs.existsSync(depPkgPath)) {
+      try {
+        const depPkg = JSON.parse(fs.readFileSync(depPkgPath, "utf-8"));
+        const typesField = depPkg.types || depPkg.typings;
+        if (typesField) {
+          const candidate = path.join(nodeModules, dep, typesField);
+          if (fs.existsSync(candidate)) dtsPath = candidate;
+        }
+      } catch {}
+    }
+
+    // Fallback: index.d.ts in package
+    if (!dtsPath) {
+      const candidate = path.join(nodeModules, dep, "index.d.ts");
+      if (fs.existsSync(candidate)) dtsPath = candidate;
+    }
+
+    // Fallback: @types package
+    if (!dtsPath) {
+      const atTypesDir = path.join(nodeModules, "@types", dep);
+      const atTypesPkg = path.join(atTypesDir, "package.json");
+      if (fs.existsSync(atTypesPkg)) {
+        try {
+          const atPkg = JSON.parse(fs.readFileSync(atTypesPkg, "utf-8"));
+          const typesField = atPkg.types || atPkg.typings || "index.d.ts";
+          const candidate = path.join(atTypesDir, typesField);
+          if (fs.existsSync(candidate)) dtsPath = candidate;
+        } catch {}
+      } else {
+        const candidate = path.join(atTypesDir, "index.d.ts");
+        if (fs.existsSync(candidate)) dtsPath = candidate;
+      }
+    }
+
+    if (dtsPath) {
+      try {
+        const stat = fs.statSync(dtsPath);
+        if (stat.size <= MAX_DTS_SIZE) {
+          const content = fs.readFileSync(dtsPath, "utf-8");
+          const monacoPath = `file:///node_modules/${dep}/${path.basename(dtsPath)}`;
+          result.libs.push({ content, filePath: monacoPath });
+        }
+      } catch {}
+    }
+  }
+
+  return result;
+});
+
+ipcMain.handle("write_file", (_event, { path: filePath, content }) => {
+  try {
+    fs.writeFileSync(filePath, content, "utf-8");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
   }
 });
 
@@ -533,6 +639,31 @@ ipcMain.handle("git_status", (_event, { cwd }) => {
   const result = execGit(["status", "--porcelain=v1", "-uall"], cwd);
   if (!result.ok) return { ok: false, error: result.error };
   return { ok: true, files: parseGitStatus(result.output) };
+});
+
+ipcMain.handle("git_diff_stats", (_event, { cwd }) => {
+  let additions = 0;
+  let deletions = 0;
+
+  for (const args of [["diff", "--numstat"], ["diff", "--cached", "--numstat"]]) {
+    const result = execGit(args, cwd);
+    if (result.ok && result.output) {
+      for (const line of result.output.split("\n")) {
+        const parts = line.split("\t");
+        if (parts.length >= 2 && parts[0] !== "-") {
+          additions += parseInt(parts[0]) || 0;
+          deletions += parseInt(parts[1]) || 0;
+        }
+      }
+    }
+  }
+
+  const statusResult = execGit(["status", "--porcelain=v1", "-uall"], cwd);
+  const changedFiles = statusResult.ok && statusResult.output
+    ? statusResult.output.split("\n").filter(Boolean).length
+    : 0;
+
+  return { ok: true, additions, deletions, changedFiles };
 });
 
 ipcMain.handle("git_branch_info", (_event, { cwd }) => {
@@ -597,7 +728,8 @@ ipcMain.handle("git_log", (_event, { cwd, count = 50, skip = 0 }) => {
   const result = execGit(
     [
       "log",
-      `--format=%H\t%h\t%an\t%ae\t%at\t%s\t%D`,
+      "--all",
+      `--format=%H\t%h\t%an\t%ae\t%at\t%s\t%D\t%P`,
       `-n`,
       String(count),
       `--skip=${skip}`,
@@ -611,7 +743,7 @@ ipcMain.handle("git_log", (_event, { cwd, count = 50, skip = 0 }) => {
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const [hash, shortHash, author, authorEmail, timestamp, subject, refs] =
+      const [hash, shortHash, author, authorEmail, timestamp, subject, refs, parents] =
         line.split("\t");
       return {
         hash,
@@ -621,9 +753,52 @@ ipcMain.handle("git_log", (_event, { cwd, count = 50, skip = 0 }) => {
         timestamp: parseInt(timestamp),
         subject,
         refs: refs || "",
+        parentHashes: parents ? parents.split(" ").filter(Boolean) : [],
       };
     });
   return { ok: true, entries };
+});
+
+ipcMain.handle("git_show_commit", (_event, { cwd, hash }) => {
+  // Get commit metadata
+  const metaResult = execGit(
+    ["show", "--format=%H\t%h\t%an\t%ae\t%at\t%s\t%b", "--no-patch", hash],
+    cwd,
+  );
+  if (!metaResult.ok) return { ok: false, error: metaResult.error };
+
+  const metaLine = metaResult.output.split("\n")[0];
+  const [h, shortHash, author, authorEmail, timestamp, subject, ...bodyParts] =
+    metaLine.split("\t");
+
+  // Get file list
+  const statResult = execGit(
+    ["diff-tree", "--no-commit-id", "-r", "--name-status", hash],
+    cwd,
+  );
+  const files = (statResult.ok && statResult.output)
+    ? statResult.output.split("\n").filter(Boolean).map((line) => {
+        const [status, ...pathParts] = line.split("\t");
+        return { status, path: pathParts.join("\t") };
+      })
+    : [];
+
+  // Get full diff
+  const diffResult = execGit(["show", "--format=", "--patch", hash], cwd, 30000);
+  const diff = diffResult.ok ? diffResult.output : "";
+
+  return {
+    ok: true,
+    hash: h,
+    shortHash,
+    author,
+    authorEmail,
+    timestamp: parseInt(timestamp),
+    subject,
+    body: bodyParts.join("\t").trim(),
+    files,
+    diff,
+  };
 });
 
 ipcMain.handle("git_file_diff", (_event, { cwd, filePath, staged }) => {
@@ -764,6 +939,30 @@ ipcMain.handle("show-open-dialog", async (_event, options) => {
 // --- App Lifecycle ---
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin") {
+    systemPreferences.askForMediaAccess("microphone");
+  }
+
+  // Serve image files via custom protocol (replaces base64 IPC)
+  protocol.handle("edity-file", (request) => {
+    let filePath;
+    try {
+      const url = new URL(request.url);
+      filePath = decodeURIComponent(url.pathname);
+      if (process.platform === "win32" && filePath.startsWith("/")) {
+        filePath = filePath.slice(1);
+      }
+    } catch {
+      return new Response("Invalid URL", { status: 400 });
+    }
+
+    const mime = detectMime(filePath);
+    if (!mime) return new Response("Forbidden", { status: 403 });
+    if (!path.isAbsolute(filePath)) return new Response("Forbidden", { status: 403 });
+
+    return net.fetch(`file://${filePath}`);
+  });
+
   ensureClaudeHooks();
   createWindow();
 });

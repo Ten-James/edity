@@ -5,6 +5,7 @@ import {
   IconCheck,
   IconPlus,
 } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,7 +28,6 @@ export function GitBranchPanel({
   onDelete,
 }: GitBranchPanelProps) {
   const [newBranch, setNewBranch] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     onLoadBranches();
@@ -38,26 +38,27 @@ export function GitBranchPanel({
 
   const handleCreate = async () => {
     if (!newBranch.trim()) return;
-    setError(null);
     const result = (await onCreate(newBranch.trim(), true)) as {
       ok: boolean;
       error?: string;
     };
     if (result.ok) {
+      toast.success("Created branch: " + newBranch.trim());
       setNewBranch("");
     } else {
-      setError(result.error ?? "Failed to create branch");
+      toast.error(result.error ?? "Failed to create branch");
     }
   };
 
   const handleSwitch = async (branch: string) => {
-    setError(null);
     const result = (await onSwitch(branch)) as {
       ok: boolean;
       error?: string;
     };
-    if (!result.ok) {
-      setError(result.error ?? "Failed to switch branch");
+    if (result.ok) {
+      toast.success("Switched to " + branch);
+    } else {
+      toast.error(result.error ?? "Failed to switch branch");
     }
   };
 
@@ -81,12 +82,6 @@ export function GitBranchPanel({
           Create
         </Button>
       </div>
-
-      {error && (
-        <div className="px-2 py-1 text-xs text-red-400 bg-red-500/10">
-          {error}
-        </div>
-      )}
 
       <ScrollArea className="flex-1">
         <div className="p-1">
@@ -119,9 +114,17 @@ export function GitBranchPanel({
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        onDelete(branch.name);
+                        const result = (await onDelete(branch.name)) as {
+                          ok: boolean;
+                          error?: string;
+                        };
+                        if (result.ok) {
+                          toast.success("Deleted branch: " + branch.name);
+                        } else {
+                          toast.error(result.error ?? "Failed to delete branch");
+                        }
                       }}
                       title="Delete branch"
                     >

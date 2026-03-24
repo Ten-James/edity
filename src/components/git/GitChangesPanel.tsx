@@ -1,12 +1,14 @@
-import {
-  IconPlus,
-  IconMinus,
-  IconArrowBackUp,
-} from "@tabler/icons-react";
+import { IconArrowBackUp } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { GitFileStatus } from "@/types/git";
+
+interface ChangeFile {
+  file: GitFileStatus;
+  isStaged: boolean;
+  statusCode: string;
+}
 
 interface GitChangesPanelProps {
   staged: GitFileStatus[];
@@ -36,58 +38,6 @@ function statusColor(code: string) {
   }
 }
 
-function FileRow({
-  file,
-  statusCode,
-  isSelected,
-  onClick,
-  actions,
-}: {
-  file: GitFileStatus;
-  statusCode: string;
-  isSelected: boolean;
-  onClick: () => void;
-  actions: React.ReactNode;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        "group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent rounded-sm",
-        isSelected && "bg-accent",
-      )}
-    >
-      <span className={cn("font-mono w-3 shrink-0", statusColor(statusCode))}>
-        {statusCode}
-      </span>
-      <span className="truncate flex-1">{file.path}</span>
-      <div className="flex shrink-0 opacity-0 group-hover:opacity-100 gap-0.5">
-        {actions}
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  count,
-  action,
-}: {
-  title: string;
-  count: number;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between px-2 py-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}{" "}
-        <span className="text-[10px] font-normal">({count})</span>
-      </span>
-      {action}
-    </div>
-  );
-}
-
 export function GitChangesPanel({
   staged,
   unstaged,
@@ -98,167 +48,124 @@ export function GitChangesPanel({
   onUnstage,
   onDiscard,
 }: GitChangesPanelProps) {
-  const iconSize = 13;
+  // Build unified file list
+  const files: ChangeFile[] = [];
+
+  for (const file of staged) {
+    files.push({ file, isStaged: true, statusCode: file.indexStatus });
+  }
+  for (const file of unstaged) {
+    // Skip if already in staged (file can be both partially staged and modified)
+    if (!staged.some((s) => s.path === file.path)) {
+      files.push({ file, isStaged: false, statusCode: file.workTreeStatus });
+    }
+  }
+  for (const file of untracked) {
+    files.push({ file, isStaged: false, statusCode: "?" });
+  }
+
+  const allStaged = files.length > 0 && files.every((f) => f.isStaged);
+  const someStaged = files.some((f) => f.isStaged);
+
+  const handleToggleAll = () => {
+    if (allStaged) {
+      onUnstage(files.map((f) => f.file.path));
+    } else {
+      const toStage = files.filter((f) => !f.isStaged).map((f) => f.file.path);
+      if (toStage.length > 0) onStage(toStage);
+    }
+  };
+
+  const handleToggle = (f: ChangeFile) => {
+    if (f.isStaged) {
+      onUnstage([f.file.path]);
+    } else {
+      onStage([f.file.path]);
+    }
+  };
+
+  if (files.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <span className="px-3 py-8 text-center text-xs text-muted-foreground">
+          No changes
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 min-h-0">
       <div className="py-1">
-        {staged.length > 0 && (
-          <div>
-            <SectionHeader
-              title="Staged"
-              count={staged.length}
-              action={
+        {/* Header with select-all checkbox */}
+        <div className="flex items-center gap-2 px-2 py-1 border-b border-border mb-1">
+          <input
+            type="checkbox"
+            checked={allStaged}
+            ref={(el) => {
+              if (el) el.indeterminate = someStaged && !allStaged;
+            }}
+            onChange={handleToggleAll}
+            className="accent-primary h-3.5 w-3.5 cursor-pointer"
+          />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Files{" "}
+            <span className="text-[10px] font-normal">({files.length})</span>
+          </span>
+        </div>
+
+        {files.map((f) => {
+          const isSelected =
+            selectedFile?.path === f.file.path &&
+            selectedFile.staged === f.isStaged;
+          const canDiscard =
+            !f.isStaged && f.statusCode !== "?" && f.statusCode !== "A";
+
+          return (
+            <div
+              key={`${f.isStaged ? "s" : "u"}-${f.file.path}`}
+              onClick={() => onSelectFile(f.file.path, f.isStaged)}
+              className={cn(
+                "group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent rounded-sm",
+                isSelected && "bg-accent",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={f.isStaged}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleToggle(f);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="accent-primary h-3.5 w-3.5 cursor-pointer shrink-0"
+              />
+              <span
+                className={cn(
+                  "font-mono w-3 shrink-0",
+                  statusColor(f.statusCode),
+                )}
+              >
+                {f.statusCode}
+              </span>
+              <span className="truncate flex-1">{f.file.path}</span>
+              {canDiscard && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onUnstage(staged.map((f) => f.path))}
-                  title="Unstage all"
+                  className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDiscard([f.file.path]);
+                  }}
+                  title="Discard"
                 >
-                  <IconMinus size={iconSize} />
+                  <IconArrowBackUp size={13} />
                 </Button>
-              }
-            />
-            {staged.map((file) => (
-              <FileRow
-                key={`s-${file.path}`}
-                file={file}
-                statusCode={file.indexStatus}
-                isSelected={
-                  selectedFile?.path === file.path && selectedFile.staged
-                }
-                onClick={() => onSelectFile(file.path, true)}
-                actions={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUnstage([file.path]);
-                    }}
-                    title="Unstage"
-                  >
-                    <IconMinus size={iconSize} />
-                  </Button>
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {unstaged.length > 0 && (
-          <div>
-            <SectionHeader
-              title="Changes"
-              count={unstaged.length}
-              action={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onStage(unstaged.map((f) => f.path))}
-                  title="Stage all"
-                >
-                  <IconPlus size={iconSize} />
-                </Button>
-              }
-            />
-            {unstaged.map((file) => (
-              <FileRow
-                key={`u-${file.path}`}
-                file={file}
-                statusCode={file.workTreeStatus}
-                isSelected={
-                  selectedFile?.path === file.path && !selectedFile.staged
-                }
-                onClick={() => onSelectFile(file.path, false)}
-                actions={
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDiscard([file.path]);
-                      }}
-                      title="Discard"
-                    >
-                      <IconArrowBackUp size={iconSize} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStage([file.path]);
-                      }}
-                      title="Stage"
-                    >
-                      <IconPlus size={iconSize} />
-                    </Button>
-                  </>
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {untracked.length > 0 && (
-          <div>
-            <SectionHeader
-              title="Untracked"
-              count={untracked.length}
-              action={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onStage(untracked.map((f) => f.path))}
-                  title="Stage all"
-                >
-                  <IconPlus size={iconSize} />
-                </Button>
-              }
-            />
-            {untracked.map((file) => (
-              <FileRow
-                key={`t-${file.path}`}
-                file={file}
-                statusCode="?"
-                isSelected={
-                  selectedFile?.path === file.path && !selectedFile.staged
-                }
-                onClick={() => onSelectFile(file.path, false)}
-                actions={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStage([file.path]);
-                    }}
-                    title="Stage"
-                  >
-                    <IconPlus size={iconSize} />
-                  </Button>
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {staged.length === 0 &&
-          unstaged.length === 0 &&
-          untracked.length === 0 && (
-            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
-              No changes
+              )}
             </div>
-          )}
+          );
+        })}
       </div>
     </ScrollArea>
   );

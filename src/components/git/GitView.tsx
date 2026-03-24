@@ -9,6 +9,7 @@ import {
   IconLoader2,
   IconAlertTriangle,
 } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useGitState } from "@/hooks/useGitState";
 import { useAppContext } from "@/contexts/AppContext";
@@ -16,6 +17,7 @@ import { GitChangesPanel } from "./GitChangesPanel";
 import { GitDiffViewer } from "./GitDiffViewer";
 import { GitCommitPanel } from "./GitCommitPanel";
 import { GitLogPanel } from "./GitLogPanel";
+import { GitCommitDetail } from "./GitCommitDetail";
 import { GitBranchPanel } from "./GitBranchPanel";
 import { cn } from "@/lib/utils";
 
@@ -29,32 +31,33 @@ interface GitViewProps {
 
 export function GitView({ isActive, projectPath }: GitViewProps) {
   const [mode, setMode] = useState<Mode>("changes");
-  const [pushError, setPushError] = useState<string | null>(null);
   const { refreshGitBranchInfo, gitBranchInfo } = useAppContext();
 
   const git = useGitState(projectPath);
 
   const handlePush = async () => {
-    setPushError(null);
     const result = await git.push(!gitBranchInfo?.upstream);
-    if (!result.ok) {
-      setPushError(result.error ?? "Push failed");
+    if (result.ok) {
+      toast.success("Pushed to remote");
+    } else {
+      toast.error(result.error ?? "Push failed");
     }
     refreshGitBranchInfo();
   };
 
   const handlePull = async () => {
-    setPushError(null);
     const result = await git.pull();
-    if (!result.ok) {
-      setPushError(result.error ?? "Pull failed");
+    if (result.ok) {
+      toast.success("Pulled from remote");
+    } else {
+      toast.error(result.error ?? "Pull failed");
     }
     refreshGitBranchInfo();
   };
 
   const handleFetch = async () => {
-    setPushError(null);
     await git.fetch();
+    toast.success("Fetched latest");
     refreshGitBranchInfo();
   };
 
@@ -69,7 +72,10 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
   if (git.isLoading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center">
-        <IconLoader2 size={20} className="animate-spin text-muted-foreground" />
+        <IconLoader2
+          size={20}
+          className="animate-spin text-muted-foreground"
+        />
       </div>
     );
   }
@@ -85,7 +91,7 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      {/* Header: mode tabs + actions */}
+      {/* Header: mode tabs + remote actions */}
       <div className="flex items-center border-b border-border px-2 h-9 shrink-0">
         <div className="flex gap-0.5">
           <Button
@@ -132,9 +138,9 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
             size="sm"
             className="h-7 gap-1 text-xs"
             onClick={handleFetch}
-            title="Fetch"
           >
             <IconRefresh size={14} />
+            Fetch
           </Button>
           <Button
             variant="ghost"
@@ -142,9 +148,9 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
             className={cn("h-7 gap-1 text-xs", git.isPulling && "opacity-50")}
             onClick={handlePull}
             disabled={git.isPulling}
-            title="Pull"
           >
             <IconArrowDown size={14} />
+            Pull
             {(gitBranchInfo?.behind ?? 0) > 0 && (
               <span className="text-orange-400 text-[10px]">
                 {gitBranchInfo!.behind}
@@ -157,9 +163,9 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
             className={cn("h-7 gap-1 text-xs", git.isPushing && "opacity-50")}
             onClick={handlePush}
             disabled={git.isPushing}
-            title="Push"
           >
             <IconArrowUp size={14} />
+            Push
             {(gitBranchInfo?.ahead ?? 0) > 0 && (
               <span className="text-green-400 text-[10px]">
                 {gitBranchInfo!.ahead}
@@ -169,17 +175,11 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
         </div>
       </div>
 
-      {pushError && (
-        <div className="px-3 py-1.5 text-xs text-red-400 bg-red-500/10 border-b border-border">
-          {pushError}
-        </div>
-      )}
-
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {mode === "changes" && (
           <div className="flex h-full">
-            <div className="flex w-[320px] flex-col border-r border-border shrink-0">
+            <div className="flex w-[320px] flex-col border-r border-border shrink-0 overflow-hidden">
               <GitChangesPanel
                 staged={git.staged}
                 unstaged={git.unstaged}
@@ -206,7 +206,29 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
         )}
 
         {mode === "history" && (
-          <GitLogPanel log={git.log} onLoadLog={git.loadLog} />
+          <div className="flex h-full">
+            <div
+              className={cn(
+                "flex flex-col overflow-hidden h-full",
+                git.selectedCommit ? "w-[400px] border-r border-border shrink-0" : "flex-1",
+              )}
+            >
+              <GitLogPanel
+                log={git.log}
+                selectedHash={git.selectedCommit?.hash ?? null}
+                onLoadLog={git.loadLog}
+                onSelectCommit={git.selectCommit}
+              />
+            </div>
+            {git.selectedCommit && (
+              <div className="flex-1">
+                <GitCommitDetail
+                  commit={git.selectedCommit}
+                  onClose={git.clearSelectedCommit}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {mode === "branches" && (

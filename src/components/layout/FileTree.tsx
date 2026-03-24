@@ -90,7 +90,7 @@ function FileTreeNode({
       <button
         onClick={toggle}
         className={cn(
-          "flex w-full items-center gap-1 px-2 py-1 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors",
+          "flex w-full items-center gap-1 px-2 py-0.5 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors",
           !entry.is_dir && "text-muted-foreground",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -98,20 +98,20 @@ function FileTreeNode({
         {entry.is_dir ? (
           <>
             {expanded ? (
-              <IconChevronDown size={14} className="shrink-0" />
+              <IconChevronDown size={13} className="shrink-0" />
             ) : (
-              <IconChevronRight size={14} className="shrink-0" />
+              <IconChevronRight size={13} className="shrink-0" />
             )}
             {expanded ? (
-              <IconFolderOpen size={14} className="shrink-0" />
+              <IconFolderOpen size={13} className="shrink-0" />
             ) : (
-              <IconFolder size={14} className="shrink-0" />
+              <IconFolder size={13} className="shrink-0" />
             )}
           </>
         ) : (
           <>
             <span className="w-3.5 shrink-0" />
-            <IconFile size={14} className="shrink-0" />
+            <IconFile size={13} className="shrink-0" />
           </>
         )}
         <span className="truncate flex-1 text-left">{entry.name}</span>
@@ -187,13 +187,13 @@ export function FileTree() {
     : entries;
 
   return (
-    <div className="flex h-full w-[280px] flex-col border-l border-border bg-card shrink-0">
-      <div className="p-2 border-b border-border">
+    <div className="flex h-full w-[260px] flex-col border-l border-border/50 bg-background shrink-0">
+      <div className="p-1.5 border-b border-border">
         <Input
           placeholder="Filter files..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="h-7 text-xs"
+          className="h-6 text-xs"
         />
       </div>
 

@@ -4,6 +4,7 @@ import type {
   GitFileStatus,
   GitBranch,
   GitLogEntry,
+  GitCommitDetail,
 } from "@/types/git";
 
 interface GitState {
@@ -17,6 +18,7 @@ interface GitState {
   log: GitLogEntry[];
   selectedFile: { path: string; staged: boolean } | null;
   selectedDiff: string | null;
+  selectedCommit: GitCommitDetail | null;
   isPushing: boolean;
   isPulling: boolean;
   isCommitting: boolean;
@@ -33,6 +35,7 @@ const initialState: GitState = {
   log: [],
   selectedFile: null,
   selectedDiff: null,
+  selectedCommit: null,
   isPushing: false,
   isPulling: false,
   isCommitting: false,
@@ -284,6 +287,37 @@ export function useGitState(projectPath: string) {
     [],
   );
 
+  const selectCommit = useCallback(async (hash: string) => {
+    try {
+      const result = await invoke<GitResult & GitCommitDetail>(
+        "git_show_commit",
+        { cwd: cwdRef.current, hash },
+      );
+      if (result.ok) {
+        setState((s) => ({
+          ...s,
+          selectedCommit: {
+            hash: result.hash as string,
+            shortHash: result.shortHash as string,
+            author: result.author as string,
+            authorEmail: result.authorEmail as string,
+            timestamp: result.timestamp as number,
+            subject: result.subject as string,
+            body: (result.body as string) ?? "",
+            files: (result.files as GitCommitDetail["files"]) ?? [],
+            diff: (result.diff as string) ?? "",
+          },
+        }));
+      }
+    } catch {
+      setState((s) => ({ ...s, selectedCommit: null }));
+    }
+  }, []);
+
+  const clearSelectedCommit = useCallback(() => {
+    setState((s) => ({ ...s, selectedCommit: null }));
+  }, []);
+
   return {
     ...state,
     refreshStatus,
@@ -300,5 +334,7 @@ export function useGitState(projectPath: string) {
     createBranch,
     deleteBranch,
     loadLog,
+    selectCommit,
+    clearSelectedCommit,
   };
 }

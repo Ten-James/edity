@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconCheck } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -18,8 +19,17 @@ export function GitCommitPanel({
 
   const handleCommit = async () => {
     if (!message.trim() || stagedCount === 0) return;
-    await onCommit(message.trim());
-    setMessage("");
+    const result = (await onCommit(message.trim())) as {
+      ok: boolean;
+      hash?: string;
+      error?: string;
+    };
+    if (result.ok) {
+      toast.success("Committed: " + (result.hash ?? ""));
+      setMessage("");
+    } else {
+      toast.error(result.error ?? "Commit failed");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

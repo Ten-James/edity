@@ -1,11 +1,98 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
+import { getHighlighter, detectLang } from "@/lib/shiki";
 import { cn } from "@/lib/utils";
+import type { DiffLine } from "@/types/git";
+import type { Highlighter } from "shiki";
 
 interface GitDiffViewerProps {
   diff: string | null;
   filePath: string | null;
+}
+
+interface TokenSpan {
+  content: string;
+  color?: string;
+}
+
+function tokenizeLine(
+  line: DiffLine,
+  lineIndex: number,
+  tokenMap: Map<number, TokenSpan[]> | null,
+): TokenSpan[] {
+  if (!tokenMap) return [{ content: line.content }];
+  return tokenMap.get(lineIndex) ?? [{ content: line.content }];
+}
+
+function useShikiTokens(
+  lines: DiffLine[] | null,
+  filePath: string | null,
+) {
+  const [tokenMap, setTokenMap] = useState<Map<number, TokenSpan[]> | null>(
+    null,
+  );
+
+  const code = useMemo(() => {
+    if (!lines) return null;
+    return lines
+      .filter((l) => l.type !== "header")
+      .map((l) => l.content)
+      .join("\n");
+  }, [lines]);
+
+  useEffect(() => {
+    if (!code || !filePath) {
+      setTokenMap(null);
+      return;
+    }
+
+    const lang = detectLang(filePath);
+    if (lang === "text") {
+      setTokenMap(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    getHighlighter().then((highlighter: Highlighter) => {
+      if (cancelled) return;
+      try {
+        const theme = document.documentElement.classList.contains("dark")
+          ? "github-dark"
+          : "github-light";
+
+        const result = highlighter.codeToTokens(code, { lang: lang as Parameters<Highlighter["codeToTokens"]>[1]["lang"], theme });
+        const map = new Map<number, TokenSpan[]>();
+
+        // Map Shiki token lines back to our diff line indices
+        let shikiLineIdx = 0;
+        if (lines) {
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].type === "header") continue;
+            const shikiLine = result.tokens[shikiLineIdx];
+            if (shikiLine) {
+              map.set(
+                i,
+                shikiLine.map((t) => ({ content: t.content, color: t.color })),
+              );
+            }
+            shikiLineIdx++;
+          }
+        }
+
+        if (!cancelled) setTokenMap(map);
+      } catch {
+        if (!cancelled) setTokenMap(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, filePath, lines]);
+
+  return tokenMap;
 }
 
 export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
@@ -13,6 +100,13 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
     if (!diff || !filePath) return null;
     return parseDiff(diff, filePath);
   }, [diff, filePath]);
+
+  const allLines = useMemo(() => {
+    if (!parsed) return null;
+    return parsed.hunks.flatMap((h) => h.lines);
+  }, [parsed]);
+
+  const tokenMap = useShikiTokens(allLines, filePath);
 
   if (!filePath) {
     return (
@@ -38,41 +132,67 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
     );
   }
 
+  let globalLineIdx = 0;
+
   return (
     <ScrollArea className="h-full">
       <div className="p-2 font-mono text-xs leading-5">
         {parsed?.hunks.map((hunk, hi) => (
           <div key={hi} className="mb-2">
-            {hunk.lines.map((line, li) => (
-              <div
-                key={li}
-                className={cn(
-                  "flex",
-                  line.type === "add" && "bg-green-500/10 text-green-400",
-                  line.type === "remove" && "bg-red-500/10 text-red-400",
-                  line.type === "header" &&
-                    "text-muted-foreground bg-muted/30 mt-1 mb-0.5",
-                  line.type === "context" && "text-muted-foreground",
-                )}
-              >
-                <span className="w-8 shrink-0 text-right pr-2 select-none text-muted-foreground/50">
-                  {line.oldLineNum ?? ""}
-                </span>
-                <span className="w-8 shrink-0 text-right pr-2 select-none text-muted-foreground/50">
-                  {line.newLineNum ?? ""}
-                </span>
-                <span className="w-4 shrink-0 select-none">
-                  {line.type === "add"
-                    ? "+"
-                    : line.type === "remove"
-                      ? "-"
-                      : line.type === "header"
-                        ? ""
-                        : " "}
-                </span>
-                <span className="whitespace-pre">{line.content}</span>
-              </div>
-            ))}
+            {hunk.lines.map((line, li) => {
+              const idx = globalLineIdx++;
+              const tokens = tokenizeLine(line, idx, tokenMap);
+
+              return (
+                <div
+                  key={li}
+                  className={cn(
+                    "flex",
+                    line.type === "add" && "bg-green-500/10",
+                    line.type === "remove" && "bg-red-500/10",
+                    line.type === "header" &&
+                      "text-muted-foreground bg-muted/30 mt-1 mb-0.5",
+                    line.type === "context" && "text-muted-foreground",
+                  )}
+                >
+                  <span className="w-8 shrink-0 text-right pr-2 select-none text-muted-foreground/50">
+                    {line.oldLineNum ?? ""}
+                  </span>
+                  <span className="w-8 shrink-0 text-right pr-2 select-none text-muted-foreground/50">
+                    {line.newLineNum ?? ""}
+                  </span>
+                  <span
+                    className={cn(
+                      "w-4 shrink-0 select-none",
+                      line.type === "add" && "text-green-400",
+                      line.type === "remove" && "text-red-400",
+                    )}
+                  >
+                    {line.type === "add"
+                      ? "+"
+                      : line.type === "remove"
+                        ? "-"
+                        : line.type === "header"
+                          ? ""
+                          : " "}
+                  </span>
+                  <span className="whitespace-pre">
+                    {line.type === "header" ? (
+                      line.content
+                    ) : (
+                      tokens.map((token, ti) => (
+                        <span
+                          key={ti}
+                          style={token.color ? { color: token.color } : undefined}
+                        >
+                          {token.content}
+                        </span>
+                      ))
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

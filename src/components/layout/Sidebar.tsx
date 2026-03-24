@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { IconPlus, IconSun, IconMoon } from "@tabler/icons-react";
+import { useState, useEffect, useRef } from "react";
+import { IconPlus, IconSun, IconMoon, IconSettings, IconTrash } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAppContext, type Project } from "@/contexts/AppContext";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { cn, PROJECT_COLORS } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { SetupDialog } from "@/components/SetupDialog";
 
 function getInitials(name: string): string {
@@ -27,22 +27,35 @@ export function Sidebar() {
     activeProject,
     setActiveProject,
     addProject,
+    removeProject,
     projectConfigs,
     projectClaudeStatus,
   } = useAppContext();
   const { theme, toggleTheme } = useTheme();
 
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ project: Project; x: number; y: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [contextMenu]);
 
   return (
     <>
-      <div className="flex h-full w-[72px] flex-col items-center border-r border-border bg-sidebar pt-10 pb-2 gap-2">
+      <div className="flex h-full w-12 flex-col items-center border-r border-border/50 bg-sidebar pt-9 pb-2 gap-1.5">
         <ScrollArea className="flex-1 w-full">
-          <div className="flex flex-col items-center gap-2 px-[10px]">
+          <div className="flex flex-col items-center gap-1.5 px-1.5">
             {projects.map((project) => {
               const config = projectConfigs.get(project.id);
               const label = config?.acronym || getInitials(project.name);
-              const colorKey = config?.color;
               const isActive = activeProject?.id === project.id;
 
               const claudeStatus = projectClaudeStatus.get(project.id);
@@ -55,33 +68,21 @@ export function Sidebar() {
                         onClick={() => setActiveProject(project)}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          setEditProject(project);
+                          setContextMenu({ project, x: e.clientX, y: e.clientY });
                         }}
                         className={cn(
-                          "flex h-10 w-10 items-center justify-center rounded-lg text-xs font-bold transition-colors",
-                          !colorKey &&
-                            (isActive
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"),
-                          colorKey &&
-                            !isActive &&
-                            "opacity-60 hover:opacity-100",
+                          "flex h-8 w-8 items-center justify-center rounded-sm text-[11px] font-semibold transition-colors",
+                          isActive
+                            ? "bg-accent text-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground",
                         )}
-                        style={
-                          colorKey && PROJECT_COLORS[colorKey]
-                            ? {
-                                backgroundColor: PROJECT_COLORS[colorKey].hex,
-                                color: PROJECT_COLORS[colorKey].textHex,
-                              }
-                            : undefined
-                        }
                       >
                         {label}
                       </button>
                       {claudeStatus && (
                         <div
                           className={cn(
-                            "h-1.5 w-1.5 rounded-full transition-colors",
+                            "h-1 w-1 rounded-full transition-colors",
                             claudeStatus === "working" && "bg-blue-500",
                             claudeStatus === "idle" && "bg-green-500",
                             claudeStatus === "notification" && "bg-red-500 animate-pulse",
@@ -101,8 +102,8 @@ export function Sidebar() {
         <div className="flex flex-col items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={addProject}>
-                <IconPlus size={18} />
+              <Button variant="ghost" size="icon-sm" onClick={addProject}>
+                <IconPlus size={16} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">Add Project</TooltipContent>
@@ -110,11 +111,11 @@ export function Sidebar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              <Button variant="ghost" size="icon-sm" onClick={toggleTheme}>
                 {theme === "dark" ? (
-                  <IconSun size={18} />
+                  <IconSun size={16} />
                 ) : (
-                  <IconMoon size={18} />
+                  <IconMoon size={16} />
                 )}
               </Button>
             </TooltipTrigger>
@@ -124,6 +125,35 @@ export function Sidebar() {
           </Tooltip>
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 w-40 rounded-md border border-border bg-popover p-1 shadow-md"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => {
+              setEditProject(contextMenu.project);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconSettings size={14} />
+            Change
+          </button>
+          <button
+            onClick={() => {
+              removeProject(contextMenu.project.id);
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconTrash size={14} />
+            Remove
+          </button>
+        </div>
+      )}
 
       {editProject && (
         <SetupDialog

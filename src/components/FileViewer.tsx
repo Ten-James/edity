@@ -1,5 +1,5 @@
 import { useFileContent } from "@/hooks/useFileContent";
-import { TextFileViewer } from "@/components/viewer/TextFileViewer";
+import { MonacoEditor } from "@/components/viewer/MonacoEditor";
 import { ImageViewer } from "@/components/viewer/ImageViewer";
 import { formatSize } from "@/lib/utils";
 
@@ -32,17 +32,15 @@ export function FileViewer({ tabId, filePath, isActive }: FileViewerProps) {
       {!loading && !error && content && (
         <>
           {content.type === "Text" && (
-            <TextFileViewer
+            <MonacoEditor
+              tabId={tabId}
               content={content.content}
               filePath={filePath}
             />
           )}
 
           {content.type === "Image" && (
-            <ImageViewer
-              dataUrl={content.data_url}
-              size={content.size}
-            />
+            <ImageViewer url={content.url} size={content.size} />
           )}
 
           {content.type === "Binary" && (

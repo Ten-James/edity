@@ -1,7 +1,8 @@
-import { useEffect } from "react";
-import { IconGitCommit } from "@tabler/icons-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect, useMemo } from "react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { computeGraph, getColorHex } from "@/lib/git-graph";
 import type { GitLogEntry } from "@/types/git";
 
 function timeAgo(timestamp: number): string {
@@ -17,43 +18,130 @@ function timeAgo(timestamp: number): string {
   return `${months}mo ago`;
 }
 
+const ROW_HEIGHT = 28;
+const COL_WIDTH = 16;
+const DOT_RADIUS = 3.5;
+
 interface GitLogPanelProps {
   log: GitLogEntry[];
+  selectedHash: string | null;
   onLoadLog: (count?: number, skip?: number) => Promise<void>;
+  onSelectCommit: (hash: string) => void;
 }
 
-export function GitLogPanel({ log, onLoadLog }: GitLogPanelProps) {
+function GraphSvg({
+  nodes,
+  rowIndex,
+}: {
+  nodes: ReturnType<typeof computeGraph>;
+  rowIndex: number;
+}) {
+  const node = nodes[rowIndex];
+  if (!node) return null;
+
+  // Determine SVG width from max column used in lines
+  let maxCol = node.column;
+  for (const line of node.lines) {
+    maxCol = Math.max(maxCol, line.fromCol, line.toCol);
+  }
+  const width = (maxCol + 1) * COL_WIDTH + 8;
+  const cx = node.column * COL_WIDTH + COL_WIDTH / 2 + 4;
+  const cy = ROW_HEIGHT / 2;
+
+  return (
+    <svg
+      width={width}
+      height={ROW_HEIGHT}
+      className="shrink-0"
+      style={{ minWidth: width }}
+    >
+      {node.lines.map((line, i) => {
+        const x1 = line.fromCol * COL_WIDTH + COL_WIDTH / 2 + 4;
+        const x2 = line.toCol * COL_WIDTH + COL_WIDTH / 2 + 4;
+        const color = getColorHex(line.color);
+
+        if (x1 === x2) {
+          // Straight pass-through line
+          return (
+            <line
+              key={i}
+              x1={x1}
+              y1={0}
+              x2={x2}
+              y2={ROW_HEIGHT}
+              stroke={color}
+              strokeWidth={2}
+            />
+          );
+        }
+
+        // Curved connection from this commit to parent's lane
+        return (
+          <path
+            key={i}
+            d={`M ${x1} ${cy} C ${x1} ${ROW_HEIGHT}, ${x2} ${cy}, ${x2} ${ROW_HEIGHT}`}
+            stroke={color}
+            strokeWidth={2}
+            fill="none"
+          />
+        );
+      })}
+
+      {/* Commit dot */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={DOT_RADIUS}
+        fill={getColorHex(node.color)}
+        stroke="var(--background)"
+        strokeWidth={1.5}
+      />
+    </svg>
+  );
+}
+
+export function GitLogPanel({
+  log,
+  selectedHash,
+  onLoadLog,
+  onSelectCommit,
+}: GitLogPanelProps) {
   useEffect(() => {
     onLoadLog();
   }, [onLoadLog]);
 
+  const graphNodes = useMemo(() => computeGraph(log), [log]);
+
   return (
     <ScrollArea className="h-full">
-      <div className="p-1">
-        {log.map((entry) => (
+      <div className="py-1 min-w-fit">
+        {log.map((entry, i) => (
           <div
             key={entry.hash}
-            className="flex items-start gap-2 px-2 py-1.5 text-xs hover:bg-accent rounded-sm"
+            onClick={() => onSelectCommit(entry.hash)}
+            className={cn(
+              "flex items-center text-xs cursor-pointer hover:bg-accent rounded-sm",
+              selectedHash === entry.hash && "bg-accent",
+            )}
+            style={{ height: ROW_HEIGHT }}
           >
-            <IconGitCommit
-              size={14}
-              className="shrink-0 mt-0.5 text-muted-foreground"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {entry.shortHash}
+            <GraphSvg nodes={graphNodes} rowIndex={i} />
+            <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+              <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                {entry.shortHash}
+              </span>
+              {entry.refs && (
+                <span className="text-[10px] text-blue-400 shrink-0 max-w-[120px] truncate">
+                  {entry.refs}
                 </span>
-                {entry.refs && (
-                  <span className="text-[10px] text-blue-400 truncate">
-                    {entry.refs}
-                  </span>
-                )}
-              </div>
-              <div className="truncate">{entry.subject}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {entry.author} · {timeAgo(entry.timestamp)}
-              </div>
+              )}
+              <span className="truncate flex-1">{entry.subject}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {entry.author}
+              </span>
+              <span className="text-[10px] text-muted-foreground shrink-0 w-14 text-right">
+                {timeAgo(entry.timestamp)}
+              </span>
             </div>
           </div>
         ))}
@@ -77,6 +165,7 @@ export function GitLogPanel({ log, onLoadLog }: GitLogPanelProps) {
           </div>
         )}
       </div>
+      <ScrollBar orientation="horizontal" />
     </ScrollArea>
   );
 }

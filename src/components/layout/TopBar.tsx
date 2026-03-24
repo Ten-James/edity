@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   IconPlayerPlay,
   IconPlayerStop,
@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppContext } from "@/contexts/AppContext";
+import { invoke } from "@/lib/ipc";
 import { SetupDialog } from "@/components/SetupDialog";
 
 const isDev = import.meta.env.DEV;
@@ -27,10 +28,16 @@ export function TopBar() {
     stopProject,
     isProjectRunning,
     gitBranchInfo,
+    gitDiffStats,
     createGitTab,
   } = useAppContext();
 
   const [setupOpen, setSetupOpen] = useState(false);
+  const [homedir, setHomedir] = useState<string>("");
+
+  useEffect(() => {
+    invoke<string>("get_homedir").then(setHomedir);
+  }, []);
 
   const onMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
@@ -43,7 +50,7 @@ export function TopBar() {
     <>
       <div
         onMouseDown={onMouseDown}
-        className="flex h-10 items-center border-b border-border bg-card px-3 gap-2 shrink-0"
+        className="flex h-8 items-center border-b border-border bg-background px-3 gap-2 shrink-0"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
         {isDev && (
@@ -52,9 +59,12 @@ export function TopBar() {
           </span>
         )}
 
-        <span className="text-sm font-medium text-foreground truncate">
-          {activeProject ? activeProject.name : "No Project"}
-          <span className="text-muted-foreground"> / ~</span>
+        <span className="text-[11px] font-medium text-muted-foreground truncate">
+          {activeProject
+            ? homedir && activeProject.path.startsWith(homedir)
+              ? "~" + activeProject.path.slice(homedir.length)
+              : activeProject.path
+            : "No Project"}
         </span>
 
         {gitBranchInfo && (
@@ -72,6 +82,19 @@ export function TopBar() {
             {gitBranchInfo.behind > 0 && (
               <span className="text-orange-500 text-[10px]">
                 {gitBranchInfo.behind}↓
+              </span>
+            )}
+            {gitDiffStats && (gitDiffStats.additions > 0 || gitDiffStats.deletions > 0 || gitDiffStats.changedFiles > 0) && (
+              <span className="flex items-center gap-1 ml-1 text-[10px]">
+                {gitDiffStats.additions > 0 && (
+                  <span className="text-green-500">+{gitDiffStats.additions}</span>
+                )}
+                {gitDiffStats.deletions > 0 && (
+                  <span className="text-red-500">-{gitDiffStats.deletions}</span>
+                )}
+                {gitDiffStats.changedFiles > 0 && (
+                  <span className="text-muted-foreground">^{gitDiffStats.changedFiles}</span>
+                )}
               </span>
             )}
           </button>
@@ -139,10 +162,10 @@ export function TopBar() {
           <TooltipTrigger asChild>
             <Button
               variant={fileTreeOpen ? "secondary" : "ghost"}
-              size="icon"
+              size="icon-xs"
               onClick={toggleFileTree}
             >
-              <IconFolder size={16} />
+              <IconFolder size={14} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Toggle File Tree</TooltipContent>

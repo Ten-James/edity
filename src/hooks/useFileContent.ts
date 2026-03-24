@@ -3,7 +3,7 @@ import { invoke, listen } from "@/lib/ipc";
 
 export type FileContent =
   | { type: "Text"; content: string; size: number }
-  | { type: "Image"; data_url: string; mime: string; size: number }
+  | { type: "Image"; url: string; mime: string; size: number }
   | { type: "Binary"; size: number }
   | { type: "TooLarge"; size: number };
 
@@ -20,6 +20,9 @@ export function useFileContent(tabId: string, filePath: string) {
       const result = await invoke<FileContent>("read_file_content", {
         path: filePath,
       });
+      if (result.type === "Image") {
+        result.url = `${result.url}?t=${Date.now()}`;
+      }
       setContent(result);
     } catch (e) {
       setError(String(e));

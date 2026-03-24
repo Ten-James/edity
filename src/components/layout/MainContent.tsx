@@ -1,65 +1,104 @@
+import { useMemo } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { TerminalView } from "@/components/Terminal";
-import { FileViewer } from "@/components/FileViewer";
-import { BrowserView } from "@/components/BrowserView";
-import { GitView } from "@/components/git/GitView";
 import { TopBar } from "./TopBar";
-import { TabBar } from "./TabBar";
 import { FileTree } from "./FileTree";
+import { PaneContainer } from "./PaneContainer";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import type { AllTab } from "@/types/tab";
 
 export function MainContent() {
-  const { allTabs, activeTabId, fileTreeOpen } = useAppContext();
+  const {
+    allTabs,
+    projects,
+    activeProject,
+    projectPanes,
+    fileTreeOpen,
+  } = useAppContext();
+
+  // Group allTabs by paneId for fast lookup
+  const tabsByPane = useMemo(() => {
+    const map = new Map<string, AllTab[]>();
+    for (const tab of allTabs) {
+      let arr = map.get(tab.paneId);
+      if (!arr) {
+        arr = [];
+        map.set(tab.paneId, arr);
+      }
+      arr.push(tab);
+    }
+    return map;
+  }, [allTabs]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <TopBar />
-      <TabBar />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 relative">
-          {allTabs.map((tab) => {
-            switch (tab.type) {
-              case "terminal":
-                return (
-                  <TerminalView
-                    key={tab.id}
-                    tabId={tab.id}
-                    isActive={tab.id === activeTabId}
-                    cwd={tab.projectPath}
-                    initialCommand={tab.initialCommand}
-                  />
-                );
-              case "file":
-                return (
-                  <FileViewer
-                    key={tab.id}
-                    tabId={tab.id}
-                    filePath={tab.filePath}
-                    isActive={tab.id === activeTabId}
-                  />
-                );
-              case "browser":
-                return (
-                  <BrowserView
-                    key={tab.id}
-                    tabId={tab.id}
-                    isActive={tab.id === activeTabId}
-                    initialUrl={tab.url}
-                  />
-                );
-              case "git":
-                return (
-                  <GitView
-                    key={tab.id}
-                    tabId={tab.id}
-                    isActive={tab.id === activeTabId}
-                    projectPath={tab.projectPath}
-                  />
-                );
-              default:
-                return null;
-            }
-          })}
-        </div>
+        {/* Render pane layouts for ALL projects — inactive ones are hidden but stay mounted */}
+        {projects.map((project) => {
+          const state = projectPanes.get(project.id);
+          if (!state) return null;
+          const isActive = project.id === activeProject?.id;
+          const { panes } = state;
+
+          return (
+            <div
+              key={project.id}
+              className="flex-1 flex overflow-hidden"
+              style={{ display: isActive ? "flex" : "none" }}
+            >
+              {panes.length <= 1 ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {panes[0] && (
+                    <PaneContainer
+                      paneId={panes[0].id}
+                      isFocused={true}
+                      tabs={tabsByPane.get(panes[0].id) ?? []}
+                      activeTabId={panes[0].activeTabId}
+                      showTabBar={isActive}
+                    />
+                  )}
+                </div>
+              ) : (
+                <ResizablePanelGroup
+                  orientation={state.splitDirection}
+                  className="flex-1"
+                >
+                  <ResizablePanel
+                    defaultSize={50}
+                    minSize={20}
+                    className="flex flex-col"
+                  >
+                    <PaneContainer
+                      paneId={panes[0].id}
+                      isFocused={panes[0].id === state.focusedPaneId}
+                      tabs={tabsByPane.get(panes[0].id) ?? []}
+                      activeTabId={panes[0].activeTabId}
+                      showTabBar={isActive}
+                    />
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel
+                    defaultSize={50}
+                    minSize={20}
+                    className="flex flex-col"
+                  >
+                    <PaneContainer
+                      paneId={panes[1].id}
+                      isFocused={panes[1].id === state.focusedPaneId}
+                      tabs={tabsByPane.get(panes[1].id) ?? []}
+                      activeTabId={panes[1].activeTabId}
+                      showTabBar={isActive}
+                    />
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              )}
+            </div>
+          );
+        })}
         {fileTreeOpen && <FileTree />}
       </div>
     </div>

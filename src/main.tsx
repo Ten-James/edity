@@ -1,6 +1,7 @@
 import ReactDOM from "react-dom/client";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "sonner";
 import App from "./App";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
@@ -8,5 +9,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <TooltipProvider>
       <App />
     </TooltipProvider>
+    <Toaster position="bottom-right" richColors />
   </ThemeProvider>,
 );
