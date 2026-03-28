@@ -1,190 +1,351 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  IconChevronRight,
-  IconChevronDown,
-  IconFolder,
-  IconFolderOpen,
   IconFile,
+  IconFolderPlus,
+  IconFilePlus,
+  IconTrash,
+  IconCopy,
+  IconCursorText,
+  IconFolder,
+  IconEyeOff,
 } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppContext } from "@/contexts/AppContext";
-import { invoke } from "@/lib/ipc";
+import { invoke, listen } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { GitFileStatus } from "@/types/git";
+import { FileTreeNode } from "./FileTreeNode";
 
-interface FileEntry {
+export interface FileEntry {
   name: string;
   path: string;
   is_dir: boolean;
 }
 
-function getFileGitStatus(
-  entryPath: string,
-  projectPath: string,
-  gitStatusMap: Map<string, string>,
-): string | null {
-  const rel = entryPath.replace(projectPath + "/", "");
-  return gitStatusMap.get(rel) ?? null;
-}
-
-function statusIndicatorColor(status: string) {
-  switch (status) {
-    case "M":
-      return "text-orange-400";
-    case "A":
-      return "text-green-400";
-    case "D":
-      return "text-red-400";
-    case "?":
-      return "text-muted-foreground";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
-function FileTreeNode({
-  entry,
-  depth,
-  filter,
-  gitStatusMap,
-  projectPath,
-}: {
+export interface FileTreeContextMenu {
   entry: FileEntry;
-  depth: number;
-  filter: string;
-  gitStatusMap: Map<string, string>;
-  projectPath: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [children, setChildren] = useState<FileEntry[]>([]);
+  x: number;
+  y: number;
+}
 
-  const { openFileTab } = useAppContext();
+type GitFilter = "all" | "M" | "A" | "D" | "?";
 
-  const toggle = useCallback(async () => {
-    if (!entry.is_dir) {
-      openFileTab(entry.path);
-      return;
-    }
-    if (!expanded) {
-      const entries = await invoke<FileEntry[]>("list_directory", {
-        path: entry.path,
-      });
-      setChildren(entries);
-    }
-    setExpanded((v) => !v);
-  }, [entry, expanded, openFileTab]);
+const GIT_FILTERS: { value: GitFilter; label: string; color: string }[] = [
+  { value: "all", label: "All", color: "text-foreground" },
+  { value: "M", label: "M", color: "text-orange-400" },
+  { value: "A", label: "A", color: "text-green-400" },
+  { value: "D", label: "D", color: "text-red-400" },
+  { value: "?", label: "?", color: "text-muted-foreground" },
+];
 
-  const filtered = filter
-    ? children.filter((c) =>
-        c.name.toLowerCase().includes(filter.toLowerCase()),
-      )
-    : children;
-
-  const gitStatus = !entry.is_dir
-    ? getFileGitStatus(entry.path, projectPath, gitStatusMap)
-    : null;
-
-  return (
-    <>
-      <button
-        onClick={toggle}
-        className={cn(
-          "flex w-full items-center gap-1 px-2 py-0.5 text-xs hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors",
-          !entry.is_dir && "text-muted-foreground",
-        )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      >
-        {entry.is_dir ? (
-          <>
-            {expanded ? (
-              <IconChevronDown size={13} className="shrink-0" />
-            ) : (
-              <IconChevronRight size={13} className="shrink-0" />
-            )}
-            {expanded ? (
-              <IconFolderOpen size={13} className="shrink-0" />
-            ) : (
-              <IconFolder size={13} className="shrink-0" />
-            )}
-          </>
-        ) : (
-          <>
-            <span className="w-3.5 shrink-0" />
-            <IconFile size={13} className="shrink-0" />
-          </>
-        )}
-        <span className="truncate flex-1 text-left">{entry.name}</span>
-        {gitStatus && (
-          <span
-            className={cn(
-              "ml-auto shrink-0 text-[10px] font-mono",
-              statusIndicatorColor(gitStatus),
-            )}
-          >
-            {gitStatus}
-          </span>
-        )}
-      </button>
-      {expanded &&
-        filtered.map((child) => (
-          <FileTreeNode
-            key={child.path}
-            entry={child}
-            depth={depth + 1}
-            filter={filter}
-            gitStatusMap={gitStatusMap}
-            projectPath={projectPath}
-          />
-        ))}
-    </>
-  );
+function hasGitStatusInTree(
+  entry: FileEntry,
+  gitStatusMap: Map<string, string>,
+  projectPath: string,
+  filter: GitFilter,
+): boolean {
+  const rel = entry.path.replace(projectPath + "/", "");
+  if (!entry.is_dir) {
+    const status = gitStatusMap.get(rel) ?? null;
+    return status === filter;
+  }
+  // Directory: check if any child matches
+  for (const [path, status] of gitStatusMap) {
+    if (path.startsWith(rel + "/") && status === filter) return true;
+  }
+  return false;
 }
 
 export function FileTree() {
-  const { activeProject } = useAppContext();
+  const { activeProject, openFileTab, closeTabsByFilePath } = useAppContext();
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState("");
   const [gitStatusMap, setGitStatusMap] = useState<Map<string, string>>(
     new Map(),
   );
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const [gitFilter, setGitFilter] = useState<GitFilter>("all");
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<FileTreeContextMenu | null>(
+    null,
+  );
+  const [renaming, setRenaming] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [creating, setCreating] = useState<{
+    parentDir: string;
+    type: "file" | "directory";
+    name: string;
+  } | null>(null);
+
+  const [showIgnored, setShowIgnored] = useState(false);
+
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const createInputRef = useRef<HTMLInputElement>(null);
+
+  const refreshTree = useCallback(() => {
+    if (!activeProject) return;
+    invoke<FileEntry[]>("list_directory", {
+      path: activeProject.path,
+      showIgnored,
+    }).then(setEntries);
+    invoke<{ ok: boolean; files?: GitFileStatus[] }>("git_status", {
+      cwd: activeProject.path,
+    }).then((result) => {
+      if (result.ok && result.files) {
+        const map = new Map<string, string>();
+        for (const file of result.files) {
+          const status =
+            file.indexStatus !== " " && file.indexStatus !== "?"
+              ? file.indexStatus
+              : file.workTreeStatus !== " "
+                ? file.workTreeStatus
+                : file.indexStatus;
+          map.set(file.path, status);
+        }
+        setGitStatusMap(map);
+      }
+    });
+  }, [activeProject, showIgnored]);
 
   useEffect(() => {
-    if (activeProject) {
-      invoke<FileEntry[]>("list_directory", { path: activeProject.path }).then(
-        setEntries,
-      );
+    refreshTree();
 
-      // Fetch git status for the project
-      invoke<{ ok: boolean; files?: GitFileStatus[] }>("git_status", {
-        cwd: activeProject.path,
-      }).then((result) => {
-        if (result.ok && result.files) {
-          const map = new Map<string, string>();
-          for (const file of result.files) {
-            // Use the most visible status (index or work tree)
-            const status =
-              file.indexStatus !== " " && file.indexStatus !== "?"
-                ? file.indexStatus
-                : file.workTreeStatus !== " "
-                  ? file.workTreeStatus
-                  : file.indexStatus;
-            map.set(file.path, status);
-          }
-          setGitStatusMap(map);
-        }
-      });
-    } else {
+    if (!activeProject) {
       setEntries([]);
       setGitStatusMap(new Map());
+      return;
     }
-  }, [activeProject]);
 
-  const filtered = filter
+    let unlisten: (() => void) | null = null;
+
+    invoke("watch_project_dir", { projectPath: activeProject.path }).catch(
+      () => {},
+    );
+
+    listen("directory-changed", () => {
+      refreshTree();
+      setRefreshSignal((s) => s + 1);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+      invoke("unwatch_project_dir").catch(() => {});
+    };
+  }, [refreshTree, activeProject]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as Node)
+      ) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [contextMenu]);
+
+  // Focus rename/create input when shown
+  useEffect(() => {
+    if (renaming) renameInputRef.current?.focus();
+  }, [renaming]);
+  useEffect(() => {
+    if (creating) createInputRef.current?.focus();
+  }, [creating]);
+
+  const handleSelect = useCallback(
+    (path: string, event: React.MouseEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        setSelectedPaths((prev) => {
+          const next = new Set(prev);
+          if (next.has(path)) {
+            next.delete(path);
+          } else {
+            next.add(path);
+          }
+          return next;
+        });
+      } else {
+        setSelectedPaths(new Set([path]));
+      }
+    },
+    [],
+  );
+
+  const handleContextMenuOpen = useCallback(
+    (menu: FileTreeContextMenu) => {
+      if (!selectedPaths.has(menu.entry.path)) {
+        setSelectedPaths(new Set([menu.entry.path]));
+      }
+      setContextMenu(menu);
+    },
+    [selectedPaths],
+  );
+
+  const handleDelete = useCallback(async () => {
+    setContextMenu(null);
+    const paths = [...selectedPaths];
+    if (paths.length === 0) return;
+
+    let successCount = 0;
+    for (const targetPath of paths) {
+      const result = await invoke<{ ok: boolean; error?: string }>(
+        "delete_path",
+        { targetPath },
+      );
+      if (result.ok) {
+        closeTabsByFilePath(targetPath);
+        successCount++;
+      } else {
+        toast.error(`Failed to delete: ${result.error}`);
+      }
+    }
+    setSelectedPaths(new Set());
+    if (successCount > 0) {
+      toast.success(
+        successCount === 1 ? "Deleted" : `Deleted ${successCount} items`,
+      );
+    }
+  }, [selectedPaths, closeTabsByFilePath]);
+
+  const handleRenameStart = useCallback(() => {
+    if (!contextMenu) return;
+    setRenaming({ path: contextMenu.entry.path, name: contextMenu.entry.name });
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleRenameSubmit = useCallback(async () => {
+    if (!renaming) return;
+    const dir = renaming.path.substring(
+      0,
+      renaming.path.lastIndexOf("/"),
+    );
+    const newPath = `${dir}/${renaming.name}`;
+    if (newPath === renaming.path) {
+      setRenaming(null);
+      return;
+    }
+    const result = await invoke<{ ok: boolean; error?: string }>(
+      "rename_path",
+      { oldPath: renaming.path, newPath },
+    );
+    if (result.ok) {
+      closeTabsByFilePath(renaming.path);
+      toast.success("Renamed");
+    } else {
+      toast.error(`Failed to rename: ${result.error}`);
+    }
+    setRenaming(null);
+  }, [renaming, closeTabsByFilePath]);
+
+  const handleNewEntry = useCallback(
+    (type: "file" | "directory") => {
+      if (!contextMenu) return;
+      const parentDir = contextMenu.entry.is_dir
+        ? contextMenu.entry.path
+        : contextMenu.entry.path.substring(
+            0,
+            contextMenu.entry.path.lastIndexOf("/"),
+          );
+      setCreating({ parentDir, type, name: "" });
+      setContextMenu(null);
+    },
+    [contextMenu],
+  );
+
+  const handleCreateSubmit = useCallback(async () => {
+    if (!creating || !creating.name.trim()) {
+      setCreating(null);
+      return;
+    }
+    const fullPath = `${creating.parentDir}/${creating.name.trim()}`;
+    const handler =
+      creating.type === "file" ? "create_file" : "create_directory";
+    const args =
+      creating.type === "file"
+        ? { filePath: fullPath }
+        : { dirPath: fullPath };
+    const result = await invoke<{ ok: boolean; error?: string }>(handler, args);
+    if (result.ok) {
+      toast.success(creating.type === "file" ? "File created" : "Folder created");
+      if (creating.type === "file") {
+        openFileTab(fullPath);
+      }
+    } else {
+      toast.error(`Failed to create: ${result.error}`);
+    }
+    setCreating(null);
+  }, [creating, openFileTab]);
+
+  const handleCopyPath = useCallback(() => {
+    if (!contextMenu) return;
+    navigator.clipboard.writeText(contextMenu.entry.path);
+    toast.success("Path copied");
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleOpenFile = useCallback(() => {
+    if (!contextMenu) return;
+    if (!contextMenu.entry.is_dir) {
+      openFileTab(contextMenu.entry.path);
+    }
+    setContextMenu(null);
+  }, [contextMenu, openFileTab]);
+
+  // Click on empty area to deselect
+  const handleBackgroundClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        setSelectedPaths(new Set());
+      }
+    },
+    [],
+  );
+
+  // Background context menu for new file/folder at root
+  const handleBackgroundContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target !== e.currentTarget || !activeProject) return;
+      e.preventDefault();
+      setContextMenu({
+        entry: { name: activeProject.name, path: activeProject.path, is_dir: true },
+        x: e.clientX,
+        y: e.clientY,
+      });
+    },
+    [activeProject],
+  );
+
+  // Apply filters
+  let filtered = filter
     ? entries.filter((e) =>
         e.name.toLowerCase().includes(filter.toLowerCase()),
       )
     : entries;
+
+  if (gitFilter !== "all" && activeProject) {
+    filtered = filtered.filter((e) =>
+      hasGitStatusInTree(e, gitStatusMap, activeProject.path, gitFilter),
+    );
+  }
+
+  // Count git statuses for filter badges
+  const gitCounts = { M: 0, A: 0, D: 0, "?": 0 };
+  for (const status of gitStatusMap.values()) {
+    if (status in gitCounts) {
+      gitCounts[status as keyof typeof gitCounts]++;
+    }
+  }
 
   return (
     <div className="flex h-full w-[260px] flex-col border-l border-border/50 bg-background shrink-0">
@@ -197,8 +358,66 @@ export function FileTree() {
         />
       </div>
 
+      {/* Inline rename input */}
+      {renaming && (
+        <div className="px-1.5 py-1 border-b border-border">
+          <Input
+            ref={renameInputRef}
+            value={renaming.name}
+            onChange={(e) =>
+              setRenaming((prev) =>
+                prev ? { ...prev, name: e.target.value } : null,
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleRenameSubmit();
+              if (e.key === "Escape") setRenaming(null);
+            }}
+            onBlur={handleRenameSubmit}
+            className="h-6 text-xs"
+          />
+        </div>
+      )}
+
+      {/* Inline create input */}
+      {creating && (
+        <div className="px-1.5 py-1 border-b border-border">
+          <div className="flex items-center gap-1 mb-0.5">
+            {creating.type === "file" ? (
+              <IconFile size={12} className="text-muted-foreground" />
+            ) : (
+              <IconFolder size={12} className="text-muted-foreground" />
+            )}
+            <span className="text-[10px] text-muted-foreground">
+              New {creating.type === "file" ? "file" : "folder"} in{" "}
+              {creating.parentDir.split("/").pop()}
+            </span>
+          </div>
+          <Input
+            ref={createInputRef}
+            value={creating.name}
+            onChange={(e) =>
+              setCreating((prev) =>
+                prev ? { ...prev, name: e.target.value } : null,
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateSubmit();
+              if (e.key === "Escape") setCreating(null);
+            }}
+            onBlur={handleCreateSubmit}
+            placeholder={creating.type === "file" ? "filename.ext" : "folder name"}
+            className="h-6 text-xs"
+          />
+        </div>
+      )}
+
       <ScrollArea className="flex-1">
-        <div className="p-1">
+        <div
+          className="p-1 min-h-full"
+          onClick={handleBackgroundClick}
+          onContextMenu={handleBackgroundContextMenu}
+        >
           {filtered.map((entry) => (
             <FileTreeNode
               key={entry.path}
@@ -207,10 +426,109 @@ export function FileTree() {
               filter={filter}
               gitStatusMap={gitStatusMap}
               projectPath={activeProject?.path ?? ""}
+              refreshSignal={refreshSignal}
+              selectedPaths={selectedPaths}
+              showIgnored={showIgnored}
+              onSelect={handleSelect}
+              onContextMenu={handleContextMenuOpen}
             />
           ))}
         </div>
       </ScrollArea>
+
+      {/* Git filter bar */}
+      <div className="flex items-center gap-0.5 px-1.5 py-1 border-t border-border">
+        {GIT_FILTERS.map((f) => {
+          const count = f.value === "all" ? null : gitCounts[f.value as keyof typeof gitCounts];
+          const isActive = gitFilter === f.value;
+          return (
+            <button
+              key={f.value}
+              onClick={() => setGitFilter(f.value)}
+              className={cn(
+                "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-mono transition-colors",
+                isActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/50",
+                f.color,
+              )}
+            >
+              {f.label}
+              {count != null && count > 0 && (
+                <span className="text-[9px] opacity-70">{count}</span>
+              )}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setShowIgnored((v) => !v)}
+          title={showIgnored ? "Hiding gitignored files" : "Showing all files"}
+          className={cn(
+            "ml-auto rounded p-0.5 transition-colors",
+            showIgnored
+              ? "text-accent-foreground bg-accent"
+              : "text-muted-foreground hover:bg-accent/50",
+          )}
+        >
+          <IconEyeOff size={12} />
+        </button>
+      </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 w-48 rounded-md border border-border bg-popover p-1 shadow-md"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          {!contextMenu.entry.is_dir && (
+            <button
+              onClick={handleOpenFile}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+            >
+              <IconFile size={14} />
+              Open
+            </button>
+          )}
+          <button
+            onClick={() => handleNewEntry("file")}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconFilePlus size={14} />
+            New File
+          </button>
+          <button
+            onClick={() => handleNewEntry("directory")}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconFolderPlus size={14} />
+            New Folder
+          </button>
+          <div className="my-1 h-px bg-border" />
+          <button
+            onClick={handleRenameStart}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconCursorText size={14} />
+            Rename
+          </button>
+          <button
+            onClick={handleCopyPath}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+          >
+            <IconCopy size={14} />
+            Copy Path
+          </button>
+          <div className="my-1 h-px bg-border" />
+          <button
+            onClick={handleDelete}
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-400"
+          >
+            <IconTrash size={14} />
+            Delete{selectedPaths.size > 1 ? ` (${selectedPaths.size})` : ""}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

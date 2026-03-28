@@ -51,6 +51,7 @@ interface AppContextValue {
   allTabs: AllTab[];
   createTab: (initialCommand?: string) => string;
   closeTab: (id: string) => void;
+  closeTabsByFilePath: (filePath: string) => void;
   setActiveTab: (id: string) => void;
 
   updateTabTitle: (tabId: string, title: string) => void;
@@ -418,6 +419,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       allTabs: tabManager.allTabs,
       createTab: tabManager.createTab,
       closeTab: tabManager.closeTab,
+      closeTabsByFilePath: tabManager.closeTabsByFilePath,
       setActiveTab: tabManager.setActiveTab,
       updateTabTitle: tabManager.updateTabTitle,
       openFileTab: tabManager.openFileTab,
@@ -461,6 +463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tabManager.allTabs,
       tabManager.createTab,
       tabManager.closeTab,
+      tabManager.closeTabsByFilePath,
       tabManager.setActiveTab,
       tabManager.updateTabTitle,
       tabManager.openFileTab,

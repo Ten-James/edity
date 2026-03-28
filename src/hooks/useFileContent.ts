@@ -12,10 +12,14 @@ export function useFileContent(tabId: string, filePath: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFetchedRef = useRef(false);
 
   const fetchContent = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial fetch, not on re-fetches
+      if (!hasFetchedRef.current) {
+        setLoading(true);
+      }
       setError(null);
       const result = await invoke<FileContent>("read_file_content", {
         path: filePath,
@@ -27,6 +31,7 @@ export function useFileContent(tabId: string, filePath: string) {
     } catch (e) {
       setError(String(e));
     } finally {
+      hasFetchedRef.current = true;
       setLoading(false);
     }
   }, [filePath]);

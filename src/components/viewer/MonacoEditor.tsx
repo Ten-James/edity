@@ -194,7 +194,9 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
     // Only update if editor matches the old saved content (not dirty)
     if (currentValue === savedContentRef.current) {
       savedContentRef.current = content;
-      ed.setValue(content);
+      if (content !== currentValue) {
+        ed.setValue(content);
+      }
       setTabDirty(tabId, false);
     } else {
       // Editor is dirty — don't overwrite, just update baseline for next save

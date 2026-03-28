@@ -62,6 +62,39 @@ function updatePaneInState(
   };
 }
 
+/** Remove a single tab from project pane state. Returns unchanged state if tab not found. */
+function removeTabFromState(
+  state: ProjectPaneState,
+  tabId: string,
+): ProjectPaneState {
+  const pane = findPaneForTab(state, tabId);
+  if (!pane) return state;
+  const remaining = pane.tabs.filter((t) => t.id !== tabId);
+  if (remaining.length === 0) {
+    if (state.panes.length > 1) {
+      const otherPanes = state.panes.filter((p) => p.id !== pane.id);
+      return { ...state, panes: otherPanes, focusedPaneId: otherPanes[0].id };
+    }
+    const newTab = makeTerminalTab();
+    return updatePaneInState(state, pane.id, () => ({
+      ...pane,
+      tabs: [newTab],
+      activeTabId: newTab.id,
+    }));
+  }
+  let newActive = pane.activeTabId;
+  if (pane.activeTabId === tabId) {
+    const closedIdx = pane.tabs.findIndex((t) => t.id === tabId);
+    newActive =
+      remaining[Math.min(closedIdx, remaining.length - 1)]?.id ?? null;
+  }
+  return updatePaneInState(state, pane.id, () => ({
+    ...pane,
+    tabs: remaining,
+    activeTabId: newActive,
+  }));
+}
+
 /** Find a tab across all projects and update it. Returns prev if not found or updater returns null. */
 function updateTabAcrossProjects(
   prev: Map<string, ProjectPaneState>,
@@ -220,47 +253,43 @@ export function useTabManager(
           setTabDirty(id, false);
         }
 
-        const remaining = pane.tabs.filter((t) => t.id !== id);
         const next = new Map(prev);
+        next.set(proj.id, removeTabFromState(state, id));
+        return next;
+      });
+    },
+    [setTabDirty],
+  );
 
-        // If pane becomes empty
-        if (remaining.length === 0) {
-          if (state.panes.length > 1) {
-            // Remove empty pane, focus the other one
-            const otherPanes = state.panes.filter((p) => p.id !== pane.id);
-            next.set(proj.id, {
-              ...state,
-              panes: otherPanes,
-              focusedPaneId: otherPanes[0].id,
-            });
-          } else {
-            // Last pane: auto-create terminal
-            const newTab = makeTerminalTab();
-            next.set(
-              proj.id,
-              updatePaneInState(state, pane.id, () => ({
-                ...pane,
-                tabs: [newTab],
-                activeTabId: newTab.id,
-              })),
-            );
+  const closeTabsByFilePath = useCallback(
+    (filePath: string) => {
+      const proj = activeProjectRef.current;
+      if (!proj) return;
+      setProjectPanes((prev) => {
+        const state = prev.get(proj.id);
+        if (!state) return prev;
+        // Find all tabs matching this path (exact match or inside directory)
+        const matchingIds: string[] = [];
+        for (const pane of state.panes) {
+          for (const tab of pane.tabs) {
+            if (
+              tab.type === "file" &&
+              (tab.filePath === filePath ||
+                tab.filePath.startsWith(filePath + "/"))
+            ) {
+              matchingIds.push(tab.id);
+            }
           }
-        } else {
-          let newActive = pane.activeTabId;
-          if (pane.activeTabId === id) {
-            const closedIdx = pane.tabs.findIndex((t) => t.id === id);
-            newActive =
-              remaining[Math.min(closedIdx, remaining.length - 1)]?.id ?? null;
-          }
-          next.set(
-            proj.id,
-            updatePaneInState(state, pane.id, () => ({
-              ...pane,
-              tabs: remaining,
-              activeTabId: newActive,
-            })),
-          );
         }
+        if (matchingIds.length === 0) return prev;
+        const next = new Map(prev);
+        let currentState = state;
+        for (const id of matchingIds) {
+          invoke("unwatch_file", { tabId: id }).catch(() => {});
+          setTabDirty(id, false);
+          currentState = removeTabFromState(currentState, id);
+        }
+        next.set(proj.id, currentState);
         return next;
       });
     },
@@ -592,6 +621,7 @@ export function useTabManager(
     // Tab actions
     createTab,
     closeTab,
+    closeTabsByFilePath,
     setActiveTab,
     openFileTab,
     pinTab,

@@ -53,6 +53,11 @@ const ptyInstances = new Map();
 /** @type {Map<string, fs.FSWatcher>} */
 const fileWatchers = new Map();
 
+/** @type {fs.FSWatcher | null} */
+let projectDirWatcher = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let projectDirDebounce = null;
+
 /** @type {Map<string, import('child_process').ChildProcess>} */
 const runningProcesses = new Map();
 
@@ -457,7 +462,7 @@ function getGitIgnoredSet(dirPath, filePaths) {
   return new Set();
 }
 
-ipcMain.handle("list_directory", (_event, { path: dirPath }) => {
+ipcMain.handle("list_directory", (_event, { path: dirPath, showIgnored }) => {
   try {
     const dirents = fs.readdirSync(dirPath, { withFileTypes: true });
     const entries = dirents
@@ -468,10 +473,12 @@ ipcMain.handle("list_directory", (_event, { path: dirPath }) => {
         is_dir: d.isDirectory(),
       }));
 
-    // Filter out gitignored entries
-    const fullPaths = entries.map((e) => e.path);
-    const ignored = getGitIgnoredSet(dirPath, fullPaths);
-    const filtered = entries.filter((e) => !ignored.has(e.path));
+    let filtered = entries;
+    if (!showIgnored) {
+      const fullPaths = entries.map((e) => e.path);
+      const ignored = getGitIgnoredSet(dirPath, fullPaths);
+      filtered = entries.filter((e) => !ignored.has(e.path));
+    }
 
     filtered.sort((a, b) => {
       if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
@@ -607,6 +614,48 @@ ipcMain.handle("write_file", (_event, { path: filePath, content }) => {
   }
 });
 
+// File Operations
+ipcMain.handle("delete_path", (_event, { targetPath }) => {
+  try {
+    const stat = fs.statSync(targetPath);
+    if (stat.isDirectory()) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(targetPath);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("rename_path", (_event, { oldPath, newPath }) => {
+  try {
+    fs.renameSync(oldPath, newPath);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("create_file", (_event, { filePath }) => {
+  try {
+    fs.writeFileSync(filePath, "", "utf-8");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("create_directory", (_event, { dirPath }) => {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
 // File Watching
 ipcMain.handle("watch_file", (_event, { tabId, path: filePath }) => {
   // Remove existing watcher for this tab
@@ -630,6 +679,53 @@ ipcMain.handle("unwatch_file", (_event, { tabId }) => {
   if (watcher) {
     watcher.close();
     fileWatchers.delete(tabId);
+  }
+});
+
+// Project Directory Watching
+ipcMain.handle("watch_project_dir", (_event, { projectPath }) => {
+  // Close existing watcher
+  if (projectDirWatcher) {
+    projectDirWatcher.close();
+    projectDirWatcher = null;
+  }
+  if (projectDirDebounce) {
+    clearTimeout(projectDirDebounce);
+    projectDirDebounce = null;
+  }
+
+  try {
+    projectDirWatcher = fs.watch(projectPath, { recursive: true }, (_eventType, filename) => {
+      // Skip .git and node_modules changes
+      if (filename && (
+        filename.startsWith(".git/") || filename.startsWith(".git\\") || filename === ".git" ||
+        filename.startsWith("node_modules/") || filename.startsWith("node_modules\\")
+      )) {
+        return;
+      }
+      if (projectDirDebounce) clearTimeout(projectDirDebounce);
+      projectDirDebounce = setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("directory-changed");
+        }
+      }, 500);
+    });
+    projectDirWatcher.on("error", () => {
+      // Watcher may fail if directory is removed
+    });
+  } catch {
+    // Directory may not exist
+  }
+});
+
+ipcMain.handle("unwatch_project_dir", () => {
+  if (projectDirWatcher) {
+    projectDirWatcher.close();
+    projectDirWatcher = null;
+  }
+  if (projectDirDebounce) {
+    clearTimeout(projectDirDebounce);
+    projectDirDebounce = null;
   }
 });
 
@@ -979,6 +1075,16 @@ app.on("window-all-closed", () => {
     watcher.close();
   }
   fileWatchers.clear();
+
+  // Clean up project directory watcher
+  if (projectDirWatcher) {
+    projectDirWatcher.close();
+    projectDirWatcher = null;
+  }
+  if (projectDirDebounce) {
+    clearTimeout(projectDirDebounce);
+    projectDirDebounce = null;
+  }
 
   // Clean up background processes
   for (const proc of runningProcesses.values()) {

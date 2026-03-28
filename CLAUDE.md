@@ -2,6 +2,7 @@
 
 Edity is an Electron desktop app — a multi-project terminal, file editor, and git management IDE. React frontend (Vite dev server on port 1420) communicates with Electron main process via IPC.
 
+
 Always write clean code and ensure if its possible one component per file, no more than 800 lines per file and typesafety at any moment.
 
 
