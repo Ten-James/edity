@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
-import { getHighlighter, detectLang } from "@/lib/shiki";
+import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import type { DiffLine } from "@/types/git";
 import type { Highlighter } from "shiki";
@@ -28,6 +29,7 @@ function tokenizeLine(
 function useShikiTokens(
   lines: DiffLine[] | null,
   filePath: string | null,
+  shikiTheme: string,
 ) {
   const [tokenMap, setTokenMap] = useState<Map<number, TokenSpan[]> | null>(
     null,
@@ -55,17 +57,14 @@ function useShikiTokens(
 
     let cancelled = false;
 
-    getHighlighter().then((highlighter: Highlighter) => {
+    (async () => {
+      await ensureShikiTheme(shikiTheme);
+      const highlighter: Highlighter = await getHighlighter();
       if (cancelled) return;
       try {
-        const theme = document.documentElement.classList.contains("dark")
-          ? "github-dark"
-          : "github-light";
-
-        const result = highlighter.codeToTokens(code, { lang: lang as Parameters<Highlighter["codeToTokens"]>[1]["lang"], theme });
+        const result = highlighter.codeToTokens(code, { lang: lang as Parameters<Highlighter["codeToTokens"]>[1]["lang"], theme: shikiTheme });
         const map = new Map<number, TokenSpan[]>();
 
-        // Map Shiki token lines back to our diff line indices
         let shikiLineIdx = 0;
         if (lines) {
           for (let i = 0; i < lines.length; i++) {
@@ -85,17 +84,19 @@ function useShikiTokens(
       } catch {
         if (!cancelled) setTokenMap(null);
       }
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [code, filePath, lines]);
+  }, [code, filePath, lines, shikiTheme]);
 
   return tokenMap;
 }
 
 export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
+  const { activeTheme } = useTheme();
+
   const parsed = useMemo(() => {
     if (!diff || !filePath) return null;
     return parseDiff(diff, filePath);
@@ -106,7 +107,7 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
     return parsed.hunks.flatMap((h) => h.lines);
   }, [parsed]);
 
-  const tokenMap = useShikiTokens(allLines, filePath);
+  const tokenMap = useShikiTokens(allLines, filePath, activeTheme.shikiTheme);
 
   if (!filePath) {
     return (

@@ -58,5 +58,6 @@ export const CONFIG_DIR = path.join(os.homedir(), ".config", "edity");
 export const PROJECTS_PATH = path.join(CONFIG_DIR, "projects.json");
 export const CLAUDE_STATUS_DIR = path.join(CONFIG_DIR, "claude-status");
 export const HOOK_SCRIPT_PATH = path.join(CONFIG_DIR, "claude-hook.sh");
+export const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 export const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 export const CLAUDE_SESSIONS_DIR = path.join(os.homedir(), ".claude", "sessions");

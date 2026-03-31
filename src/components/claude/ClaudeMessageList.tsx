@@ -19,7 +19,7 @@ export function ClaudeMessageList({ messages }: ClaudeMessageListProps) {
   const visible = messages.filter((m) => !isMessageEmpty(m));
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-2 p-4">
       {visible.map((message) => (
         <ClaudeMessageBubble key={message.id} message={message} />
       ))}

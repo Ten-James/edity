@@ -28,6 +28,7 @@ import type {
 export type { Tab, AllTab, Pane, SplitDirection, ProjectPaneState, TerminalTab, FileTab, BrowserTab, GitTab, ClaudeTab };
 
 import type { Project, EdityConfig } from "@shared/types/project";
+import { useTheme } from "@/components/theme/ThemeProvider";
 export type { Project, EdityConfig };
 
 interface AppContextValue {
@@ -87,6 +88,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { settings } = useTheme();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProjectState] = useState<Project | null>(null);
   const [fileTreeOpen, setFileTreeOpen] = useState(false);
@@ -125,9 +127,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     invoke<Project[]>("get_projects")
       .then((p) => {
         setProjects(p);
-        if (p.length > 0) {
-          setActiveProjectState(p[0]);
-          tabManager.ensureProjectPanes(p[0].id);
+        const defaultProject = settings.defaultProjectId
+          ? p.find((proj) => proj.id === settings.defaultProjectId)
+          : null;
+        const initial = defaultProject ?? p[0] ?? null;
+        if (initial) {
+          setActiveProjectState(initial);
+          tabManager.ensureProjectPanes(initial.id);
         }
         p.forEach((project) => loadEdityConfig(project));
       })

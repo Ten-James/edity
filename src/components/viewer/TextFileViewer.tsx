@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
-import { getHighlighter, detectLang } from "@/lib/shiki";
+import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IconCopy } from "@tabler/icons-react";
 
@@ -16,7 +16,7 @@ interface LineSelection {
 }
 
 export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
-  const { theme } = useTheme();
+  const { activeTheme } = useTheme();
   const { activeProject } = useAppContext();
   const [lines, setLines] = useState<string[]>([]);
   const [selection, setSelection] = useState<LineSelection | null>(null);
@@ -31,7 +31,8 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
       if (cancelled) return;
 
       const lang = detectLang(filePath);
-      const shikiTheme = theme === "dark" ? "github-dark" : "github-light";
+      const shikiTheme = activeTheme.shikiTheme;
+      await ensureShikiTheme(shikiTheme);
 
       // Load language if not already loaded
       const loadedLangs = highlighter.getLoadedLanguages();
@@ -68,7 +69,7 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
     return () => {
       cancelled = true;
     };
-  }, [content, filePath, theme]);
+  }, [content, filePath, activeTheme]);
 
   const getRelativePath = useCallback(() => {
     if (activeProject) {

@@ -5,8 +5,9 @@
 export function getToolSummary(
   toolName: string,
   input: Record<string, unknown>,
+  inputJson?: string,
 ): string | null {
-  const filePath = getFilePath(input);
+  const filePath = getFilePath(input) ?? extractPathFromJson(inputJson);
 
   switch (toolName) {
     case "Bash":
@@ -35,4 +36,11 @@ export function getToolSummary(
 export function getFilePath(input: Record<string, unknown>): string | null {
   const raw = input.file_path ?? input.filePath;
   return raw ? String(raw) : null;
+}
+
+/** Try to extract file_path from partial inputJson during streaming. */
+function extractPathFromJson(inputJson?: string): string | null {
+  if (!inputJson) return null;
+  const match = inputJson.match(/"file_path"\s*:\s*"([^"]+)"/);
+  return match?.[1] ?? null;
 }

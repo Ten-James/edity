@@ -23,14 +23,46 @@ const PRELOADED_LANGS = [
   "cpp",
 ] as const;
 
+const PRELOADED_THEMES = [
+  "github-dark",
+  "github-light",
+  "catppuccin-latte",
+  "catppuccin-frappe",
+  "catppuccin-macchiato",
+  "catppuccin-mocha",
+  "rose-pine",
+  "rose-pine-moon",
+  "rose-pine-dawn",
+  "tokyo-night",
+  "dracula",
+  "nord",
+  "gruvbox-dark-medium",
+  "gruvbox-light-medium",
+  "one-dark-pro",
+  "solarized-dark",
+  "solarized-light",
+] as const;
+
 export function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
-      themes: ["github-dark", "github-light"],
+      themes: [...PRELOADED_THEMES],
       langs: [...PRELOADED_LANGS],
     });
   }
   return highlighterPromise;
+}
+
+export async function ensureShikiTheme(themeName: string): Promise<void> {
+  const highlighter = await getHighlighter();
+  const loaded = highlighter.getLoadedThemes();
+  if (!loaded.includes(themeName as never)) {
+    try {
+      await highlighter.loadTheme(themeName as never);
+    } catch {
+      // Theme not available in shiki, will fall back
+    }
+  }
 }
 
 const EXT_TO_LANG: Record<string, string> = {

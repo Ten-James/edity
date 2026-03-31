@@ -34,11 +34,11 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
 
   return (
     <div className="flex gap-3">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent">
+      <div className={"flex size-5 shrink-0 items-center justify-center rounded-full bg-accent"}>
         {message.isStreaming ? (
-          <IconLoader2 size={14} className="animate-spin text-muted-foreground" />
+          <IconLoader2 size={10} className="animate-spin text-muted-foreground" />
         ) : (
-          <IconRobot size={14} className="text-muted-foreground" />
+          <IconRobot size={10} className="text-muted-foreground" />
         )}
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
@@ -81,7 +81,7 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
 
         {/* Tool calls */}
         {message.toolUses.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             {message.toolUses.map((toolUse) => (
               <ClaudeToolCall key={toolUse.id} toolUse={toolUse} />
             ))}

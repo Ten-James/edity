@@ -5,33 +5,12 @@ import { toast } from "sonner";
 import { invoke } from "@/lib/ipc";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
+import type { MonacoThemeColors } from "@shared/types/settings";
 
 // Cache loaded project types to avoid re-fetching per file
 const loadedProjects = new Set<string>();
-let themesRegistered = false;
 
-// Hex values derived from App.css oklch theme variables
-const DARK = {
-  bg: "#202020",
-  fg: "#f5f7f7",
-  card: "#2e3338",
-  muted: "#3a4147",
-  mutedFg: "#9eacb4",
-  accent: "#3a4147",
-  primary: "#c44a10",
-};
-
-const LIGHT = {
-  bg: "#ffffff",
-  fg: "#202020",
-  card: "#ffffff",
-  muted: "#eef2f4",
-  mutedFg: "#718c99",
-  accent: "#eef2f4",
-  primary: "#e06020",
-};
-
-function edityThemeColors(c: typeof DARK) {
+function monacoThemeColors(c: MonacoThemeColors) {
   return {
     "editor.background": c.bg,
     "editor.foreground": c.fg,
@@ -61,25 +40,6 @@ function edityThemeColors(c: typeof DARK) {
     "list.activeSelectionBackground": c.primary + "40",
     "list.focusBackground": c.accent,
   };
-}
-
-function registerEdityThemes(m: Monaco) {
-  if (themesRegistered) return;
-  themesRegistered = true;
-
-  m.editor.defineTheme("edity-dark", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [],
-    colors: edityThemeColors(DARK),
-  });
-
-  m.editor.defineTheme("edity-light", {
-    base: "vs",
-    inherit: true,
-    rules: [],
-    colors: edityThemeColors(LIGHT),
-  });
 }
 
 interface ProjectTypes {
@@ -180,9 +140,10 @@ interface MonacoEditorProps {
 }
 
 export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
-  const { theme } = useTheme();
+  const { mode, activeTheme } = useTheme();
   const { setTabDirty, activeProject } = useAppContext();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const savedContentRef = useRef(content);
   const language = detectLanguage(filePath);
 
@@ -228,6 +189,7 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
   const handleMount: OnMount = useCallback(
     (editor, monacoInstance) => {
       editorRef.current = editor;
+      monacoRef.current = monacoInstance;
       savedContentRef.current = content;
 
       // Cmd+S / Ctrl+S to save
@@ -249,9 +211,29 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
     [content, handleSave, activeProject],
   );
 
+  // Re-register Monaco theme whenever the active theme changes
+  useEffect(() => {
+    const m = monacoRef.current;
+    if (!m) return;
+    const themeName = mode === "dark" ? "edity-dark" : "edity-light";
+    m.editor.defineTheme(themeName, {
+      base: mode === "dark" ? "vs-dark" : "vs",
+      inherit: true,
+      rules: [],
+      colors: monacoThemeColors(activeTheme.monaco),
+    });
+    m.editor.setTheme(themeName);
+  }, [activeTheme, mode]);
+
   const handleBeforeMount: BeforeMount = useCallback((monacoInstance) => {
-    registerEdityThemes(monacoInstance);
-  }, []);
+    const themeName = mode === "dark" ? "edity-dark" : "edity-light";
+    monacoInstance.editor.defineTheme(themeName, {
+      base: mode === "dark" ? "vs-dark" : "vs",
+      inherit: true,
+      rules: [],
+      colors: monacoThemeColors(activeTheme.monaco),
+    });
+  }, [activeTheme, mode]);
 
   const handleChange = useCallback(
     (value: string | undefined) => {
@@ -264,7 +246,7 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
     <Editor
       defaultValue={content}
       language={language}
-      theme={theme === "dark" ? "edity-dark" : "edity-light"}
+      theme={mode === "dark" ? "edity-dark" : "edity-light"}
       beforeMount={handleBeforeMount}
       onMount={handleMount}
       onChange={handleChange}

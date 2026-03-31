@@ -61,10 +61,26 @@ function getStatusIcon(status: ClaudeToolUse["status"]) {
 
 export function ClaudeToolCall({ toolUse }: ClaudeToolCallProps) {
   const [open, setOpen] = useState(false);
-  const summary = getToolSummary(toolUse.name, toolUse.input) ?? toolUse.name;
+  const summary = getToolSummary(toolUse.name, toolUse.input, toolUse.inputJson) ?? toolUse.name;
   const hasInput = Object.keys(toolUse.input).length > 0 || toolUse.inputJson;
   const isAgent = toolUse.name === "Agent";
   const hasSubContent = isAgent && (toolUse.subContent || (toolUse.subToolUses && toolUse.subToolUses.length > 0));
+  const isInline = toolUse.name === "Read" || toolUse.name === "Write";
+
+  if (isInline) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+        <span className="shrink-0 text-muted-foreground">
+          {getToolIcon(toolUse.name)}
+        </span>
+        <span className="font-medium">{toolUse.name}</span>
+        {summary && (
+          <span className="truncate text-muted-foreground">{summary}</span>
+        )}
+        <span className="ml-auto shrink-0">{getStatusIcon(toolUse.status)}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-border bg-muted/20 text-xs">

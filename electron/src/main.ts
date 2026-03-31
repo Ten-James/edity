@@ -20,6 +20,7 @@ import { registerFileHandlers } from "./ipc/files";
 import { registerProjectHandlers } from "./ipc/projects";
 import { ensureClaudeHooks, registerClaudeDetectionHandlers } from "./ipc/claude-detection";
 import { registerClaudeSdkHandlers, cleanupAllSessions } from "./ipc/claude-sdk";
+import { registerSettingsHandlers } from "./ipc/settings";
 
 // --- Custom Protocol ---
 
@@ -62,6 +63,7 @@ registerFileHandlers();
 registerProjectHandlers();
 registerClaudeDetectionHandlers();
 registerClaudeSdkHandlers(() => mainWindow);
+registerSettingsHandlers();
 
 // --- App Lifecycle ---
 

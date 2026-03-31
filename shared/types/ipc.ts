@@ -1,4 +1,5 @@
 import type { Project, EdityConfig } from "./project";
+import type { GlobalSettings } from "./settings";
 
 // --- Result wrappers ---
 
@@ -191,6 +192,10 @@ export interface IpcHandlerMap {
   // Background Process
   run_project_command: { args: { projectId: string; command: string; cwd: string }; ret: { pid: number | undefined } };
   kill_project_command: { args: { projectId: string }; ret: void };
+
+  // Settings
+  get_settings: { args: undefined; ret: GlobalSettings };
+  save_settings: { args: { settings: GlobalSettings }; ret: void };
 
   // Dialog
   "show-open-dialog": { args: { properties?: string[]; title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }; ret: { canceled: boolean; filePaths: string[] } };

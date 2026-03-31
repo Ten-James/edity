@@ -11,6 +11,7 @@ import { useAppContext, type Project } from "@/contexts/AppContext";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { SetupDialog } from "@/components/SetupDialog";
+import { SettingsDialog } from "@/components/SettingsDialog";
 
 function getInitials(name: string): string {
   return name
@@ -35,6 +36,7 @@ export function Sidebar() {
   const { theme, toggleTheme } = useTheme();
 
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ project: Project; x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -134,6 +136,15 @@ export function Sidebar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" onClick={() => setSettingsOpen(true)}>
+                <IconSettings size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Settings</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button variant="ghost" size="icon-sm" onClick={toggleTheme}>
                 {theme === "dark" ? (
                   <IconSun size={16} />
@@ -188,6 +199,8 @@ export function Sidebar() {
           projectPath={editProject.path}
         />
       )}
+
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );
 }

@@ -22,17 +22,11 @@ interface TerminalViewProps {
   initialCommand?: string;
 }
 
-function getTermTheme(theme: "light" | "dark") {
-  return theme === "dark"
-    ? { background: "#1e1e1e", foreground: "#d4d4d4", cursor: "#d4d4d4" }
-    : { background: "#ffffff", foreground: "#1e1e1e", cursor: "#1e1e1e" };
-}
-
 export function TerminalView({ tabId, isActive, cwd, initialCommand }: TerminalViewProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const { theme } = useTheme();
+  const { activeTheme } = useTheme();
   const { updateTabTitle } = useAppContext();
 
   // Poll for foreground process name + Claude Code status
@@ -72,7 +66,7 @@ export function TerminalView({ tabId, isActive, cwd, initialCommand }: TerminalV
       cursorBlink: true,
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      theme: getTermTheme(theme),
+      theme: activeTheme.terminal,
     });
 
     const fitAddon = new FitAddon();
@@ -124,9 +118,9 @@ export function TerminalView({ tabId, isActive, cwd, initialCommand }: TerminalV
 
   useEffect(() => {
     if (termRef.current) {
-      termRef.current.options.theme = getTermTheme(theme);
+      termRef.current.options.theme = activeTheme.terminal;
     }
-  }, [theme]);
+  }, [activeTheme]);
 
   useEffect(() => {
     if (isActive && fitAddonRef.current && termRef.current) {
