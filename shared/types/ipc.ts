@@ -86,6 +86,14 @@ export interface GitCommitDetail {
   diff: string;
 }
 
+// --- Script detection ---
+
+export interface DetectedScript {
+  name: string;
+  command: string;
+  source: string;
+}
+
 // --- Claude types ---
 
 export type PermissionMode = "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk";
@@ -189,9 +197,12 @@ export interface IpcHandlerMap {
   read_edity_config: { args: { projectPath: string }; ret: EdityConfig | null };
   write_edity_config: { args: { projectPath: string; config: EdityConfig }; ret: EdityConfig };
 
+  // Script Detection
+  detect_project_scripts: { args: { projectPath: string }; ret: DetectedScript[] };
+
   // Background Process
-  run_project_command: { args: { projectId: string; command: string; cwd: string }; ret: { pid: number | undefined } };
-  kill_project_command: { args: { projectId: string }; ret: void };
+  run_project_command: { args: { projectId: string; command: string; cwd: string; commandId?: string }; ret: { pid: number | undefined } };
+  kill_project_command: { args: { projectId: string; commandId?: string }; ret: void };
 
   // Settings
   get_settings: { args: undefined; ret: GlobalSettings };

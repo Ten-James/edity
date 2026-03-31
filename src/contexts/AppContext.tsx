@@ -27,9 +27,10 @@ import type {
 
 export type { Tab, AllTab, Pane, SplitDirection, ProjectPaneState, TerminalTab, FileTab, BrowserTab, GitTab, ClaudeTab };
 
-import type { Project, EdityConfig } from "@shared/types/project";
+import type { Project, EdityConfig, RunCommand } from "@shared/types/project";
 import { useTheme } from "@/components/theme/ThemeProvider";
-export type { Project, EdityConfig };
+import { getDefaultRunCommand } from "@/lib/run-commands";
+export type { Project, EdityConfig, RunCommand };
 
 interface AppContextValue {
   projects: Project[];
@@ -71,9 +72,10 @@ interface AppContextValue {
   edityConfig: EdityConfig | null;
   projectConfigs: Map<string, EdityConfig | null>;
   saveEdityConfig: (config: EdityConfig, projectPath: string) => Promise<void>;
-  runProject: () => void;
-  stopProject: () => void;
+  runProject: (command?: RunCommand) => void;
+  stopProject: (commandId?: string) => void;
   isProjectRunning: boolean;
+  runningCommandIds: Set<string>;
 
   gitBranchInfo: GitBranchInfo | null;
   gitDiffStats: GitDiffStats | null;
@@ -95,9 +97,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [edityConfigs, setEdityConfigs] = useState<
     Map<string, EdityConfig | null>
   >(new Map());
-  const [runningProjects, setRunningProjects] = useState<Set<string>>(
-    new Set(),
-  );
+  const [runningProjects, setRunningProjects] = useState<
+    Map<string, Set<string>>
+  >(new Map());
 
   const tabManager = useTabManager(activeProject, projects);
 
@@ -215,64 +217,97 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const exitListenersRef = useRef<Map<string, () => void>>(new Map());
 
-  const cleanupExitListener = useCallback((projectId: string) => {
-    const cleanup = exitListenersRef.current.get(projectId);
+  const cleanupExitListener = useCallback((key: string) => {
+    const cleanup = exitListenersRef.current.get(key);
     if (cleanup) {
       cleanup();
-      exitListenersRef.current.delete(projectId);
+      exitListenersRef.current.delete(key);
     }
   }, []);
 
-  const runProject = useCallback(() => {
+  const addRunningCommand = useCallback((projectId: string, commandId: string) => {
+    setRunningProjects((prev) => {
+      const next = new Map(prev);
+      const set = new Set(next.get(projectId) ?? []);
+      set.add(commandId);
+      next.set(projectId, set);
+      return next;
+    });
+  }, []);
+
+  const removeRunningCommand = useCallback((projectId: string, commandId?: string) => {
+    setRunningProjects((prev) => {
+      const next = new Map(prev);
+      if (!commandId) { next.delete(projectId); return next; }
+      const set = new Set(next.get(projectId) ?? []);
+      set.delete(commandId);
+      if (set.size === 0) next.delete(projectId);
+      else next.set(projectId, set);
+      return next;
+    });
+  }, []);
+
+  const runProject = useCallback((command?: RunCommand) => {
     const proj = activeProjectRef.current;
     if (!proj) return;
-    const config = edityConfigs.get(proj.id);
-    if (!config?.runCommand) return;
 
-    if (config.runMode === "background") {
-      cleanupExitListener(proj.id);
+    const cmd = command ?? getDefaultRunCommand(edityConfigs.get(proj.id) ?? null);
+    if (!cmd) return;
+
+    const commandId = cmd.name;
+
+    if (cmd.mode === "background") {
+      const key = `${proj.id}:${commandId}`;
+      cleanupExitListener(key);
       invoke("run_project_command", {
         projectId: proj.id,
-        command: config.runCommand,
+        command: cmd.command,
         cwd: proj.path,
+        commandId,
       }).then(() => {
-        setRunningProjects((prev) => new Set(prev).add(proj.id));
-        toast.success("Project started");
-        listen(`project-run-exit-${proj.id}`, () => {
-          setRunningProjects((prev) => {
-            const next = new Set(prev);
-            next.delete(proj.id);
-            return next;
-          });
-          cleanupExitListener(proj.id);
+        addRunningCommand(proj.id, commandId);
+        toast.success(`Started: ${cmd.name}`);
+        listen(`project-run-exit-${key}`, () => {
+          removeRunningCommand(proj.id, commandId);
+          cleanupExitListener(key);
         }).then((fn) => {
-          exitListenersRef.current.set(proj.id, fn);
+          exitListenersRef.current.set(key, fn);
         });
       });
     } else {
-      tabManager.createTab(config.runCommand);
+      tabManager.createTab(cmd.command);
     }
-  }, [edityConfigs, cleanupExitListener, tabManager.createTab]);
+  }, [edityConfigs, cleanupExitListener, addRunningCommand, removeRunningCommand, tabManager.createTab]);
 
-  const stopProject = useCallback(() => {
+  const stopProject = useCallback((commandId?: string) => {
     const proj = activeProjectRef.current;
     if (!proj) return;
-    cleanupExitListener(proj.id);
-    invoke("kill_project_command", { projectId: proj.id });
-    setRunningProjects((prev) => {
-      const next = new Set(prev);
-      next.delete(proj.id);
-      return next;
-    });
-    toast.success("Project stopped");
-  }, [cleanupExitListener]);
+
+    if (commandId) {
+      cleanupExitListener(`${proj.id}:${commandId}`);
+      invoke("kill_project_command", { projectId: proj.id, commandId });
+      removeRunningCommand(proj.id, commandId);
+      toast.success(`Stopped: ${commandId}`);
+    } else {
+      const running = runningProjects.get(proj.id);
+      if (running) {
+        for (const id of running) {
+          cleanupExitListener(`${proj.id}:${id}`);
+        }
+      }
+      invoke("kill_project_command", { projectId: proj.id });
+      removeRunningCommand(proj.id);
+      toast.success("All processes stopped");
+    }
+  }, [cleanupExitListener, removeRunningCommand, runningProjects]);
 
   const edityConfig = activeProject
     ? edityConfigs.get(activeProject.id) ?? null
     : null;
-  const isProjectRunning = activeProject
-    ? runningProjects.has(activeProject.id)
-    : false;
+  const runningCommandIds = activeProject
+    ? runningProjects.get(activeProject.id) ?? new Set<string>()
+    : new Set<string>();
+  const isProjectRunning = runningCommandIds.size > 0;
 
   const toggleFileTree = useCallback(() => setFileTreeOpen((v) => !v), []);
 
@@ -460,6 +495,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       runProject,
       stopProject,
       isProjectRunning,
+      runningCommandIds,
       gitBranchInfo,
       gitDiffStats,
       refreshGitBranchInfo,
@@ -504,6 +540,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       runProject,
       stopProject,
       isProjectRunning,
+      runningCommandIds,
       gitBranchInfo,
       gitDiffStats,
       refreshGitBranchInfo,

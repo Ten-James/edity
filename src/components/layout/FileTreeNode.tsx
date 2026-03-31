@@ -4,8 +4,8 @@ import {
   IconChevronDown,
   IconFolder,
   IconFolderOpen,
-  IconFile,
 } from "@tabler/icons-react";
+import { getFileIcon } from "@/lib/file-icons";
 import { useAppContext } from "@/contexts/AppContext";
 import { invoke } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
@@ -129,13 +129,13 @@ export function FileTreeNode({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         className={cn(
-          "flex w-full items-center gap-1 px-2 py-0.5 text-xs rounded-sm transition-colors",
+          "flex w-full items-center gap-1 pr-2 py-px text-xs rounded-sm transition-colors",
           isSelected
             ? "bg-primary/20 text-accent-foreground"
             : "hover:bg-accent hover:text-accent-foreground",
           !entry.is_dir && !isSelected && "text-muted-foreground",
         )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        style={{ paddingLeft: `${depth * 12 + 4}px` }}
       >
         {entry.is_dir ? (
           <>
@@ -153,7 +153,7 @@ export function FileTreeNode({
         ) : (
           <>
             <span className="w-3.5 shrink-0" />
-            <IconFile size={13} className="shrink-0" />
+            {(() => { const FileIcon = getFileIcon(entry.name); return <FileIcon size={13} className="shrink-0" />; })()}
           </>
         )}
         <span className="truncate flex-1 text-left">{entry.name}</span>

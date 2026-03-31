@@ -4,9 +4,14 @@ export interface Project {
   path: string;
 }
 
+export interface RunCommand {
+  name: string;
+  command: string;
+  mode: "terminal" | "background";
+}
+
 export interface EdityConfig {
   acronym?: string;
   color?: string;
-  runCommand?: string;
-  runMode?: "terminal" | "background";
+  runCommands?: RunCommand[];
 }

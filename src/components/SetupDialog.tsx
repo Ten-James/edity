@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import {
+  IconPlus,
+  IconTrash,
+  IconGripVertical,
+} from "@tabler/icons-react";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -8,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppContext, type EdityConfig } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/AppContext";
+import type { EdityConfig, RunCommand } from "@shared/types/project";
 import { cn, PROJECT_COLORS, COLOR_KEYS } from "@/lib/utils";
 
 interface SetupDialogProps {
@@ -28,15 +34,13 @@ export function SetupDialog({
 
   const [acronym, setAcronym] = useState("");
   const [color, setColor] = useState<string>("blue");
-  const [runCommand, setRunCommand] = useState("");
-  const [runMode, setRunMode] = useState<"terminal" | "background">("terminal");
+  const [runCommands, setRunCommands] = useState<RunCommand[]>([]);
 
   useEffect(() => {
     if (open) {
       setAcronym(initialConfig?.acronym ?? "");
       setColor(initialConfig?.color ?? "blue");
-      setRunCommand(initialConfig?.runCommand ?? "");
-      setRunMode(initialConfig?.runMode ?? "terminal");
+      setRunCommands(initialConfig?.runCommands ?? []);
     }
   }, [open, initialConfig]);
 
@@ -44,16 +48,33 @@ export function SetupDialog({
     const config: EdityConfig = {};
     if (acronym.trim()) config.acronym = acronym.trim().toUpperCase();
     if (color) config.color = color;
-    if (runCommand.trim()) config.runCommand = runCommand.trim();
-    config.runMode = runMode;
+    const validCommands = runCommands.filter((c) => c.command.trim());
+    if (validCommands.length > 0) config.runCommands = validCommands;
 
     await saveEdityConfig(config, projectPath);
     onOpenChange(false);
   };
 
+  const addCommand = () => {
+    setRunCommands((prev) => [
+      ...prev,
+      { name: "", command: "", mode: "terminal" },
+    ]);
+  };
+
+  const updateCommand = (index: number, updates: Partial<RunCommand>) => {
+    setRunCommands((prev) =>
+      prev.map((cmd, i) => (i === index ? { ...cmd, ...updates } : cmd)),
+    );
+  };
+
+  const removeCommand = (index: number) => {
+    setRunCommands((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle>Project Setup</DialogTitle>
         </DialogHeader>
@@ -101,36 +122,81 @@ export function SetupDialog({
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Run Command</label>
-            <Input
-              value={runCommand}
-              onChange={(e) => setRunCommand(e.target.value)}
-              placeholder="npm run dev"
-              className="h-8"
-            />
-          </div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-muted-foreground">Run Commands</label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={addCommand}
+              >
+                <IconPlus size={14} />
+              </Button>
+            </div>
 
-          <div>
-            <label className="text-xs text-muted-foreground">Run Mode</label>
-            <div className="flex gap-1 mt-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={runMode === "terminal" ? "default" : "outline"}
-                className="flex-1 h-8 text-xs"
-                onClick={() => setRunMode("terminal")}
-              >
-                Terminal
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={runMode === "background" ? "default" : "outline"}
-                className="flex-1 h-8 text-xs"
-                onClick={() => setRunMode("background")}
-              >
-                Background
-              </Button>
+            {runCommands.length === 0 && (
+              <p className="text-xs text-muted-foreground/60 py-2 text-center">
+                No run commands configured
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2">
+              {runCommands.map((cmd, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col gap-1.5 rounded-md border border-border p-2"
+                >
+                  <div className="flex items-center gap-1">
+                    <IconGripVertical size={12} className="text-muted-foreground shrink-0" />
+                    {i === 0 && (
+                      <span className="text-[10px] font-medium text-primary px-1 rounded bg-primary/10 shrink-0">
+                        Default
+                      </span>
+                    )}
+                    <Input
+                      value={cmd.name}
+                      onChange={(e) => updateCommand(i, { name: e.target.value })}
+                      placeholder="Name (e.g. dev)"
+                      className="h-6 text-xs flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => removeCommand(i)}
+                    >
+                      <IconTrash size={12} />
+                    </Button>
+                  </div>
+                  <Input
+                    value={cmd.command}
+                    onChange={(e) => updateCommand(i, { command: e.target.value })}
+                    placeholder="Command (e.g. npm run dev)"
+                    className="h-7 text-xs"
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={cmd.mode === "terminal" ? "default" : "outline"}
+                      className="flex-1 h-6 text-[11px]"
+                      onClick={() => updateCommand(i, { mode: "terminal" })}
+                    >
+                      Terminal
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={cmd.mode === "background" ? "default" : "outline"}
+                      className="flex-1 h-6 text-[11px]"
+                      onClick={() => updateCommand(i, { mode: "background" })}
+                    >
+                      Background
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

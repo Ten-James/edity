@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { invoke } from "@/lib/ipc";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
+import { detectLanguage } from "@/lib/languages";
 import type { MonacoThemeColors } from "@shared/types/settings";
 
 // Cache loaded project types to avoid re-fetching per file
@@ -61,76 +62,28 @@ function applyProjectTypes(monacoInstance: Monaco, projectTypes: ProjectTypes) {
     allowSyntheticDefaultImports: true,
     strict: false,
     allowNonTsExtensions: true,
+    noEmit: true,
+    skipLibCheck: true,
+    resolveJsonModule: true,
+    isolatedModules: true,
     ...(projectTypes.compilerOptions ?? {}),
   };
 
-  ts.typescriptDefaults.setCompilerOptions(
-    compilerOptions as Parameters<typeof ts.typescriptDefaults.setCompilerOptions>[0],
-  );
-  ts.javascriptDefaults.setCompilerOptions(
-    compilerOptions as Parameters<typeof ts.javascriptDefaults.setCompilerOptions>[0],
-  );
-
-  // Register type definition libs
-  for (const lib of projectTypes.libs) {
-    ts.typescriptDefaults.addExtraLib(lib.content, lib.filePath);
-    ts.javascriptDefaults.addExtraLib(lib.content, lib.filePath);
+  const defaults = [ts.typescriptDefaults, ts.javascriptDefaults];
+  for (const d of defaults) {
+    d.setCompilerOptions(
+      compilerOptions as Parameters<typeof ts.typescriptDefaults.setCompilerOptions>[0],
+    );
+    d.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: false,
+    });
+    d.setEagerModelSync(true);
+    for (const lib of projectTypes.libs) {
+      d.addExtraLib(lib.content, lib.filePath);
+    }
   }
-}
-
-const EXT_TO_LANG: Record<string, string> = {
-  js: "javascript",
-  jsx: "javascript",
-  ts: "typescript",
-  tsx: "typescript",
-  json: "json",
-  html: "html",
-  htm: "html",
-  css: "css",
-  scss: "scss",
-  less: "less",
-  md: "markdown",
-  mdx: "markdown",
-  py: "python",
-  rb: "ruby",
-  rs: "rust",
-  go: "go",
-  java: "java",
-  kt: "kotlin",
-  swift: "swift",
-  c: "c",
-  cpp: "cpp",
-  h: "c",
-  hpp: "cpp",
-  cs: "csharp",
-  php: "php",
-  sh: "shell",
-  bash: "shell",
-  zsh: "shell",
-  fish: "shell",
-  yml: "yaml",
-  yaml: "yaml",
-  toml: "ini",
-  xml: "xml",
-  svg: "xml",
-  sql: "sql",
-  graphql: "graphql",
-  gql: "graphql",
-  dockerfile: "dockerfile",
-  makefile: "makefile",
-  lua: "lua",
-  r: "r",
-  dart: "dart",
-  vue: "html",
-  svelte: "html",
-};
-
-function detectLanguage(filePath: string): string {
-  const name = filePath.split("/").pop()?.toLowerCase() ?? "";
-  if (name === "dockerfile") return "dockerfile";
-  if (name === "makefile" || name === "gnumakefile") return "makefile";
-  const ext = name.split(".").pop() ?? "";
-  return EXT_TO_LANG[ext] ?? "plaintext";
 }
 
 interface MonacoEditorProps {
@@ -191,6 +144,9 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
       editorRef.current = editor;
       monacoRef.current = monacoInstance;
       savedContentRef.current = content;
+
+      // Enable lightbulb (programmatic to avoid enum type mismatch)
+      editor.updateOptions({ lightbulb: { enabled: "onCode" } } as Record<string, unknown>);
 
       // Cmd+S / Ctrl+S to save
       editor.addCommand(
@@ -259,6 +215,46 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
         scrollBeyondLastLine: false,
         renderWhitespace: "selection",
         tabSize: 2,
+        suggestOnTriggerCharacters: true,
+        parameterHints: { enabled: true, cycle: true },
+        quickSuggestions: { other: true, comments: false, strings: true },
+        formatOnPaste: true,
+        formatOnType: true,
+        autoClosingBrackets: "languageDefined",
+        autoClosingQuotes: "languageDefined",
+        autoSurround: "languageDefined",
+        bracketPairColorization: { enabled: true },
+        matchBrackets: "always",
+        linkedEditing: true,
+        codeLens: true,
+        // lightbulb enabled programmatically in onMount to avoid enum type mismatch
+        inlayHints: { enabled: "on" as const },
+        hover: { enabled: true, delay: 300 },
+        suggest: {
+          showMethods: true,
+          showFunctions: true,
+          showConstructors: true,
+          showFields: true,
+          showVariables: true,
+          showClasses: true,
+          showInterfaces: true,
+          showModules: true,
+          showProperties: true,
+          showKeywords: true,
+          showSnippets: true,
+          preview: true,
+          filterGraceful: true,
+          localityBonus: true,
+        },
+        stickyScroll: { enabled: true },
+        renderLineHighlight: "all",
+        cursorSmoothCaretAnimation: "on",
+        smoothScrolling: true,
+        mouseWheelZoom: true,
+        folding: true,
+        foldingStrategy: "auto",
+        showFoldingControls: "mouseover",
+        guides: { bracketPairs: true, indentation: true },
       }}
     />
   );
