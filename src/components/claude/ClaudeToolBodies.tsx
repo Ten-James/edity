@@ -1,4 +1,5 @@
 import type { ClaudeToolUse } from "@/types/claude";
+import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -95,6 +96,63 @@ export function McpBody({ input }: { input: Record<string, unknown> }) {
     <CodeBlock className="max-h-40">
       {typeof input.input === "string" ? input.input : JSON.stringify(input.input, null, 2)}
     </CodeBlock>
+  );
+}
+
+// --- AskUserQuestion: interactive question UI ---
+
+interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
+interface Question {
+  question: string;
+  header?: string;
+  options?: QuestionOption[];
+  multiSelect?: boolean;
+}
+
+export function AskUserQuestionBody({
+  input,
+  isRunning,
+  onAnswer,
+}: {
+  input: Record<string, unknown>;
+  isRunning: boolean;
+  onAnswer?: (answer: string) => void;
+}) {
+  const questions = (input.questions ?? []) as Question[];
+  if (questions.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {questions.map((q, i) => (
+        <div key={i} className="flex flex-col gap-1.5">
+          {q.header && (
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              {q.header}
+            </span>
+          )}
+          <p className="text-xs">{q.question}</p>
+          {q.options && isRunning && onAnswer && (
+            <div className="flex flex-wrap gap-1">
+              {q.options.map((opt) => (
+                <Button
+                  key={opt.label}
+                  variant="outline"
+                  size="xs"
+                  onClick={() => onAnswer(opt.label)}
+                  title={opt.description}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

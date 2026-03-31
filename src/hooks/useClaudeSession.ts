@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { invoke, listen } from "@/lib/ipc";
+import { invoke } from "@/lib/ipc";
 import type {
   ClaudeMessage,
   ClaudeConversation,
@@ -8,6 +8,7 @@ import type {
   ClaudePermissionRequest,
   ClaudeSessionInfo,
   ClaudeSessionMessage,
+  ClaudeUsage,
   ContentBlockToolUse,
   StreamEventPayload,
   PermissionMode,
@@ -89,6 +90,8 @@ function makeEmptyConversation(): ClaudeConversation {
     pendingPermission: null,
     totalCost: 0,
     numTurns: 0,
+    durationMs: 0,
+    usage: null,
     model: null,
     permissionMode: "default",
     tools: [],
@@ -218,16 +221,33 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
       };
     }
 
-    case "RESULT":
+    case "RESULT": {
+      const msg = action.message as unknown as Record<string, unknown>;
+      const modelUsage = msg.modelUsage as Record<string, { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number; contextWindow?: number }> | undefined;
+      let usage: ClaudeUsage | null = state.usage;
+      if (modelUsage) {
+        let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreation = 0, contextWindow = 0;
+        for (const u of Object.values(modelUsage)) {
+          inputTokens += u.inputTokens ?? 0;
+          outputTokens += u.outputTokens ?? 0;
+          cacheRead += u.cacheReadInputTokens ?? 0;
+          cacheCreation += u.cacheCreationInputTokens ?? 0;
+          if (u.contextWindow && u.contextWindow > contextWindow) contextWindow = u.contextWindow;
+        }
+        usage = { inputTokens, outputTokens, cacheReadInputTokens: cacheRead, cacheCreationInputTokens: cacheCreation, contextWindow };
+      }
       return {
         ...state,
         status: "idle",
-        totalCost: action.message.total_cost_usd ?? state.totalCost,
-        numTurns: action.message.num_turns ?? state.numTurns,
+        totalCost: (msg.total_cost_usd as number) ?? state.totalCost,
+        numTurns: (msg.num_turns as number) ?? state.numTurns,
+        durationMs: (msg.duration_ms as number) ?? state.durationMs,
+        usage,
         messages: state.messages.map((m) =>
           m.isStreaming ? { ...m, isStreaming: false } : m,
         ),
       };
+    }
 
     case "PERMISSION_REQUEST":
       return {
@@ -294,22 +314,34 @@ export function useClaudeSession(projectPath: string) {
   const [sessions, setSessions] = useState<ClaudeSessionInfo[]>([]);
 
   // Listen for messages from main process
-  useEffect(() => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
+  // Uses a ref + imperative registration so the listener is ready BEFORE sdk.query() fires
+  const unlistenRef = useRef<(() => void) | null>(null);
 
-    const cleanup = listen<ClaudeMessage>(`claude-msg-${sid}`, ({ payload }) => {
+  const setupListener = useCallback((sid: string) => {
+    // Clean up previous listener
+    unlistenRef.current?.();
+    unlistenRef.current = window.electronAPI.on(`claude-msg-${sid}`, (data: unknown) => {
+      const payload = data as ClaudeMessage;
       switch (payload.type) {
-        case "system":
+        case "system": {
+          // Only handle init subtype, ignore status/session_state_changed
+          const raw = data as Record<string, unknown>;
+          if (raw.subtype !== "init") break;
+          // slash_commands may be string[] or {name, description}[] - normalize
+          const rawCmds = raw.slash_commands as unknown[];
+          const slashCommands = Array.isArray(rawCmds)
+            ? rawCmds.map((c) => (typeof c === "string" ? c : (c as { name: string }).name))
+            : [];
           dispatch({
             type: "SYSTEM_INIT",
             sessionId: payload.session_id,
             model: payload.model,
             permissionMode: payload.permissionMode,
             tools: payload.tools,
-            slashCommands: payload.slash_commands,
+            slashCommands,
           });
           break;
+        }
         case "stream_event":
           dispatch({ type: "STREAM_EVENT", message: payload });
           break;
@@ -327,11 +359,12 @@ export function useClaudeSession(projectPath: string) {
           break;
       }
     });
+  }, []);
 
-    return () => {
-      cleanup.then((fn) => fn());
-    };
-  }, [conversation.sessionId]);
+  const teardownListener = useCallback(() => {
+    unlistenRef.current?.();
+    unlistenRef.current = null;
+  }, []);
 
   const refreshSessions = useCallback(() => {
     invoke<ClaudeSessionInfo[]>("claude_list_sessions", { projectPath })
@@ -339,15 +372,17 @@ export function useClaudeSession(projectPath: string) {
       .catch(() => {});
   }, [projectPath]);
 
-  // Load sessions on mount
+  // Load sessions on mount + cleanup listener on unmount
   useEffect(() => {
     refreshSessions();
-  }, [refreshSessions]);
+    return () => { teardownListener(); };
+  }, [refreshSessions, teardownListener]);
 
   const startSession = useCallback(
     async (prompt: string) => {
       const sessionId = crypto.randomUUID();
       sessionIdRef.current = sessionId;
+      setupListener(sessionId);
       dispatch({ type: "SET_SESSION_ID", sessionId });
       dispatch({ type: "USER_MESSAGE", text: prompt });
 
@@ -359,7 +394,7 @@ export function useClaudeSession(projectPath: string) {
         permissionMode: conversation.permissionMode,
       });
     },
-    [projectPath, conversation.model, conversation.permissionMode],
+    [projectPath, conversation.model, conversation.permissionMode, setupListener],
   );
 
   const sendMessage = useCallback(
@@ -382,6 +417,7 @@ export function useClaudeSession(projectPath: string) {
   const resumeSession = useCallback(
     async (sessionId: string) => {
       sessionIdRef.current = sessionId;
+      setupListener(sessionId);
       dispatch({ type: "RESET" });
 
       const history = await invoke<ClaudeSessionMessage[]>("claude_get_session_messages", {
@@ -391,7 +427,7 @@ export function useClaudeSession(projectPath: string) {
       const messages = convertSessionMessages(history);
       dispatch({ type: "LOAD_HISTORY", sessionId, messages });
     },
-    [projectPath],
+    [projectPath, setupListener],
   );
 
   const respondPermission = useCallback(
@@ -416,7 +452,8 @@ export function useClaudeSession(projectPath: string) {
     await invoke("claude_abort", { sessionId: sid });
     dispatch({ type: "RESET" });
     sessionIdRef.current = null;
-  }, []);
+    teardownListener();
+  }, [teardownListener]);
 
   const setModel = useCallback((model: string) => {
     dispatch({ type: "SET_MODEL", model });

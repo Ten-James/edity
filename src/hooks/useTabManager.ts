@@ -27,7 +27,7 @@ function makeTerminalTab(initialCommand?: string): TerminalTab {
 }
 
 function makePane(tabs?: Tab[]): Pane {
-  const paneTabs = tabs ?? [makeTerminalTab()];
+  const paneTabs = tabs ?? [];
   return {
     id: crypto.randomUUID(),
     tabs: paneTabs,
@@ -76,11 +76,10 @@ function removeTabFromState(
       const otherPanes = state.panes.filter((p) => p.id !== pane.id);
       return { ...state, panes: otherPanes, focusedPaneId: otherPanes[0].id };
     }
-    const newTab = makeTerminalTab();
     return updatePaneInState(state, pane.id, () => ({
       ...pane,
-      tabs: [newTab],
-      activeTabId: newTab.id,
+      tabs: [],
+      activeTabId: null,
     }));
   }
   let newActive = pane.activeTabId;

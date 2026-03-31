@@ -1,8 +1,13 @@
+export interface ClaudeSettings {
+  showChatAvatars: boolean;
+  autoExpandTools: string[];
+}
+
 export interface GlobalSettings {
   lightTheme: string;
   darkTheme: string;
   defaultProjectId: string | null;
-  autoExpandTools: string[];
+  claude: ClaudeSettings;
 }
 
 export interface ThemeCssVars {
@@ -87,5 +92,8 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   lightTheme: "edity-light",
   darkTheme: "edity-dark",
   defaultProjectId: null,
-  autoExpandTools: ["Edit", "Bash"],
+  claude: {
+    showChatAvatars: true,
+    autoExpandTools: ["Edit", "Bash"],
+  },
 };

@@ -130,6 +130,14 @@ export interface ClaudeUIMessage {
   error?: string;
 }
 
+export interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  contextWindow: number;
+}
+
 export interface ClaudeConversation {
   sessionId: string | null;
   messages: ClaudeUIMessage[];
@@ -137,6 +145,8 @@ export interface ClaudeConversation {
   pendingPermission: ClaudePermissionRequest | null;
   totalCost: number;
   numTurns: number;
+  durationMs: number;
+  usage: ClaudeUsage | null;
   model: string | null;
   permissionMode: PermissionMode;
   tools: string[];

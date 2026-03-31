@@ -1,8 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { IconSend2 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+
+const BUILTIN_COMMANDS = [
+  "bug", "clear", "compact", "config", "context", "cost", "diff",
+  "doctor", "fast", "help", "init", "login", "logout", "memory",
+  "model", "permissions", "pr-comments", "review", "search",
+  "status", "terminal-setup", "vim",
+];
 
 interface ClaudeInputBarProps {
   onSend: (text: string) => void;
@@ -24,7 +30,8 @@ export function ClaudeInputBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandsRef = useRef<HTMLDivElement>(null);
 
-  const filteredCommands = slashCommands.filter((cmd) =>
+  const allCommands = slashCommands.length > 0 ? slashCommands : BUILTIN_COMMANDS;
+  const filteredCommands = allCommands.filter((cmd) =>
     cmd.toLowerCase().includes(commandFilter.toLowerCase()),
   );
 
@@ -119,27 +126,16 @@ export function ClaudeInputBar({
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        <Textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={placeholder}
-          rows={1}
-          className="flex-1 resize-none max-h-[200px] text-sm"
-        />
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleSubmit}
-          disabled={disabled || !value.trim()}
-          className="h-9 w-9 shrink-0"
-        >
-          <IconSend2 size={16} />
-        </Button>
-      </div>
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleInput}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder={placeholder}
+        rows={1}
+        className="resize-none max-h-[200px] text-sm"
+      />
     </div>
   );
 }

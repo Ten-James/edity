@@ -34,6 +34,8 @@ const MODELS = [
   { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
   { value: "claude-opus-4-6", label: "Opus 4.6" },
   { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+  { value: "claude-sonnet-4-6[1m]", label: "Sonnet 4.6 (1M)" },
+  { value: "claude-opus-4-6[1m]", label: "Opus 4.6 (1M)" },
 ];
 
 const MODES: { value: PermissionMode; label: string }[] = [
@@ -73,13 +75,13 @@ export function ClaudeSettingsBar({
   onRefreshSessions,
 }: ClaudeSettingsBarProps) {
   const { settings, updateSettings } = useTheme();
-  const autoExpandSet = new Set(settings.autoExpandTools);
+  const autoExpandSet = new Set(settings.claude.autoExpandTools);
 
   const toggleTool = (tool: string) => {
     const next = new Set(autoExpandSet);
     if (next.has(tool)) next.delete(tool);
     else next.add(tool);
-    updateSettings({ autoExpandTools: [...next] });
+    updateSettings({ claude: { ...settings.claude, autoExpandTools: [...next] } });
   };
 
   return (

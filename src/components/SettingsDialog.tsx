@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -15,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
 import { LIGHT_THEMES, DARK_THEMES } from "@/lib/themes";
@@ -70,16 +70,23 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [lightTheme, setLightTheme] = useState(settings.lightTheme);
   const [darkTheme, setDarkTheme] = useState(settings.darkTheme);
   const [defaultProjectId, setDefaultProjectId] = useState(settings.defaultProjectId);
+  const [showChatAvatars, setShowChatAvatars] = useState(settings.claude.showChatAvatars);
   useEffect(() => {
     if (open) {
       setLightTheme(settings.lightTheme);
       setDarkTheme(settings.darkTheme);
       setDefaultProjectId(settings.defaultProjectId);
+      setShowChatAvatars(settings.claude.showChatAvatars);
     }
   }, [open, settings]);
 
   const handleSave = async () => {
-    await updateSettings({ lightTheme, darkTheme, defaultProjectId });
+    await updateSettings({
+      lightTheme,
+      darkTheme,
+      defaultProjectId,
+      claude: { ...settings.claude, showChatAvatars },
+    });
     onOpenChange(false);
   };
 
@@ -90,7 +97,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
           <div className="flex flex-col gap-5 py-2">
           {/* Light theme */}
           <div>
@@ -122,6 +129,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </div>
           </div>
 
+          {/* Claude UI */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Claude</label>
+            <div className="flex items-center gap-2 mt-1.5">
+              <Checkbox
+                id="show-avatars"
+                checked={showChatAvatars}
+                onCheckedChange={(v) => setShowChatAvatars(v === true)}
+              />
+              <label htmlFor="show-avatars" className="text-xs cursor-pointer">
+                Show avatars in chat
+              </label>
+            </div>
+          </div>
+
           {/* Default project */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Default Project</label>
@@ -143,7 +165,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </Select>
           </div>
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="shrink-0">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

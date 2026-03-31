@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { useClaudeSession } from "@/hooks/useClaudeSession";
 import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
@@ -7,9 +7,8 @@ import { ClaudeInputBar } from "./ClaudeInputBar";
 import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
 import { ClaudeTaskPopover } from "./ClaudeTaskPopover";
 import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { IconRobot } from "@tabler/icons-react";
+import { IconRobot, IconLoader2 } from "@tabler/icons-react";
 
 interface ClaudeViewProps {
   isActive: boolean;
@@ -32,15 +31,38 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
   } = useClaudeSession(projectPath);
 
   const hasSession = conversation.sessionId !== null;
+  const isBusy =
+    conversation.status === "streaming" ||
+    conversation.status === "waiting_permission";
   const isWaitingPermission = conversation.status === "waiting_permission";
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Elapsed time tracking
+  const [streamStart, setStreamStart] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    if (isBusy && !streamStart) {
+      setStreamStart(Date.now());
+    } else if (!isBusy && streamStart) {
+      setStreamStart(null);
+    }
+  }, [isBusy, streamStart]);
+
+  useEffect(() => {
+    if (!streamStart) { setElapsed(""); return; }
+    const tick = () => {
+      const s = Math.floor((Date.now() - streamStart) / 1000);
+      setElapsed(s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [streamStart]);
+
   useEffect(() => {
     if (conversation.status === "streaming" && scrollRef.current) {
-      const viewport = scrollRef.current.querySelector("[data-slot='scroll-area-viewport']") as HTMLElement | null;
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [conversation.messages, conversation.status]);
 
@@ -70,19 +92,27 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
         onAbort={abort}
       />
 
-      <div ref={scrollRef} className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          {!hasSession && conversation.messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <IconRobot size={48} strokeWidth={1.5} />
-                <p className="text-sm">Ask Claude anything about this project</p>
-              </div>
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        {!hasSession && conversation.messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <IconRobot size={48} strokeWidth={1.5} />
+              <p className="text-sm">Ask Claude anything about this project</p>
             </div>
-          ) : (
-            <ClaudeMessageList messages={conversation.messages} />
-          )}
-        </ScrollArea>
+          </div>
+        ) : (
+          <>
+            <ClaudeMessageList messages={conversation.messages} onSendMessage={handleSend} />
+            {isBusy && (
+              <div className="flex items-center gap-2 px-4 pb-4 text-xs text-muted-foreground">
+                <IconLoader2 size={12} className="animate-spin" />
+                <span>{conversation.status === "waiting_permission" ? "Waiting for approval" : "Working"}</span>
+                {elapsed && <span>{elapsed}</span>}
+                {conversation.numTurns > 0 && <span>{conversation.numTurns}t</span>}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {isWaitingPermission && conversation.pendingPermission && (

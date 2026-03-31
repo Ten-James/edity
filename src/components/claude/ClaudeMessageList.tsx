@@ -4,6 +4,7 @@ import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
 
 interface ClaudeMessageListProps {
   messages: ClaudeUIMessage[];
+  onSendMessage?: (text: string) => void;
 }
 
 function isMessageEmpty(msg: ClaudeUIMessage): boolean {
@@ -17,13 +18,13 @@ function isMessageEmpty(msg: ClaudeUIMessage): boolean {
   );
 }
 
-export function ClaudeMessageList({ messages }: ClaudeMessageListProps) {
+export function ClaudeMessageList({ messages, onSendMessage }: ClaudeMessageListProps) {
   const visible = messages.filter((m) => !isMessageEmpty(m));
 
   return (
     <div className="flex flex-col gap-2 p-4">
       {visible.map((message) => (
-        <ClaudeMessageBubble key={message.id} message={message} />
+        <ClaudeMessageBubble key={message.id} message={message} onSendMessage={onSendMessage} />
       ))}
     </div>
   );

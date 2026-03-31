@@ -3,7 +3,7 @@ import type { ClaudeToolUse } from "@/types/claude";
 import { Button } from "@/components/ui/button";
 import { getToolSummary } from "./claude-utils";
 import { getToolIcon, getStatusIcon, INLINE_TOOLS } from "./claude-tool-config";
-import { EditDiff, BashCommand, AgentBody, SkillBody, McpBody, FormattedJson } from "./ClaudeToolBodies";
+import { EditDiff, BashCommand, AgentBody, SkillBody, McpBody, AskUserQuestionBody, FormattedJson } from "./ClaudeToolBodies";
 
 // Re-export for consumers
 export { TASK_TOOL_NAMES, INLINE_TOOLS } from "./claude-tool-config";
@@ -11,9 +11,10 @@ export { TASK_TOOL_NAMES, INLINE_TOOLS } from "./claude-tool-config";
 interface ClaudeToolCallProps {
   toolUse: ClaudeToolUse;
   autoExpand?: boolean;
+  onAnswer?: (answer: string) => void;
 }
 
-function getToolBody(toolUse: ClaudeToolUse) {
+function getToolBody(toolUse: ClaudeToolUse, onAnswer?: (answer: string) => void) {
   const { name, input, inputJson } = toolUse;
   const hasAgent = toolUse.subContent || (toolUse.subToolUses && toolUse.subToolUses.length > 0);
 
@@ -28,6 +29,8 @@ function getToolBody(toolUse: ClaudeToolUse) {
       return <SkillBody input={input} />;
     case "Mcp":
       return <McpBody input={input} />;
+    case "AskUserQuestion":
+      return <AskUserQuestionBody input={input} isRunning={toolUse.status === "running"} onAnswer={onAnswer} />;
     default: {
       const hasInput = Object.keys(input).length > 0 || inputJson;
       return hasInput ? <FormattedJson input={input} inputJson={inputJson} /> : null;
@@ -35,8 +38,9 @@ function getToolBody(toolUse: ClaudeToolUse) {
   }
 }
 
-export function ClaudeToolCall({ toolUse, autoExpand = false }: ClaudeToolCallProps) {
-  const [open, setOpen] = useState(autoExpand);
+export function ClaudeToolCall({ toolUse, autoExpand = false, onAnswer }: ClaudeToolCallProps) {
+  const isQuestion = toolUse.name === "AskUserQuestion";
+  const [open, setOpen] = useState(autoExpand || isQuestion);
   const summary = getToolSummary(toolUse.name, toolUse.input, toolUse.inputJson) ?? toolUse.name;
   const isInline = INLINE_TOOLS.has(toolUse.name);
 
@@ -51,7 +55,7 @@ export function ClaudeToolCall({ toolUse, autoExpand = false }: ClaudeToolCallPr
     );
   }
 
-  const body = open ? getToolBody(toolUse) : null;
+  const body = open ? getToolBody(toolUse, onAnswer) : null;
 
   return (
     <div className="border border-border bg-muted/20 text-xs">

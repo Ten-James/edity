@@ -139,16 +139,13 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
       abortController,
       cwd: projectPath,
       pathToClaudeCodeExecutable: getSdkPath("cli.js"),
-      allowedTools: [
-        "Read", "Write", "Edit", "Bash", "Glob", "Grep",
-        "WebSearch", "WebFetch", "Agent", "AskUserQuestion",
-      ],
       permissionMode: permissionMode || "default",
+      betas: ["context-1m-2025-08-07"],
       includePartialMessages: true,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       canUseTool: (toolName: string, input: unknown, options: any) => {
         return new Promise((resolve) => {
-          const toolUseID = options?.tool_use_id || crypto.randomUUID();
+          const toolUseID = options?.toolUseID || crypto.randomUUID();
           session.permissionCallbacks.set(toolUseID, { resolve });
           sendToRenderer(session, {
             type: "permission_request",

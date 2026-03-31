@@ -1,5 +1,5 @@
 import type { ClaudePermissionRequest } from "@/types/claude";
-import { getToolSummary } from "./claude-utils";
+import { getToolSummary, getFilePath } from "./claude-utils";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { IconShieldCheck, IconShieldX } from "@tabler/icons-react";
@@ -16,7 +16,8 @@ export function ClaudePermissionPrompt({
   const description =
     request.description || request.title || `${request.toolName} wants to execute`;
 
-  const inputSummary = getInputSummary(request);
+  const filePath = getFilePath(request.input);
+  const detail = getPermissionDetail(request);
 
   return (
     <div className="border-t border-border bg-amber-500/5 p-4">
@@ -31,11 +32,16 @@ export function ClaudePermissionPrompt({
             <p className="text-xs text-muted-foreground mt-0.5">
               {description}
             </p>
+            {filePath && (
+              <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                {filePath}
+              </p>
+            )}
           </div>
         </div>
 
-        {inputSummary && (
-          <CodeBlock className="max-h-32">{inputSummary}</CodeBlock>
+        {detail && (
+          <CodeBlock className="max-h-64">{detail}</CodeBlock>
         )}
 
         <div className="flex items-center gap-2">
@@ -63,13 +69,31 @@ export function ClaudePermissionPrompt({
   );
 }
 
-function getInputSummary(request: ClaudePermissionRequest): string | null {
-  const summary = getToolSummary(request.toolName, request.input);
-  if (summary) {
-    return request.toolName === "Bash" ? `$ ${summary}` : summary;
+function getPermissionDetail(request: ClaudePermissionRequest): string | null {
+  const { toolName, input } = request;
+
+  switch (toolName) {
+    case "Bash":
+      return input.command ? String(input.command) : null;
+    case "Write":
+      return input.content ? String(input.content) : null;
+    case "Edit":
+      if (input.old_string != null && input.new_string != null) {
+        const lines: string[] = [];
+        for (const line of String(input.old_string).split("\n")) {
+          lines.push(`- ${line}`);
+        }
+        for (const line of String(input.new_string).split("\n")) {
+          lines.push(`+ ${line}`);
+        }
+        return lines.join("\n");
+      }
+      return null;
+    default: {
+      const summary = getToolSummary(toolName, input);
+      if (summary) return summary;
+      if (Object.keys(input).length > 0) return JSON.stringify(input, null, 2);
+      return null;
+    }
   }
-  if (Object.keys(request.input).length > 0) {
-    return JSON.stringify(request.input, null, 2);
-  }
-  return null;
 }
