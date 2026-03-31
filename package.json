@@ -1,12 +1,13 @@
 {
   "name": "edity",
   "version": "1.0.0",
-  "main": "electron/main.js",
+  "main": "electron/dist/electron/src/main.js",
   "scripts": {
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:renderer": "vite",
-    "dev:electron": "wait-on http://localhost:1420 && VITE_DEV_SERVER_URL=http://localhost:1420 electron .",
-    "build": "tsc && vite build",
+    "dev:electron": "tsc -p electron/tsconfig.json && wait-on http://localhost:1420 && VITE_DEV_SERVER_URL=http://localhost:1420 electron .",
+    "build": "tsc -p electron/tsconfig.json && tsc && vite build",
+    "build:electron": "tsc -p electron/tsconfig.json",
     "package": "npm run build && electron-builder",
     "rebuild": "electron-rebuild"
   },
@@ -22,7 +23,10 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*",
+      "electron/dist/**/*",
+      "electron/preload.js",
+      "electron/claude-hook.sh",
+      "shared/**/*",
       "icon.png"
     ],
     "mac": {
@@ -42,6 +46,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -54,6 +59,7 @@
     "wait-on": "^8.0.3"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.88",
     "@fontsource-variable/inter": "^5.2.8",
     "@monaco-editor/react": "^4.7.0",
     "@tabler/icons-react": "^3.40.0",
@@ -66,7 +72,9 @@
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.7.5",
+    "remark-gfm": "^4.0.1",
     "shadcn": "^4.1.0",
     "shiki": "^4.0.2",
     "sonner": "^2.0.7",

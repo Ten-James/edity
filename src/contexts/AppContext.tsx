@@ -22,22 +22,13 @@ import type {
   FileTab,
   BrowserTab,
   GitTab,
+  ClaudeTab,
 } from "@/types/tab";
 
-export type { Tab, AllTab, Pane, SplitDirection, ProjectPaneState, TerminalTab, FileTab, BrowserTab, GitTab };
+export type { Tab, AllTab, Pane, SplitDirection, ProjectPaneState, TerminalTab, FileTab, BrowserTab, GitTab, ClaudeTab };
 
-export interface Project {
-  id: string;
-  name: string;
-  path: string;
-}
-
-export interface EdityConfig {
-  acronym?: string;
-  color?: string;
-  runCommand?: string;
-  runMode?: "terminal" | "background";
-}
+import type { Project, EdityConfig } from "@shared/types/project";
+export type { Project, EdityConfig };
 
 interface AppContextValue {
   projects: Project[];
@@ -45,6 +36,7 @@ interface AppContextValue {
   setActiveProject: (p: Project) => void;
   addProject: () => Promise<void>;
   removeProject: (id: string) => Promise<void>;
+  reorderProjects: (fromIndex: number, toIndex: number) => void;
 
   tabs: Tab[];
   activeTabId: string | null;
@@ -61,6 +53,7 @@ interface AppContextValue {
   createBrowserTab: (initialUrl?: string) => string;
   updateBrowserUrl: (tabId: string, url: string) => void;
   createGitTab: () => void;
+  createClaudeTab: () => void;
 
   projectPanes: Map<string, ProjectPaneState>;
   panes: Pane[];
@@ -178,6 +171,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
     },
     [tabManager.removeProjectPanes],
+  );
+
+  const reorderProjects = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setProjects((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        // Persist new order
+        invoke("reorder_projects", { ids: next.map((p) => p.id) }).catch(() => {});
+        return next;
+      });
+    },
+    [],
   );
 
   const saveEdityConfig = useCallback(
@@ -413,6 +420,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActiveProject,
       addProject,
       removeProject,
+      reorderProjects,
 
       tabs: tabManager.tabs,
       activeTabId: tabManager.activeTabId,
@@ -427,6 +435,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createBrowserTab: tabManager.createBrowserTab,
       updateBrowserUrl: tabManager.updateBrowserUrl,
       createGitTab: tabManager.createGitTab,
+      createClaudeTab: tabManager.createClaudeTab,
 
       projectPanes: tabManager.projectPanes,
       panes: tabManager.panes,
@@ -458,6 +467,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActiveProject,
       addProject,
       removeProject,
+      reorderProjects,
       tabManager.tabs,
       tabManager.activeTabId,
       tabManager.allTabs,
@@ -471,6 +481,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tabManager.createBrowserTab,
       tabManager.updateBrowserUrl,
       tabManager.createGitTab,
+      tabManager.createClaudeTab,
       tabManager.projectPanes,
       tabManager.panes,
       tabManager.focusedPaneId,

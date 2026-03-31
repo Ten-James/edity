@@ -28,6 +28,7 @@ export function Sidebar() {
     setActiveProject,
     addProject,
     removeProject,
+    reorderProjects,
     projectConfigs,
     projectClaudeStatus,
   } = useAppContext();
@@ -36,6 +37,8 @@ export function Sidebar() {
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [contextMenu, setContextMenu] = useState<{ project: Project; x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -50,10 +53,10 @@ export function Sidebar() {
 
   return (
     <>
-      <div className="flex h-full w-12 flex-col items-center border-r border-border/50 bg-sidebar pt-9 pb-2 gap-1.5">
+      <div className="flex h-full w-12 flex-col items-center bg-sidebar pt-9 pb-2 gap-1.5">
         <ScrollArea className="flex-1 w-full">
           <div className="flex flex-col items-center gap-1.5 px-1.5">
-            {projects.map((project) => {
+            {projects.map((project, idx) => {
               const config = projectConfigs.get(project.id);
               const label = config?.acronym || getInitials(project.name);
               const isActive = activeProject?.id === project.id;
@@ -63,7 +66,26 @@ export function Sidebar() {
               return (
                 <Tooltip key={project.id}>
                   <TooltipTrigger asChild>
-                    <div className="flex flex-col items-center gap-1">
+                    <div
+                      className={cn(
+                        "flex flex-col items-center gap-1",
+                        dragOverIdx === idx && dragIdx !== idx && "border-t-2 border-primary",
+                      )}
+                      draggable
+                      onDragStart={() => setDragIdx(idx)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverIdx(idx);
+                      }}
+                      onDragEnd={() => {
+                        if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+                          reorderProjects(dragIdx, dragOverIdx);
+                        }
+                        setDragIdx(null);
+                        setDragOverIdx(null);
+                      }}
+                      onDragLeave={() => setDragOverIdx(null)}
+                    >
                       <button
                         onClick={() => setActiveProject(project)}
                         onContextMenu={(e) => {
@@ -75,6 +97,7 @@ export function Sidebar() {
                           isActive
                             ? "bg-accent text-foreground"
                             : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          dragIdx === idx && "opacity-50",
                         )}
                       >
                         {label}

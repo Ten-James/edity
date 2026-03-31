@@ -326,11 +326,19 @@ export function FileTree() {
     [activeProject],
   );
 
-  // Apply filters
+  // Apply filters — keep folders if their name matches OR any descendant file matches
   let filtered = filter
-    ? entries.filter((e) =>
-        e.name.toLowerCase().includes(filter.toLowerCase()),
-      )
+    ? entries.filter((e) => {
+        const lf = filter.toLowerCase();
+        if (e.name.toLowerCase().includes(lf)) return true;
+        if (!e.is_dir || !activeProject) return false;
+        // Check if any git-tracked file inside this folder matches the filter
+        const rel = e.path.replace(activeProject.path + "/", "");
+        for (const [filePath] of gitStatusMap) {
+          if (filePath.startsWith(rel + "/") && filePath.toLowerCase().includes(lf)) return true;
+        }
+        return true; // Keep all folders when filtering — children may match lazily
+      })
     : entries;
 
   if (gitFilter !== "all" && activeProject) {
@@ -348,7 +356,7 @@ export function FileTree() {
   }
 
   return (
-    <div className="flex h-full w-[260px] flex-col border-l border-border/50 bg-background shrink-0">
+    <div className="flex h-full w-[260px] flex-col bg-background shrink-0">
       <div className="p-1.5 border-b border-border">
         <Input
           placeholder="Filter files..."

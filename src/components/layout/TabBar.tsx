@@ -3,6 +3,7 @@ import {
   IconFile,
   IconWorld,
   IconGitBranch,
+  IconRobot,
   IconX,
   IconPlus,
   IconLayoutColumns,
@@ -22,11 +23,11 @@ interface TabBarProps {
 export function TabBar({ paneId }: TabBarProps) {
   const {
     panes,
-    focusedPaneId,
     setActiveTab,
     createTab,
     createBrowserTab,
     createGitTab,
+    createClaudeTab,
     closeTab,
     pinTab,
     dirtyTabs,
@@ -96,6 +97,8 @@ export function TabBar({ paneId }: TabBarProps) {
         return <IconWorld size={14} />;
       case "git":
         return <IconGitBranch size={14} />;
+      case "claude":
+        return <IconRobot size={14} />;
     }
   }
 
@@ -104,8 +107,7 @@ export function TabBar({ paneId }: TabBarProps) {
   return (
     <div
       className={cn(
-        "flex h-8 items-center border-b border-border bg-background shrink-0",
-        paneId === focusedPaneId && panes.length > 1 && "border-t-2 border-t-primary/40",
+        "flex h-8 items-center bg-background shrink-0",
       )}
     >
       <div className="flex flex-1 items-center overflow-x-auto">
@@ -192,6 +194,16 @@ export function TabBar({ paneId }: TabBarProps) {
             >
               <IconGitBranch size={14} />
               Git
+            </button>
+            <button
+              onClick={() => {
+                createClaudeTab();
+                setDropdownOpen(false);
+              }}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
+            >
+              <IconRobot size={14} />
+              Claude
             </button>
           </div>
         )}

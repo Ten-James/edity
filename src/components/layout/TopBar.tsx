@@ -50,7 +50,7 @@ export function TopBar() {
     <>
       <div
         onMouseDown={onMouseDown}
-        className="flex h-8 items-center border-b border-border bg-background px-3 gap-2 shrink-0"
+        className="flex h-8 items-center bg-background px-3 gap-2 shrink-0"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
         {isDev && (

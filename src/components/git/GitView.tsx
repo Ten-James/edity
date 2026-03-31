@@ -92,7 +92,7 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
   return (
     <div className="absolute inset-0 flex flex-col">
       {/* Header: mode tabs + remote actions */}
-      <div className="flex items-center border-b border-border px-2 h-9 shrink-0">
+      <div className="flex items-center px-2 h-9 shrink-0">
         <div className="flex gap-0.5">
           <Button
             variant={mode === "changes" ? "secondary" : "ghost"}

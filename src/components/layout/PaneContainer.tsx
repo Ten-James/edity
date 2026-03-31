@@ -3,8 +3,8 @@ import { TerminalView } from "@/components/Terminal";
 import { FileViewer } from "@/components/FileViewer";
 import { BrowserView } from "@/components/BrowserView";
 import { GitView } from "@/components/git/GitView";
+import { ClaudeView } from "@/components/claude/ClaudeView";
 import { TabBar } from "./TabBar";
-import { cn } from "@/lib/utils";
 import type { AllTab } from "@/types/tab";
 
 interface PaneContainerProps {
@@ -22,14 +22,11 @@ export function PaneContainer({
   activeTabId,
   showTabBar,
 }: PaneContainerProps) {
-  const { panes, setFocusedPane } = useAppContext();
+  const { setFocusedPane } = useAppContext();
 
   return (
     <div
-      className={cn(
-        "flex h-full flex-col overflow-hidden",
-        isFocused && panes.length > 1 && "ring-1 ring-inset ring-accent",
-      )}
+      className="flex h-full flex-col overflow-hidden"
       onPointerDown={() => {
         if (!isFocused) setFocusedPane(paneId);
       }}
@@ -72,6 +69,14 @@ export function PaneContainer({
                 <GitView
                   key={tab.id}
                   tabId={tab.id}
+                  isActive={isActive}
+                  projectPath={tab.projectPath}
+                />
+              );
+            case "claude":
+              return (
+                <ClaudeView
+                  key={tab.id}
                   isActive={isActive}
                   projectPath={tab.projectPath}
                 />

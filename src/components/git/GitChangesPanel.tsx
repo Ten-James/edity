@@ -1,4 +1,4 @@
-import { IconArrowBackUp } from "@tabler/icons-react";
+import { IconArrowBackUp, IconCircleFilled, IconCircle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -48,14 +48,12 @@ export function GitChangesPanel({
   onUnstage,
   onDiscard,
 }: GitChangesPanelProps) {
-  // Build unified file list
   const files: ChangeFile[] = [];
 
   for (const file of staged) {
     files.push({ file, isStaged: true, statusCode: file.indexStatus });
   }
   for (const file of unstaged) {
-    // Skip if already in staged (file can be both partially staged and modified)
     if (!staged.some((s) => s.path === file.path)) {
       files.push({ file, isStaged: false, statusCode: file.workTreeStatus });
     }
@@ -65,7 +63,6 @@ export function GitChangesPanel({
   }
 
   const allStaged = files.length > 0 && files.every((f) => f.isStaged);
-  const someStaged = files.some((f) => f.isStaged);
 
   const handleToggleAll = () => {
     if (allStaged) {
@@ -97,17 +94,19 @@ export function GitChangesPanel({
   return (
     <ScrollArea className="flex-1 min-h-0">
       <div className="py-1">
-        {/* Header with select-all checkbox */}
-        <div className="flex items-center gap-2 px-2 py-1 border-b border-border mb-1">
-          <input
-            type="checkbox"
-            checked={allStaged}
-            ref={(el) => {
-              if (el) el.indeterminate = someStaged && !allStaged;
-            }}
-            onChange={handleToggleAll}
-            className="accent-primary h-3.5 w-3.5 cursor-pointer"
-          />
+        {/* Header with stage-all toggle */}
+        <div className="flex items-center gap-2 px-2 py-1 mb-1">
+          <button
+            onClick={handleToggleAll}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title={allStaged ? "Unstage all" : "Stage all"}
+          >
+            {allStaged ? (
+              <IconCircleFilled size={14} className="text-primary" />
+            ) : (
+              <IconCircle size={14} />
+            )}
+          </button>
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Files{" "}
             <span className="text-[10px] font-normal">({files.length})</span>
@@ -130,16 +129,20 @@ export function GitChangesPanel({
                 isSelected && "bg-accent",
               )}
             >
-              <input
-                type="checkbox"
-                checked={f.isStaged}
-                onChange={(e) => {
+              <button
+                onClick={(e) => {
                   e.stopPropagation();
                   handleToggle(f);
                 }}
-                onClick={(e) => e.stopPropagation()}
-                className="accent-primary h-3.5 w-3.5 cursor-pointer shrink-0"
-              />
+                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                title={f.isStaged ? "Unstage" : "Stage"}
+              >
+                {f.isStaged ? (
+                  <IconCircleFilled size={12} className="text-primary" />
+                ) : (
+                  <IconCircle size={12} />
+                )}
+              </button>
               <span
                 className={cn(
                   "font-mono w-3 shrink-0",

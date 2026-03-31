@@ -116,6 +116,33 @@ export function useGitState(projectPath: string) {
     async (path: string, staged: boolean) => {
       const cwd = cwdRef.current;
       setState((s) => ({ ...s, selectedFile: { path, staged } }));
+
+      // Check if file is untracked/new — show full content instead of empty diff
+      const isUntracked = state.untracked.some((f) => f.path === path);
+      const isNewStaged = staged && state.staged.some((f) => f.path === path && f.indexStatus === "A");
+
+      if (isUntracked || isNewStaged) {
+        try {
+          const fullPath = `${cwd}/${path}`;
+          const fileResult = await invoke<{ type: string; content?: string }>(
+            "read_file_content",
+            { path: fullPath },
+          );
+          if (fileResult.type === "Text" && fileResult.content) {
+            // Construct a synthetic diff showing the entire file as additions
+            const lines = fileResult.content.split("\n");
+            const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n`;
+            const body = lines.map((l) => `+${l}`).join("\n");
+            setState((s) => ({ ...s, selectedDiff: header + body }));
+          } else {
+            setState((s) => ({ ...s, selectedDiff: null }));
+          }
+        } catch {
+          setState((s) => ({ ...s, selectedDiff: null }));
+        }
+        return;
+      }
+
       try {
         const result = await invoke<GitResult & { diff?: string }>(
           "git_file_diff",
@@ -129,7 +156,7 @@ export function useGitState(projectPath: string) {
         setState((s) => ({ ...s, selectedDiff: null }));
       }
     },
-    [],
+    [state.untracked, state.staged],
   );
 
   const gitFileAction = useCallback(

@@ -90,9 +90,11 @@ export function FileTreeNode({
   }, [refreshSignal, expanded, entry.is_dir, entry.path, showIgnored]);
 
   const filtered = filter
-    ? children.filter((c) =>
-        c.name.toLowerCase().includes(filter.toLowerCase()),
-      )
+    ? children.filter((c) => {
+        if (c.name.toLowerCase().includes(filter.toLowerCase())) return true;
+        // Keep folders — their children may match
+        return c.is_dir;
+      })
     : children;
 
   const gitStatus = !entry.is_dir

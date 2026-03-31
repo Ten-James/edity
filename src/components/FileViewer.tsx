@@ -14,7 +14,7 @@ export function FileViewer({ tabId, filePath, isActive }: FileViewerProps) {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col bg-background"
+      className="absolute inset-0 flex flex-col bg-background overflow-auto"
       style={{ display: isActive ? "flex" : "none" }}
     >
       {loading && (

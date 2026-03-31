@@ -7,6 +7,7 @@ import type {
   FileTab,
   BrowserTab,
   GitTab,
+  ClaudeTab,
   AllTab,
   Pane,
   SplitDirection,
@@ -119,6 +120,31 @@ function updateTabAcrossProjects(
     return next;
   }
   return prev;
+}
+
+/** Activate existing singleton tab or create a new one. */
+function openOrCreateSingletonTab(
+  prev: Map<string, ProjectPaneState>,
+  projectId: string,
+  predicate: (tab: Tab) => boolean,
+  factory: () => Tab,
+): Map<string, ProjectPaneState> {
+  const state = prev.get(projectId) ?? makeDefaultState();
+  for (const pane of state.panes) {
+    const existing = pane.tabs.find(predicate);
+    if (existing) {
+      const next = new Map(prev);
+      next.set(projectId, {
+        ...updatePaneInState(state, pane.id, (p) => ({
+          ...p,
+          activeTabId: existing.id,
+        })),
+        focusedPaneId: pane.id,
+      });
+      return next;
+    }
+  }
+  return addTabToFocusedPane(prev, projectId, factory());
 }
 
 /** Add a tab to the focused pane of a project. */
@@ -405,33 +431,27 @@ export function useTabManager(
   const createGitTab = useCallback(() => {
     const proj = activeProjectRef.current;
     if (!proj) return;
+    setProjectPanes((prev) =>
+      openOrCreateSingletonTab(
+        prev,
+        proj.id,
+        (t) => t.type === "git",
+        (): GitTab => ({ id: crypto.randomUUID(), title: "Git", type: "git" }),
+      ),
+    );
+  }, []);
 
-    setProjectPanes((prev) => {
-      const state = prev.get(proj.id) ?? makeDefaultState();
-
-      // Search ALL panes for existing git tab
-      for (const pane of state.panes) {
-        const existing = pane.tabs.find((t) => t.type === "git");
-        if (existing) {
-          const next = new Map(prev);
-          next.set(proj.id, {
-            ...updatePaneInState(state, pane.id, (p) => ({
-              ...p,
-              activeTabId: existing.id,
-            })),
-            focusedPaneId: pane.id,
-          });
-          return next;
-        }
-      }
-
-      const tab: GitTab = {
-        id: crypto.randomUUID(),
-        title: "Git",
-        type: "git",
-      };
-      return addTabToFocusedPane(prev, proj.id, tab);
-    });
+  const createClaudeTab = useCallback(() => {
+    const proj = activeProjectRef.current;
+    if (!proj) return;
+    setProjectPanes((prev) =>
+      openOrCreateSingletonTab(
+        prev,
+        proj.id,
+        (t) => t.type === "claude",
+        (): ClaudeTab => ({ id: crypto.randomUUID(), title: "Claude", type: "claude" }),
+      ),
+    );
   }, []);
 
   const updateBrowserUrl = useCallback((tabId: string, url: string) => {
@@ -627,6 +647,7 @@ export function useTabManager(
     pinTab,
     createBrowserTab,
     createGitTab,
+    createClaudeTab,
     updateTabTitle,
     updateBrowserUrl,
     setTabDirty,

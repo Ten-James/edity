@@ -23,7 +23,11 @@ export interface GitTab extends BaseTab {
   type: "git";
 }
 
-export type Tab = TerminalTab | FileTab | BrowserTab | GitTab;
+export interface ClaudeTab extends BaseTab {
+  type: "claude";
+}
+
+export type Tab = TerminalTab | FileTab | BrowserTab | GitTab | ClaudeTab;
 
 export type SplitDirection = "horizontal" | "vertical";
 
