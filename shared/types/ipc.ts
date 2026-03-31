@@ -97,6 +97,13 @@ export interface ClaudeSessionInfo {
   gitBranch?: string;
 }
 
+export interface ClaudeSessionMessage {
+  type: "user" | "assistant" | "system";
+  uuid: string;
+  session_id: string;
+  message: unknown;
+}
+
 export interface ClaudeStatusResult {
   isClaudeCode: true;
   oscTitle: string | null;
@@ -128,6 +135,7 @@ export interface IpcHandlerMap {
   claude_abort: { args: { sessionId: string }; ret: { ok: boolean } };
   claude_interrupt: { args: { sessionId: string }; ret: { ok: boolean } };
   claude_list_sessions: { args: { projectPath: string }; ret: ClaudeSessionInfo[] };
+  claude_get_session_messages: { args: { sessionId: string; projectPath: string }; ret: ClaudeSessionMessage[] };
 
   // System
   get_homedir: { args: undefined; ret: string };

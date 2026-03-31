@@ -4,6 +4,7 @@ import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
 import { ClaudePermissionPrompt } from "./ClaudePermissionPrompt";
 import { ClaudeInputBar } from "./ClaudeInputBar";
+import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
 import { cn } from "@/lib/utils";
 import { IconRobot } from "@tabler/icons-react";
 
@@ -54,13 +55,8 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
     >
       <ClaudeHeader
         conversation={conversation}
-        sessions={sessions}
         onInterrupt={interrupt}
         onAbort={abort}
-        onModelChange={setModel}
-        onModeChange={setPermissionMode}
-        onResumeSession={resumeSession}
-        onRefreshSessions={refreshSessions}
       />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -90,6 +86,15 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
           hasSession ? "Send a follow-up..." : "Ask Claude something..."
         }
         slashCommands={conversation.slashCommands}
+      />
+
+      <ClaudeSettingsBar
+        conversation={conversation}
+        sessions={sessions}
+        onModelChange={setModel}
+        onModeChange={setPermissionMode}
+        onResumeSession={resumeSession}
+        onRefreshSessions={refreshSessions}
       />
     </div>
   );

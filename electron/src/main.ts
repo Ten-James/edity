@@ -65,7 +65,15 @@ registerClaudeSdkHandlers(() => mainWindow);
 
 // --- App Lifecycle ---
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Fix PATH for packaged macOS apps (Finder doesn't inherit shell PATH)
+  try {
+    const { default: fixPath } = await import("fix-path");
+    fixPath();
+  } catch {
+    // fix-path is best-effort
+  }
+
   if (process.platform === "darwin") {
     systemPreferences.askForMediaAccess("microphone");
   }

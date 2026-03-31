@@ -34,9 +34,10 @@ export type StreamEventPayload =
 
 // --- Messages from main process to renderer ---
 
-import type { PermissionMode as _PermissionMode, ClaudeSessionInfo as _ClaudeSessionInfo } from "@shared/types/ipc";
+import type { PermissionMode as _PermissionMode, ClaudeSessionInfo as _ClaudeSessionInfo, ClaudeSessionMessage as _ClaudeSessionMessage } from "@shared/types/ipc";
 export type PermissionMode = _PermissionMode;
 export type ClaudeSessionInfo = _ClaudeSessionInfo;
+export type ClaudeSessionMessage = _ClaudeSessionMessage;
 
 export interface ClaudeSystemMessage {
   type: "system";
@@ -114,6 +115,8 @@ export interface ClaudeToolUse {
   inputJson: string;
   output?: string;
   status: "pending" | "running" | "complete" | "error";
+  subContent?: string;
+  subToolUses?: ClaudeToolUse[];
 }
 
 export interface ClaudeUIMessage {

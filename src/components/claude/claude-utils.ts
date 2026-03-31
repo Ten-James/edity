@@ -16,13 +16,16 @@ export function getToolSummary(
     case "Write":
       return filePath;
     case "Glob":
-      return input.pattern ? String(input.pattern) : null;
     case "Grep":
       return input.pattern ? String(input.pattern) : null;
     case "WebSearch":
       return input.query ? String(input.query) : null;
     case "WebFetch":
       return input.url ? String(input.url) : null;
+    case "Agent":
+      return input.description ? String(input.description) : input.prompt ? String(input.prompt).slice(0, 80) : null;
+    case "AskUserQuestion":
+      return input.question ? String(input.question).slice(0, 80) : null;
     default:
       return null;
   }

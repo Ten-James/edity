@@ -7,7 +7,9 @@ import type {
   ClaudeToolUse,
   ClaudePermissionRequest,
   ClaudeSessionInfo,
+  ClaudeSessionMessage,
   ContentBlockToolUse,
+  StreamEventPayload,
   PermissionMode,
 } from "@/types/claude";
 
@@ -23,7 +25,61 @@ type Action =
   | { type: "SET_SESSION_ID"; sessionId: string }
   | { type: "SET_MODEL"; model: string }
   | { type: "SET_PERMISSION_MODE"; mode: PermissionMode }
+  | { type: "LOAD_HISTORY"; sessionId: string; messages: ClaudeUIMessage[] }
   | { type: "RESET" };
+
+interface ContentBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+}
+
+function convertSessionMessages(messages: ClaudeSessionMessage[]): ClaudeUIMessage[] {
+  return messages
+    .filter((m) => m.type === "user" || m.type === "assistant")
+    .map((m) => {
+      const msg = m.message as { content?: string | ContentBlock[] } | undefined;
+      const content = msg?.content;
+
+      let textContent = "";
+      let thinkingContent = "";
+      const toolUses: ClaudeToolUse[] = [];
+
+      if (typeof content === "string") {
+        textContent = content;
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === "text" && block.text) {
+            textContent += block.text;
+          } else if (block.type === "thinking" && block.thinking) {
+            thinkingContent += block.thinking;
+          } else if (block.type === "tool_use" && block.id && block.name) {
+            toolUses.push({
+              id: block.id,
+              name: block.name,
+              input: block.input ?? {},
+              inputJson: JSON.stringify(block.input ?? {}),
+              status: "complete",
+            });
+          }
+        }
+      }
+
+      return {
+        id: m.uuid,
+        role: m.type as "user" | "assistant",
+        textContent,
+        thinkingContent,
+        toolUses,
+        isStreaming: false,
+        timestamp: Date.now(),
+      };
+    })
+    .filter((m) => m.textContent || m.thinkingContent || m.toolUses.length > 0);
+}
 
 function makeEmptyConversation(): ClaudeConversation {
   return {
@@ -57,6 +113,33 @@ function ensureCurrentAssistant(messages: ClaudeUIMessage[]): ClaudeUIMessage[] 
   ];
 }
 
+/** Apply tool_use stream events (start/delta/stop) to a tool use array. Returns updated array or null if unhandled. */
+function applyToolUseEvent(toolUses: ClaudeToolUse[], event: StreamEventPayload): ClaudeToolUse[] | null {
+  if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
+    const block = event.content_block as ContentBlockToolUse;
+    return [...toolUses, { id: block.id, name: block.name, input: {}, inputJson: "", status: "running" }];
+  }
+  if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
+    const updated = [...toolUses];
+    const last = updated[updated.length - 1];
+    if (last) {
+      updated[updated.length - 1] = { ...last, inputJson: last.inputJson + event.delta.partial_json };
+    }
+    return updated;
+  }
+  if (event.type === "content_block_stop") {
+    const updated = [...toolUses];
+    const last = updated[updated.length - 1];
+    if (last && last.inputJson && last.status === "running") {
+      try {
+        updated[updated.length - 1] = { ...last, input: JSON.parse(last.inputJson) };
+      } catch { /* partial JSON */ }
+    }
+    return updated;
+  }
+  return null;
+}
+
 function reducer(state: ClaudeConversation, action: Action): ClaudeConversation {
   switch (action.type) {
     case "SET_SESSION_ID":
@@ -75,52 +158,43 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
 
     case "STREAM_EVENT": {
       const event = action.message.event;
+      const parentId = action.message.parent_tool_use_id;
       const messages = ensureCurrentAssistant(state.messages);
       const current = { ...messages[messages.length - 1] };
 
-      if (event.type === "content_block_start") {
-        if (event.content_block.type === "tool_use") {
-          const block = event.content_block as ContentBlockToolUse;
-          const toolUse: ClaudeToolUse = {
-            id: block.id,
-            name: block.name,
-            input: {},
-            inputJson: "",
-            status: "running",
-          };
-          current.toolUses = [...current.toolUses, toolUse];
+      // Sub-agent messages: route to parent tool use
+      if (parentId) {
+        const toolUses = [...current.toolUses];
+        const parentIdx = toolUses.findIndex((t) => t.id === parentId);
+        if (parentIdx !== -1) {
+          const parent = { ...toolUses[parentIdx] };
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            parent.subContent = (parent.subContent ?? "") + event.delta.text;
+          } else {
+            const updated = applyToolUseEvent(parent.subToolUses ?? [], event);
+            if (updated) parent.subToolUses = updated;
+          }
+          toolUses[parentIdx] = parent;
+          current.toolUses = toolUses;
         }
-      } else if (event.type === "content_block_delta") {
+
+        return {
+          ...state,
+          status: "streaming",
+          messages: [...messages.slice(0, -1), current],
+        };
+      }
+
+      // Main agent messages: text/thinking deltas go on the message, tool events on toolUses
+      if (event.type === "content_block_delta") {
         if (event.delta.type === "text_delta") {
           current.textContent += event.delta.text;
         } else if (event.delta.type === "thinking_delta") {
           current.thinkingContent += event.delta.thinking;
-        } else if (event.delta.type === "input_json_delta") {
-          const toolUses = [...current.toolUses];
-          const last = toolUses[toolUses.length - 1];
-          if (last) {
-            toolUses[toolUses.length - 1] = {
-              ...last,
-              inputJson: last.inputJson + event.delta.partial_json,
-            };
-          }
-          current.toolUses = toolUses;
         }
-      } else if (event.type === "content_block_stop") {
-        const toolUses = [...current.toolUses];
-        const last = toolUses[toolUses.length - 1];
-        if (last && last.inputJson && last.status === "running") {
-          try {
-            toolUses[toolUses.length - 1] = {
-              ...last,
-              input: JSON.parse(last.inputJson),
-            };
-          } catch {
-            // partial JSON, keep as-is
-          }
-        }
-        current.toolUses = toolUses;
       }
+      const updatedToolUses = applyToolUseEvent(current.toolUses, event);
+      if (updatedToolUses) current.toolUses = updatedToolUses;
 
       return {
         ...state,
@@ -198,6 +272,14 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
     case "SET_PERMISSION_MODE":
       return { ...state, permissionMode: action.mode };
 
+    case "LOAD_HISTORY":
+      return {
+        ...state,
+        sessionId: action.sessionId,
+        messages: action.messages,
+        status: "idle",
+      };
+
     case "RESET":
       return { ...makeEmptyConversation(), model: state.model, permissionMode: state.permissionMode };
 
@@ -251,12 +333,16 @@ export function useClaudeSession(projectPath: string) {
     };
   }, [conversation.sessionId]);
 
-  // Load sessions on mount
-  useEffect(() => {
+  const refreshSessions = useCallback(() => {
     invoke<ClaudeSessionInfo[]>("claude_list_sessions", { projectPath })
       .then(setSessions)
       .catch(() => {});
   }, [projectPath]);
+
+  // Load sessions on mount
+  useEffect(() => {
+    refreshSessions();
+  }, [refreshSessions]);
 
   const startSession = useCallback(
     async (prompt: string) => {
@@ -294,22 +380,18 @@ export function useClaudeSession(projectPath: string) {
   );
 
   const resumeSession = useCallback(
-    async (sessionId: string, prompt: string) => {
+    async (sessionId: string) => {
       sessionIdRef.current = sessionId;
       dispatch({ type: "RESET" });
-      dispatch({ type: "SET_SESSION_ID", sessionId });
-      dispatch({ type: "USER_MESSAGE", text: prompt });
 
-      await invoke("claude_start", {
+      const history = await invoke<ClaudeSessionMessage[]>("claude_get_session_messages", {
         sessionId,
         projectPath,
-        prompt,
-        model: conversation.model,
-        permissionMode: conversation.permissionMode,
-        resume: sessionId,
       });
+      const messages = convertSessionMessages(history);
+      dispatch({ type: "LOAD_HISTORY", sessionId, messages });
     },
-    [projectPath, conversation.model, conversation.permissionMode],
+    [projectPath],
   );
 
   const respondPermission = useCallback(
@@ -343,12 +425,6 @@ export function useClaudeSession(projectPath: string) {
   const setPermissionMode = useCallback((mode: PermissionMode) => {
     dispatch({ type: "SET_PERMISSION_MODE", mode });
   }, []);
-
-  const refreshSessions = useCallback(() => {
-    invoke<ClaudeSessionInfo[]>("claude_list_sessions", { projectPath })
-      .then(setSessions)
-      .catch(() => {});
-  }, [projectPath]);
 
   return {
     conversation,

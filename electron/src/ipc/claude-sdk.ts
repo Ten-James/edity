@@ -1,5 +1,7 @@
-import { ipcMain, BrowserWindow } from "electron";
-import type { ClaudeSessionInfo } from "../../../shared/types/ipc";
+import { ipcMain, BrowserWindow, app } from "electron";
+import * as path from "path";
+import { pathToFileURL } from "url";
+import type { ClaudeSessionInfo, ClaudeSessionMessage } from "../../../shared/types/ipc";
 
 interface ClaudeSession {
   abortController: AbortController;
@@ -15,9 +17,30 @@ const claudeSessions = new Map<string, ClaudeSession>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sdkModule: any = null;
 
+/** Resolve SDK paths — handles both dev (node_modules) and packaged (asar.unpacked). */
+function getSdkPath(file: string): string {
+  const appPath = app.getAppPath();
+  const rel = path.join("node_modules", "@anthropic-ai", "claude-agent-sdk", file);
+  if (appPath.includes("app.asar")) {
+    return path.join(appPath.replace("app.asar", "app.asar.unpacked"), rel);
+  }
+  return path.join(appPath, rel);
+}
+
+// Use Function constructor to preserve real import() — TypeScript CJS compilation converts import() to require()
+// which cannot load ESM modules. This bypasses that transformation.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<any>;
+
 async function loadSDK() {
   if (!sdkModule) {
-    sdkModule = await import("@anthropic-ai/claude-agent-sdk");
+    try {
+      const sdkUrl = pathToFileURL(getSdkPath("sdk.mjs")).href;
+      sdkModule = await dynamicImport(sdkUrl);
+    } catch (err) {
+      console.error("[claude-sdk] Failed to load SDK:", err);
+      throw err;
+    }
   }
   return sdkModule;
 }
@@ -94,7 +117,6 @@ interface StartSessionArgs {
 
 async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): Promise<{ sessionId: string }> {
   const { sessionId, projectPath, prompt, model, permissionMode, resume } = args;
-  const sdk = await loadSDK();
 
   const abortController = new AbortController();
 
@@ -109,39 +131,51 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
 
   claudeSessions.set(sessionId, session);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const queryOptions: any = {
-    abortController,
-    cwd: projectPath,
-    allowedTools: [
-      "Read", "Write", "Edit", "Bash", "Glob", "Grep",
-      "WebSearch", "WebFetch", "Agent", "AskUserQuestion",
-    ],
-    permissionMode: permissionMode || "default",
-    includePartialMessages: true,
+  try {
+    const sdk = await loadSDK();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    canUseTool: (toolName: string, input: unknown, options: any) => {
-      return new Promise((resolve) => {
-        const toolUseID = options?.tool_use_id || crypto.randomUUID();
-        session.permissionCallbacks.set(toolUseID, { resolve });
-        sendToRenderer(session, {
-          type: "permission_request",
-          toolName,
-          input,
-          toolUseID,
-          title: options?.title,
-          displayName: options?.displayName,
-          description: options?.description,
+    const queryOptions: any = {
+      abortController,
+      cwd: projectPath,
+      pathToClaudeCodeExecutable: getSdkPath("cli.js"),
+      allowedTools: [
+        "Read", "Write", "Edit", "Bash", "Glob", "Grep",
+        "WebSearch", "WebFetch", "Agent", "AskUserQuestion",
+      ],
+      permissionMode: permissionMode || "default",
+      includePartialMessages: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      canUseTool: (toolName: string, input: unknown, options: any) => {
+        return new Promise((resolve) => {
+          const toolUseID = options?.tool_use_id || crypto.randomUUID();
+          session.permissionCallbacks.set(toolUseID, { resolve });
+          sendToRenderer(session, {
+            type: "permission_request",
+            toolName,
+            input,
+            toolUseID,
+            title: options?.title,
+            displayName: options?.displayName,
+            description: options?.description,
+          });
         });
-      });
-    },
-  };
+      },
+    };
 
-  if (model) queryOptions.model = model;
-  if (resume) queryOptions.resume = resume;
+    if (model) queryOptions.model = model;
+    if (resume) queryOptions.resume = resume;
 
-  const queryIterator = sdk.query({ prompt, options: queryOptions });
-  runSessionLoop(session, queryIterator);
+    const queryIterator = sdk.query({ prompt, options: queryOptions });
+    runSessionLoop(session, queryIterator);
+  } catch (err: unknown) {
+    console.error("[claude-sdk] Failed to start session:", err);
+    sendToRenderer(session, {
+      type: "error",
+      message: `Failed to start Claude session: ${(err as Error).message}`,
+    });
+    claudeSessions.delete(sessionId);
+  }
 
   return { sessionId };
 }
@@ -158,6 +192,23 @@ async function listSessions(args: { projectPath: string }): Promise<ClaudeSessio
       lastModified: s.lastModified || 0,
       cwd: s.cwd,
       gitBranch: s.gitBranch,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function getSessionMessages(args: { sessionId: string; projectPath: string }): Promise<ClaudeSessionMessage[]> {
+  const sdk = await loadSDK();
+  try {
+    if (typeof sdk.getSessionMessages !== "function") return [];
+    const messages = await sdk.getSessionMessages(args.sessionId, { dir: args.projectPath });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (messages || []).map((m: any) => ({
+      type: m.type,
+      uuid: m.uuid,
+      session_id: m.session_id,
+      message: m.message,
     }));
   } catch {
     return [];
@@ -218,5 +269,9 @@ export function registerClaudeSdkHandlers(getMainWindow: () => BrowserWindow | n
 
   ipcMain.handle("claude_list_sessions", (_event, args: { projectPath: string }) => {
     return listSessions(args);
+  });
+
+  ipcMain.handle("claude_get_session_messages", (_event, args: { sessionId: string; projectPath: string }) => {
+    return getSessionMessages(args);
   });
 }

@@ -13,7 +13,11 @@ import {
   IconLoader2,
   IconCheck,
   IconX,
+  IconRobot,
+  IconQuestionMark,
 } from "@tabler/icons-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ClaudeToolCallProps {
   toolUse: ClaudeToolUse;
@@ -34,6 +38,10 @@ function getToolIcon(name: string) {
     case "WebSearch":
     case "WebFetch":
       return <IconWorld size={12} />;
+    case "Agent":
+      return <IconRobot size={12} />;
+    case "AskUserQuestion":
+      return <IconQuestionMark size={12} />;
     default:
       return <IconTool size={12} />;
   }
@@ -55,6 +63,8 @@ export function ClaudeToolCall({ toolUse }: ClaudeToolCallProps) {
   const [open, setOpen] = useState(false);
   const summary = getToolSummary(toolUse.name, toolUse.input) ?? toolUse.name;
   const hasInput = Object.keys(toolUse.input).length > 0 || toolUse.inputJson;
+  const isAgent = toolUse.name === "Agent";
+  const hasSubContent = isAgent && (toolUse.subContent || (toolUse.subToolUses && toolUse.subToolUses.length > 0));
 
   return (
     <div className="rounded-md border border-border bg-muted/20 text-xs">
@@ -77,10 +87,60 @@ export function ClaudeToolCall({ toolUse }: ClaudeToolCallProps) {
         <span className="ml-auto shrink-0">{getStatusIcon(toolUse.status)}</span>
       </button>
 
-      {open && hasInput && (
-        <div className="border-t border-border px-3 py-2">
-          <FormattedJson input={toolUse.input} inputJson={toolUse.inputJson} />
+      {open && (
+        <div className="border-t border-border">
+          {/* Agent sub-content: markdown output from sub-agent */}
+          {hasSubContent && (
+            <div className="px-3 py-2 flex flex-col gap-2">
+              {toolUse.subContent && (
+                <div className="prose prose-sm dark:prose-invert max-w-none text-xs [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded">
+                  <Markdown remarkPlugins={[remarkGfm]}>
+                    {toolUse.subContent}
+                  </Markdown>
+                </div>
+              )}
+              {toolUse.subToolUses && toolUse.subToolUses.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {toolUse.subToolUses.map((sub) => (
+                    <ClaudeToolCall key={sub.id} toolUse={sub} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Regular tool input (non-agent or when no sub-content yet) */}
+          {hasInput && !hasSubContent && (
+            <div className="px-3 py-2">
+              {isAgent ? (
+                <AgentInput input={toolUse.input} />
+              ) : (
+                <FormattedJson input={toolUse.input} inputJson={toolUse.inputJson} />
+              )}
+            </div>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function AgentInput({ input }: { input: Record<string, unknown> }) {
+  const prompt = input.prompt ? String(input.prompt) : null;
+  const description = input.description ? String(input.description) : null;
+
+  return (
+    <div className="flex flex-col gap-1.5 text-xs">
+      {description && (
+        <div className="text-muted-foreground">
+          <span className="font-medium text-foreground">Task: </span>
+          {description}
+        </div>
+      )}
+      {prompt && (
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
+          {prompt.length > 500 ? prompt.slice(0, 500) + "..." : prompt}
+        </pre>
       )}
     </div>
   );

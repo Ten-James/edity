@@ -420,7 +420,7 @@ export function FileTree() {
         </div>
       )}
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-hidden">
         <div
           className="p-1 min-h-full"
           onClick={handleBackgroundClick}
