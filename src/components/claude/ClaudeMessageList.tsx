@@ -1,5 +1,6 @@
 import type { ClaudeUIMessage } from "@/types/claude";
 import { ClaudeMessageBubble } from "./ClaudeMessageBubble";
+import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
 
 interface ClaudeMessageListProps {
   messages: ClaudeUIMessage[];
@@ -8,10 +9,11 @@ interface ClaudeMessageListProps {
 function isMessageEmpty(msg: ClaudeUIMessage): boolean {
   if (msg.isStreaming) return false;
   if (msg.error) return false;
+  const visibleTools = msg.toolUses.filter((t) => !TASK_TOOL_NAMES.has(t.name));
   return (
     !msg.textContent &&
     !msg.thinkingContent &&
-    msg.toolUses.length === 0
+    visibleTools.length === 0
   );
 }
 

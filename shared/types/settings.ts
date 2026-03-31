@@ -2,6 +2,7 @@ export interface GlobalSettings {
   lightTheme: string;
   darkTheme: string;
   defaultProjectId: string | null;
+  autoExpandTools: string[];
 }
 
 export interface ThemeCssVars {
@@ -86,4 +87,5 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   lightTheme: "edity-light",
   darkTheme: "edity-dark",
   defaultProjectId: null,
+  autoExpandTools: ["Edit", "Bash"],
 };

@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import {
   IconChevronDown,
@@ -16,7 +17,9 @@ import {
   IconRefresh,
   IconCpu,
   IconShield,
+  IconEye,
 } from "@tabler/icons-react";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 interface ClaudeSettingsBarProps {
   conversation: ClaudeConversation;
@@ -53,6 +56,10 @@ function getModelValue(model: string | null): string {
   return found?.value ?? model;
 }
 
+const OPENABLE_TOOLS = [
+  "Edit", "Bash", "Glob", "Grep", "WebSearch", "WebFetch", "Agent", "AskUserQuestion",
+];
+
 function getModeLabel(mode: PermissionMode): string {
   return MODES.find((m) => m.value === mode)?.label ?? mode;
 }
@@ -65,6 +72,16 @@ export function ClaudeSettingsBar({
   onResumeSession,
   onRefreshSessions,
 }: ClaudeSettingsBarProps) {
+  const { settings, updateSettings } = useTheme();
+  const autoExpandSet = new Set(settings.autoExpandTools);
+
+  const toggleTool = (tool: string) => {
+    const next = new Set(autoExpandSet);
+    if (next.has(tool)) next.delete(tool);
+    else next.add(tool);
+    updateSettings({ autoExpandTools: [...next] });
+  };
+
   return (
     <div className="flex items-center gap-1 px-3 pb-2">
       {/* Model selector */}
@@ -112,6 +129,29 @@ export function ClaudeSettingsBar({
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Auto-expand tools */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="xs" className="gap-1 text-muted-foreground">
+            <IconEye size={12} />
+            Expand
+            <IconChevronDown size={10} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start">
+          <DropdownMenuLabel>Auto-expand Tools</DropdownMenuLabel>
+          {OPENABLE_TOOLS.map((tool) => (
+            <DropdownMenuCheckboxItem
+              key={tool}
+              checked={autoExpandSet.has(tool)}
+              onCheckedChange={() => toggleTool(tool)}
+            >
+              {tool}
+            </DropdownMenuCheckboxItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

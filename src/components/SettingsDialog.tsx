@@ -62,7 +62,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [lightTheme, setLightTheme] = useState(settings.lightTheme);
   const [darkTheme, setDarkTheme] = useState(settings.darkTheme);
   const [defaultProjectId, setDefaultProjectId] = useState(settings.defaultProjectId);
-
   useEffect(() => {
     if (open) {
       setLightTheme(settings.lightTheme);

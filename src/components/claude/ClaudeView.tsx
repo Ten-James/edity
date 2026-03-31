@@ -1,10 +1,12 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { useClaudeSession } from "@/hooks/useClaudeSession";
 import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
 import { ClaudePermissionPrompt } from "./ClaudePermissionPrompt";
 import { ClaudeInputBar } from "./ClaudeInputBar";
 import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
+import { ClaudeTaskPopover } from "./ClaudeTaskPopover";
+import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
 import { cn } from "@/lib/utils";
 import { IconRobot } from "@tabler/icons-react";
 
@@ -37,6 +39,11 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [conversation.messages, conversation.status]);
+
+  const taskTools = useMemo(
+    () => conversation.messages.flatMap((m) => m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name))),
+    [conversation.messages],
+  );
 
   const handleSend = async (text: string) => {
     if (!hasSession) {
@@ -79,14 +86,17 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
         />
       )}
 
-      <ClaudeInputBar
-        onSend={handleSend}
-        disabled={conversation.status === "streaming" || isWaitingPermission}
-        placeholder={
-          hasSession ? "Send a follow-up..." : "Ask Claude something..."
-        }
-        slashCommands={conversation.slashCommands}
-      />
+      <div className="relative">
+        <ClaudeTaskPopover taskTools={taskTools} />
+        <ClaudeInputBar
+          onSend={handleSend}
+          disabled={conversation.status === "streaming" || isWaitingPermission}
+          placeholder={
+            hasSession ? "Send a follow-up..." : "Ask Claude something..."
+          }
+          slashCommands={conversation.slashCommands}
+        />
+      </div>
 
       <ClaudeSettingsBar
         conversation={conversation}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ClaudeUIMessage } from "@/types/claude";
-import { ClaudeToolCall } from "./ClaudeToolCall";
+import { ClaudeToolCall, TASK_TOOL_NAMES } from "./ClaudeToolCall";
+import { useTheme } from "@/components/theme/ThemeProvider";
 import {
   IconUser,
   IconRobot,
@@ -18,12 +19,16 @@ interface ClaudeMessageBubbleProps {
 
 export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
   const [thinkingOpen, setThinkingOpen] = useState(false);
+  const { settings } = useTheme();
+  const autoExpandSet = new Set(settings.autoExpandTools);
+
+  const visibleToolUses = message.toolUses.filter((t) => !TASK_TOOL_NAMES.has(t.name));
 
   if (message.role === "user") {
     return (
       <div className="flex gap-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-          <IconUser size={14} className="text-primary" />
+        <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <IconUser size={10} className="text-primary" />
         </div>
         <div className="flex-1 pt-0.5">
           <p className="text-sm whitespace-pre-wrap">{message.textContent}</p>
@@ -75,15 +80,15 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
         {/* Streaming cursor */}
         {message.isStreaming &&
           !message.textContent &&
-          message.toolUses.length === 0 && (
+          visibleToolUses.length === 0 && (
             <span className="inline-block h-4 w-1.5 animate-pulse bg-foreground/50 rounded-sm" />
           )}
 
         {/* Tool calls */}
-        {message.toolUses.length > 0 && (
+        {visibleToolUses.length > 0 && (
           <div className="flex flex-col gap-2">
-            {message.toolUses.map((toolUse) => (
-              <ClaudeToolCall key={toolUse.id} toolUse={toolUse} />
+            {visibleToolUses.map((toolUse) => (
+              <ClaudeToolCall key={toolUse.id} toolUse={toolUse} autoExpand={autoExpandSet.has(toolUse.name)} />
             ))}
           </div>
         )}
