@@ -9,8 +9,16 @@ import {
   IconFolder,
   IconEyeOff,
 } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAppContext } from "@/contexts/AppContext";
 import { invoke, listen } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
@@ -83,7 +91,7 @@ export function FileTree() {
 
   const [showIgnored, setShowIgnored] = useState(false);
 
-  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const menuOpen = contextMenu !== null;
   const renameInputRef = useRef<HTMLInputElement>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
@@ -139,21 +147,6 @@ export function FileTree() {
       invoke("unwatch_project_dir").catch(() => {});
     };
   }, [refreshTree, activeProject]);
-
-  // Close context menu on outside click
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(e.target as Node)
-      ) {
-        setContextMenu(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [contextMenu]);
 
   // Focus rename/create input when shown
   useEffect(() => {
@@ -357,7 +350,7 @@ export function FileTree() {
 
   return (
     <div className="flex h-full w-[260px] flex-col bg-background shrink-0">
-      <div className="p-1.5 border-b border-border">
+      <div className="flex items-center h-8 px-1.5 border-b border-border shrink-0">
         <Input
           placeholder="Filter files..."
           value={filter}
@@ -450,11 +443,13 @@ export function FileTree() {
           const count = f.value === "all" ? null : gitCounts[f.value as keyof typeof gitCounts];
           const isActive = gitFilter === f.value;
           return (
-            <button
+            <Button
               key={f.value}
+              variant="ghost"
+              size="xs"
               onClick={() => setGitFilter(f.value)}
               className={cn(
-                "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-mono transition-colors",
+                "flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono transition-colors h-auto",
                 isActive
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/50",
@@ -465,78 +460,61 @@ export function FileTree() {
               {count != null && count > 0 && (
                 <span className="text-[9px] opacity-70">{count}</span>
               )}
-            </button>
+            </Button>
           );
         })}
-        <button
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => setShowIgnored((v) => !v)}
           title={showIgnored ? "Hiding gitignored files" : "Showing all files"}
           className={cn(
-            "ml-auto rounded p-0.5 transition-colors",
+            "ml-auto p-0.5 h-auto transition-colors",
             showIgnored
               ? "text-accent-foreground bg-accent"
               : "text-muted-foreground hover:bg-accent/50",
           )}
         >
           <IconEyeOff size={12} />
-        </button>
+        </Button>
       </div>
 
       {/* Context menu */}
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="fixed z-50 w-48 rounded-md border border-border bg-popover p-1 shadow-md"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          {!contextMenu.entry.is_dir && (
-            <button
-              onClick={handleOpenFile}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
-            >
+      <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) setContextMenu(null); }}>
+        <DropdownMenuTrigger asChild>
+          <span className="fixed w-0 h-0" style={{ left: contextMenu?.x ?? 0, top: contextMenu?.y ?? 0 }} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="bottom" align="start">
+          {contextMenu && !contextMenu.entry.is_dir && (
+            <DropdownMenuItem onClick={handleOpenFile}>
               <IconFile size={14} />
               Open
-            </button>
+            </DropdownMenuItem>
           )}
-          <button
-            onClick={() => handleNewEntry("file")}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
-          >
+          <DropdownMenuItem onClick={() => handleNewEntry("file")}>
             <IconFilePlus size={14} />
             New File
-          </button>
-          <button
-            onClick={() => handleNewEntry("directory")}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleNewEntry("directory")}>
             <IconFolderPlus size={14} />
             New Folder
-          </button>
-          <div className="my-1 h-px bg-border" />
-          <button
-            onClick={handleRenameStart}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleRenameStart}>
             <IconCursorText size={14} />
             Rename
-          </button>
-          <button
-            onClick={handleCopyPath}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleCopyPath}>
             <IconCopy size={14} />
             Copy Path
-          </button>
-          <div className="my-1 h-px bg-border" />
-          <button
-            onClick={handleDelete}
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-400"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleDelete} className="text-red-400 focus:text-red-400">
             <IconTrash size={14} />
             Delete{selectedPaths.size > 1 ? ` (${selectedPaths.size})` : ""}
-          </button>
-        </div>
-      )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

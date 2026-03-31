@@ -120,7 +120,7 @@ export function GitLogPanel({
             key={entry.hash}
             onClick={() => onSelectCommit(entry.hash)}
             className={cn(
-              "flex items-center text-xs cursor-pointer hover:bg-accent rounded-sm",
+              "flex items-center text-xs cursor-pointer hover:bg-accent",
               selectedHash === entry.hash && "bg-accent",
             )}
             style={{ height: ROW_HEIGHT }}

@@ -82,7 +82,7 @@ export function SetupDialog({
         <div className="flex flex-col gap-4 py-2">
           <div className="flex items-center gap-3">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-xs font-bold"
               style={{
                 backgroundColor: PROJECT_COLORS[color]?.hex ?? PROJECT_COLORS.blue.hex,
                 color: PROJECT_COLORS[color]?.textHex ?? "#fff",
@@ -144,12 +144,12 @@ export function SetupDialog({
               {runCommands.map((cmd, i) => (
                 <div
                   key={i}
-                  className="flex flex-col gap-1.5 rounded-md border border-border p-2"
+                  className="flex flex-col gap-1.5 border border-border p-2"
                 >
                   <div className="flex items-center gap-1">
                     <IconGripVertical size={12} className="text-muted-foreground shrink-0" />
                     {i === 0 && (
-                      <span className="text-[10px] font-medium text-primary px-1 rounded bg-primary/10 shrink-0">
+                      <span className="text-[10px] font-medium text-primary px-1 bg-primary/10 shrink-0">
                         Default
                       </span>
                     )}

@@ -57,7 +57,7 @@ function getModelValue(model: string | null): string {
 }
 
 const OPENABLE_TOOLS = [
-  "Edit", "Bash", "Glob", "Grep", "WebSearch", "WebFetch", "Agent", "AskUserQuestion",
+  "Edit", "Bash", "Agent", "Skill", "Mcp", "NotebookEdit", "LSP", "AskUserQuestion",
 ];
 
 function getModeLabel(mode: PermissionMode): string {
@@ -165,7 +165,7 @@ export function ClaudeSettingsBar({
               <IconChevronDown size={10} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="max-w-[280px]">
+          <DropdownMenuContent side="top" align="start" className="w-[360px]">
             <DropdownMenuLabel>Session History</DropdownMenuLabel>
             {sessions.slice(0, 15).map((s) => (
               <DropdownMenuItem
@@ -173,7 +173,7 @@ export function ClaudeSettingsBar({
                 onClick={() => onResumeSession(s.sessionId)}
                 className={conversation.sessionId === s.sessionId ? "font-medium text-foreground" : ""}
               >
-                <span className="truncate">{s.summary.slice(0, 60)}</span>
+                <span className="truncate">{s.summary.slice(0, 100)}</span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />

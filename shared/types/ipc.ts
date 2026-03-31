@@ -217,6 +217,7 @@ export interface IpcHandlerMap {
 export interface IpcEventMap {
   "claude-notification": { tabId: string };
   "directory-changed": void;
+  "fullscreen-changed": boolean;
   [key: `pty-output-${string}`]: string;
   [key: `file-changed-${string}`]: void;
   [key: `project-run-exit-${string}`]: void;

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IconCopy } from "@tabler/icons-react";
 
@@ -126,20 +127,22 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden relative">
       {selection && (
-        <div className="absolute top-2 right-4 z-10 flex items-center gap-2 rounded-md border border-border bg-popover px-3 py-1.5 shadow-md text-xs">
+        <div className="absolute top-2 right-4 z-10 flex items-center gap-2 border border-border bg-popover px-3 py-1.5 shadow-md text-xs">
           <span className="text-muted-foreground">
             {getRelativePath()}:
             {selection.start === selection.end
               ? selection.start
               : `${selection.start}-${selection.end}`}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={copyReference}
             className="flex items-center gap-1 text-foreground hover:text-primary transition-colors"
           >
             <IconCopy size={12} />
             {copied ? "Copied!" : "Copy"}
-          </button>
+          </Button>
         </div>
       )}
 

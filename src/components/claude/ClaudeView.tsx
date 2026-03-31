@@ -7,6 +7,7 @@ import { ClaudeInputBar } from "./ClaudeInputBar";
 import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
 import { ClaudeTaskPopover } from "./ClaudeTaskPopover";
 import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { IconRobot } from "@tabler/icons-react";
 
@@ -36,7 +37,10 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
 
   useEffect(() => {
     if (conversation.status === "streaming" && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const viewport = scrollRef.current.querySelector("[data-slot='scroll-area-viewport']") as HTMLElement | null;
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   }, [conversation.messages, conversation.status]);
 
@@ -66,17 +70,19 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
         onAbort={abort}
       />
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {!hasSession && conversation.messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <IconRobot size={48} strokeWidth={1.5} />
-              <p className="text-sm">Ask Claude anything about this project</p>
+      <div ref={scrollRef} className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          {!hasSession && conversation.messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                <IconRobot size={48} strokeWidth={1.5} />
+                <p className="text-sm">Ask Claude anything about this project</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <ClaudeMessageList messages={conversation.messages} />
-        )}
+          ) : (
+            <ClaudeMessageList messages={conversation.messages} />
+          )}
+        </ScrollArea>
       </div>
 
       {isWaitingPermission && conversation.pendingPermission && (

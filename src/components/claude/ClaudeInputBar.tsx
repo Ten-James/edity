@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { IconSend2 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface ClaudeInputBarProps {
@@ -27,7 +28,6 @@ export function ClaudeInputBar({
     cmd.toLowerCase().includes(commandFilter.toLowerCase()),
   );
 
-  // Show command menu when typing /
   useEffect(() => {
     if (value.startsWith("/") && !value.includes(" ")) {
       setShowCommands(true);
@@ -95,31 +95,32 @@ export function ClaudeInputBar({
 
   return (
     <div className="relative border-t border-border p-3">
-      {/* Slash command autocomplete */}
       {showCommands && filteredCommands.length > 0 && (
         <div
           ref={commandsRef}
-          className="absolute bottom-full left-3 right-3 mb-1 max-h-48 overflow-auto rounded-md border border-border bg-popover p-1 shadow-md"
+          className="absolute bottom-full left-3 right-3 mb-1 max-h-48 overflow-auto border border-border bg-popover p-1 shadow-md"
         >
           {filteredCommands.map((cmd, i) => (
-            <button
+            <Button
               key={cmd}
+              variant="ghost"
+              size="xs"
               onClick={() => insertCommand(cmd)}
               className={cn(
-                "flex w-full items-center rounded-sm px-2 py-1.5 text-xs",
+                "w-full justify-start",
                 i === selectedIdx
                   ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  : "text-muted-foreground",
               )}
             >
               /{cmd}
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
       <div className="flex items-end gap-2">
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={value}
           onChange={handleInput}
@@ -127,12 +128,7 @@ export function ClaudeInputBar({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className={cn(
-            "flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm",
-            "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            "max-h-[200px]",
-          )}
+          className="flex-1 resize-none max-h-[200px] text-sm"
         />
         <Button
           size="icon"

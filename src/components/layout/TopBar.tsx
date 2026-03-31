@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppContext } from "@/contexts/AppContext";
-import { invoke } from "@/lib/ipc";
+import { invoke, listen } from "@/lib/ipc";
 import { RunButton } from "@/components/layout/RunButton";
 
 const isDev = import.meta.env.DEV;
@@ -26,9 +26,14 @@ export function TopBar() {
   } = useAppContext();
 
   const [homedir, setHomedir] = useState<string>("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     invoke<string>("get_homedir").then(setHomedir);
+    let unlisten: (() => void) | undefined;
+    listen<boolean>("fullscreen-changed", (e) => setIsFullscreen(e.payload))
+      .then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
   }, []);
 
   const onMouseDown = (e: React.MouseEvent) => {
@@ -39,11 +44,11 @@ export function TopBar() {
   return (
     <div
       onMouseDown={onMouseDown}
-      className="flex h-8 items-center bg-background px-3 gap-2 shrink-0"
+      className={`flex h-8 items-center bg-background pr-3 gap-2 shrink-0 ${isFullscreen ? "pl-3" : "pl-20"}`}
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {isDev && (
-        <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
+        <span className="bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
           Dev
         </span>
       )}
@@ -57,7 +62,9 @@ export function TopBar() {
       </span>
 
       {gitBranchInfo && (
-        <button
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={createGitTab}
           className="flex items-center gap-1 text-xs text-muted-foreground ml-1 hover:text-foreground transition-colors"
         >
@@ -86,7 +93,7 @@ export function TopBar() {
               )}
             </span>
           )}
-        </button>
+        </Button>
       )}
 
       <div className="flex-1" />

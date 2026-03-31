@@ -7,6 +7,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
 import { LIGHT_THEMES, DARK_THEMES } from "@/lib/themes";
@@ -43,7 +51,7 @@ function ThemeCard({
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col gap-1.5 rounded-md border p-2 text-left text-xs transition-all hover:bg-accent",
+        "flex flex-col gap-1.5 border p-2 text-left text-xs transition-all hover:bg-accent",
         selected
           ? "border-primary ring-1 ring-primary bg-accent"
           : "border-border",
@@ -77,12 +85,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[480px] max-h-[80vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-5 py-2">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="flex flex-col gap-5 py-2">
           {/* Light theme */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Light Theme</label>
@@ -116,22 +125,27 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           {/* Default project */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Default Project</label>
-            <select
-              value={defaultProjectId ?? ""}
-              onChange={(e) => setDefaultProjectId(e.target.value || null)}
-              className="mt-1.5 flex h-8 w-full rounded-md border border-input bg-background px-3 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            <Select
+              value={defaultProjectId ?? "none"}
+              onValueChange={(v) => setDefaultProjectId(v === "none" ? null : v)}
             >
-              <option value="">None</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="mt-1.5 h-8 text-xs">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

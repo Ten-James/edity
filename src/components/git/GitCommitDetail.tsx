@@ -82,7 +82,7 @@ export function GitCommitDetail({ commit, onClose }: GitCommitDetailProps) {
                 key={file.path}
                 onClick={() => setSelectedFile(file.path)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent rounded-sm",
+                  "flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent",
                   selectedFile === file.path && "bg-accent",
                 )}
               >

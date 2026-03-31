@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { TopBar } from "./TopBar";
 import { FileTree } from "./FileTree";
 import { PaneContainer } from "./PaneContainer";
 import {
@@ -34,9 +33,7 @@ export function MainContent() {
   }, [allTabs]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <TopBar />
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 overflow-hidden">
         {/* Render pane layouts for ALL projects — inactive ones are hidden but stay mounted */}
         {projects.map((project) => {
           const state = projectPanes.get(project.id);
@@ -100,7 +97,6 @@ export function MainContent() {
           );
         })}
         {fileTreeOpen && <FileTree />}
-      </div>
     </div>
   );
 }

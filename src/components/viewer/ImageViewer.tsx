@@ -199,12 +199,14 @@ export function ImageViewer({ url, size }: ImageViewerProps) {
           >
             <IconMinus size={14} />
           </Button>
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={resetZoom}
             className="px-1.5 text-xs text-muted-foreground hover:text-foreground tabular-nums min-w-[3.5rem] text-center"
           >
             {Math.round(scale * 100)}%
-          </button>
+          </Button>
           <Button
             variant="ghost"
             size="icon-xs"

@@ -96,9 +96,11 @@ export function GitChangesPanel({
       <div className="py-1">
         {/* Header with stage-all toggle */}
         <div className="flex items-center gap-2 px-2 py-1 mb-1">
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={handleToggleAll}
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors h-auto p-0"
             title={allStaged ? "Unstage all" : "Stage all"}
           >
             {allStaged ? (
@@ -106,7 +108,7 @@ export function GitChangesPanel({
             ) : (
               <IconCircle size={14} />
             )}
-          </button>
+          </Button>
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Files{" "}
             <span className="text-[10px] font-normal">({files.length})</span>
@@ -125,16 +127,18 @@ export function GitChangesPanel({
               key={`${f.isStaged ? "s" : "u"}-${f.file.path}`}
               onClick={() => onSelectFile(f.file.path, f.isStaged)}
               className={cn(
-                "group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent rounded-sm",
+                "group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer hover:bg-accent",
                 isSelected && "bg-accent",
               )}
             >
-              <button
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggle(f);
                 }}
-                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors h-auto p-0"
                 title={f.isStaged ? "Unstage" : "Stage"}
               >
                 {f.isStaged ? (
@@ -142,7 +146,7 @@ export function GitChangesPanel({
                 ) : (
                   <IconCircle size={12} />
                 )}
-              </button>
+              </Button>
               <span
                 className={cn(
                   "font-mono w-3 shrink-0",

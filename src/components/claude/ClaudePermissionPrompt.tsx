@@ -1,6 +1,7 @@
 import type { ClaudePermissionRequest } from "@/types/claude";
 import { getToolSummary } from "./claude-utils";
 import { Button } from "@/components/ui/button";
+import { CodeBlock } from "@/components/ui/code-block";
 import { IconShieldCheck, IconShieldX } from "@tabler/icons-react";
 
 interface ClaudePermissionPromptProps {
@@ -34,9 +35,7 @@ export function ClaudePermissionPrompt({
         </div>
 
         {inputSummary && (
-          <pre className="rounded-md bg-muted px-3 py-2 text-xs font-mono whitespace-pre-wrap break-all max-h-32 overflow-auto">
-            {inputSummary}
-          </pre>
+          <CodeBlock className="max-h-32">{inputSummary}</CodeBlock>
         )}
 
         <div className="flex items-center gap-2">

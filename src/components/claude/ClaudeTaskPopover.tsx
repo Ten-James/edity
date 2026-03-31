@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
+import { Button } from "@/components/ui/button";
 import {
   IconChecklist,
   IconCheck,
@@ -75,10 +76,11 @@ export function ClaudeTaskPopover({ taskTools }: ClaudeTaskPopoverProps) {
 
   return (
     <div className="absolute bottom-full right-3 mb-1 z-10">
-      <div className="rounded-md border border-border bg-popover shadow-md text-xs min-w-[220px] max-w-[320px]">
-        <button
+      <div className="border border-border bg-popover shadow-md text-xs min-w-[220px] max-w-[320px]">
+        <Button
+          variant="ghost"
           onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center gap-2 px-3 py-2 hover:bg-accent/50 transition-colors"
+          className="flex w-full items-center justify-start gap-2 px-3 py-2 hover:bg-accent/50 transition-colors h-auto"
         >
           <IconChecklist size={14} className="text-muted-foreground shrink-0" />
           <span className="font-medium">Tasks</span>
@@ -86,7 +88,7 @@ export function ClaudeTaskPopover({ taskTools }: ClaudeTaskPopoverProps) {
           <span className="ml-auto">
             {open ? <IconChevronDown size={12} /> : <IconChevronUp size={12} />}
           </span>
-        </button>
+        </Button>
 
         {open && (
           <div className="border-t border-border px-3 py-2 flex flex-col gap-1.5 max-h-[200px] overflow-y-auto">

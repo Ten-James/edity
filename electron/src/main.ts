@@ -4,6 +4,7 @@ import {
   PROJECT_ROOT,
   mainWindow,
   setMainWindow,
+  sendToWindow,
   ptyInstances,
   fileWatchers,
   runningProcesses,
@@ -37,7 +38,7 @@ function createWindow(): void {
     height: 800,
     icon: path.join(PROJECT_ROOT, "icon.png"),
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 8, y: 13 },
+    trafficLightPosition: { x: 8, y: 8 },
     webPreferences: {
       preload: path.join(PROJECT_ROOT, "electron/preload.js"),
       contextIsolation: true,
@@ -47,6 +48,9 @@ function createWindow(): void {
   });
 
   setMainWindow(win);
+
+  win.on("enter-full-screen", () => sendToWindow("fullscreen-changed", true));
+  win.on("leave-full-screen", () => sendToWindow("fullscreen-changed", false));
 
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ClaudeUIMessage } from "@/types/claude";
 import { ClaudeToolCall, TASK_TOOL_NAMES } from "./ClaudeToolCall";
+import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import {
   IconUser,
@@ -49,7 +50,9 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
       <div className="flex-1 min-w-0 pt-0.5">
         {/* Thinking block */}
         {message.thinkingContent && (
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setThinkingOpen((v) => !v)}
             className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
@@ -60,10 +63,10 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
               <IconChevronRight size={12} />
             )}
             <span>Thinking</span>
-          </button>
+          </Button>
         )}
         {thinkingOpen && message.thinkingContent && (
-          <div className="mb-3 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+          <div className="mb-3 border border-border bg-muted/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
             {message.thinkingContent}
           </div>
         )}
@@ -81,7 +84,7 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
         {message.isStreaming &&
           !message.textContent &&
           visibleToolUses.length === 0 && (
-            <span className="inline-block h-4 w-1.5 animate-pulse bg-foreground/50 rounded-sm" />
+            <span className="inline-block h-4 w-1.5 animate-pulse bg-foreground/50" />
           )}
 
         {/* Tool calls */}
@@ -95,7 +98,7 @@ export function ClaudeMessageBubble({ message }: ClaudeMessageBubbleProps) {
 
         {/* Error */}
         {message.error && (
-          <div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
+          <div className="mt-2 border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
             {message.error}
           </div>
         )}

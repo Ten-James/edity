@@ -5,6 +5,7 @@ import {
   IconFolder,
   IconFolderOpen,
 } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { getFileIcon } from "@/lib/file-icons";
 import { useAppContext } from "@/contexts/AppContext";
 import { invoke } from "@/lib/ipc";
@@ -125,11 +126,12 @@ export function FileTreeNode({
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         className={cn(
-          "flex w-full items-center gap-1 pr-2 py-px text-xs rounded-sm transition-colors",
+          "flex w-full items-center justify-start gap-1 pr-2 h-6 text-xs transition-colors",
           isSelected
             ? "bg-primary/20 text-accent-foreground"
             : "hover:bg-accent hover:text-accent-foreground",
@@ -167,7 +169,7 @@ export function FileTreeNode({
             {gitStatus}
           </span>
         )}
-      </button>
+      </Button>
       {expanded &&
         filtered.map((child) => (
           <FileTreeNode

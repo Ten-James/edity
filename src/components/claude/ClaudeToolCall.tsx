@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
+import { Button } from "@/components/ui/button";
 import { getToolSummary } from "./claude-utils";
 import { getToolIcon, getStatusIcon, INLINE_TOOLS } from "./claude-tool-config";
 import { EditDiff, BashCommand, AgentBody, SkillBody, McpBody, FormattedJson } from "./ClaudeToolBodies";
@@ -53,19 +54,20 @@ export function ClaudeToolCall({ toolUse, autoExpand = false }: ClaudeToolCallPr
   const body = open ? getToolBody(toolUse) : null;
 
   return (
-    <div className="rounded-md border border-border bg-muted/20 text-xs">
-      <button
+    <div className="border border-border bg-muted/20 text-xs">
+      <Button
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+        className="flex w-full items-center justify-start gap-2 px-3 py-2 text-left hover:bg-muted/40 transition-colors h-auto"
       >
         <span className="shrink-0 text-muted-foreground">{getToolIcon(toolUse.name)}</span>
         <span className="font-medium">{toolUse.name}</span>
         {summary && <span className="truncate text-muted-foreground">{summary}</span>}
         <span className="ml-auto shrink-0">{getStatusIcon(toolUse.status)}</span>
-      </button>
+      </Button>
 
       {body && (
-        <div className="border-t border-border px-3 py-2">
+        <div className="border-t border-border">
           {body}
         </div>
       )}

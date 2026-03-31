@@ -94,7 +94,7 @@ export function GitBranchPanel({
                 <div
                   key={branch.name}
                   className={cn(
-                    "group flex items-center gap-1.5 px-2 py-1 text-xs rounded-sm",
+                    "group flex items-center gap-1.5 px-2 py-1 text-xs",
                     branch.isCurrent
                       ? "bg-accent text-accent-foreground"
                       : "hover:bg-accent cursor-pointer",

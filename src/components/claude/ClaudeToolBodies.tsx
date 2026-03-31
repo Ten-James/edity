@@ -1,4 +1,5 @@
 import type { ClaudeToolUse } from "@/types/claude";
+import { CodeBlock } from "@/components/ui/code-block";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ClaudeToolCall } from "./ClaudeToolCall";
@@ -21,7 +22,7 @@ export function EditDiff({ input, inputJson }: ToolInputProps) {
   const diffLines = computeInlineDiff(oldLines, newLines);
 
   return (
-    <div className="max-h-60 overflow-auto rounded bg-muted font-mono text-xs">
+    <div className="max-h-60 overflow-auto bg-muted font-mono text-xs">
       {diffLines.map((line, i) => (
         <div
           key={i}
@@ -53,11 +54,7 @@ export function BashCommand({ input, inputJson }: ToolInputProps) {
   const display = command ?? partialCommand;
   if (!display) return null;
 
-  return (
-    <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
-      {display}
-    </pre>
-  );
+  return <CodeBlock>{display}</CodeBlock>;
 }
 
 // --- Agent: sub-content + sub-tool calls ---
@@ -87,11 +84,7 @@ export function AgentBody({ toolUse }: { toolUse: ClaudeToolUse }) {
 
 export function SkillBody({ input }: { input: Record<string, unknown> }) {
   if (!input.args) return null;
-  return (
-    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
-      {String(input.args)}
-    </pre>
-  );
+  return <CodeBlock className="max-h-40">{String(input.args)}</CodeBlock>;
 }
 
 // --- Mcp: show tool input ---
@@ -99,9 +92,9 @@ export function SkillBody({ input }: { input: Record<string, unknown> }) {
 export function McpBody({ input }: { input: Record<string, unknown> }) {
   if (!input.input) return null;
   return (
-    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
+    <CodeBlock className="max-h-40">
       {typeof input.input === "string" ? input.input : JSON.stringify(input.input, null, 2)}
-    </pre>
+    </CodeBlock>
   );
 }
 
@@ -112,11 +105,7 @@ export function FormattedJson({ input, inputJson }: ToolInputProps) {
     ? JSON.stringify(input, null, 2)
     : inputJson || "{}";
 
-  return (
-    <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
-      {json}
-    </pre>
-  );
+  return <CodeBlock>{json}</CodeBlock>;
 }
 
 // --- Diff helpers ---
