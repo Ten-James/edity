@@ -32,7 +32,7 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import { getDefaultRunCommand } from "@/lib/run-commands";
 export type { Project, EdityConfig, RunCommand };
 
-interface AppContextValue {
+export interface AppContextValue {
   projects: Project[];
   activeProject: Project | null;
   setActiveProject: (p: Project) => void;

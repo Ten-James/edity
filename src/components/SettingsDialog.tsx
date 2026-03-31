@@ -19,6 +19,7 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
 import { LIGHT_THEMES, DARK_THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
+import { KeybindingsSettings } from "@/components/KeybindingsSettings";
 import type { ColorTheme } from "@shared/types/settings";
 
 interface SettingsDialogProps {
@@ -71,12 +72,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [darkTheme, setDarkTheme] = useState(settings.darkTheme);
   const [defaultProjectId, setDefaultProjectId] = useState(settings.defaultProjectId);
   const [showChatAvatars, setShowChatAvatars] = useState(settings.claude.showChatAvatars);
+  const [keybindings, setKeybindings] = useState<Record<string, string>>(settings.keybindings);
   useEffect(() => {
     if (open) {
       setLightTheme(settings.lightTheme);
       setDarkTheme(settings.darkTheme);
       setDefaultProjectId(settings.defaultProjectId);
       setShowChatAvatars(settings.claude.showChatAvatars);
+      setKeybindings(settings.keybindings);
     }
   }, [open, settings]);
 
@@ -86,6 +89,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       darkTheme,
       defaultProjectId,
       claude: { ...settings.claude, showChatAvatars },
+      keybindings,
     });
     onOpenChange(false);
   };
@@ -163,6 +167,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Keyboard Shortcuts */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Keyboard Shortcuts</label>
+            <div className="mt-1.5">
+              <KeybindingsSettings keybindings={keybindings} onChange={setKeybindings} />
+            </div>
           </div>
           </div>
         </div>

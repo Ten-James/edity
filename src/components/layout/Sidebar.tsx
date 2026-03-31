@@ -17,7 +17,6 @@ import { useAppContext, type Project } from "@/contexts/AppContext";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn, PROJECT_COLORS } from "@/lib/utils";
 import { SetupDialog } from "@/components/SetupDialog";
-import { SettingsDialog } from "@/components/SettingsDialog";
 
 function getInitials(name: string): string {
   return name
@@ -28,7 +27,11 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onOpenSettings: () => void;
+}
+
+export function Sidebar({ onOpenSettings }: SidebarProps) {
   const {
     projects,
     activeProject,
@@ -42,7 +45,6 @@ export function Sidebar() {
   const { theme, toggleTheme } = useTheme();
 
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -147,7 +149,7 @@ export function Sidebar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={() => setSettingsOpen(true)}>
+              <Button variant="ghost" size="icon-sm" onClick={onOpenSettings}>
                 <IconSettings size={16} />
               </Button>
             </TooltipTrigger>
@@ -182,7 +184,6 @@ export function Sidebar() {
         />
       )}
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );
 }

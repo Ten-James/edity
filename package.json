@@ -72,6 +72,7 @@
     "@xterm/xterm": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "fix-path": "^5.0.0",
     "node-pty": "^1.0.0",
     "radix-ui": "^1.4.3",

@@ -8,6 +8,7 @@ export interface GlobalSettings {
   darkTheme: string;
   defaultProjectId: string | null;
   claude: ClaudeSettings;
+  keybindings: Record<string, string>;
 }
 
 export interface ThemeCssVars {
@@ -96,4 +97,5 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
     showChatAvatars: true,
     autoExpandTools: ["Edit", "Bash"],
   },
+  keybindings: {},
 };
