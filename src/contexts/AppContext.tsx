@@ -66,8 +66,8 @@ interface AppContextValue {
   setFocusedPane: (paneId: string) => void;
   unsplit: () => void;
 
-  fileTreeOpen: boolean;
-  toggleFileTree: () => void;
+  sidebarPanel: "files" | "git" | null;
+  toggleSidebarPanel: (panel: "files" | "git") => void;
 
   edityConfig: EdityConfig | null;
   projectConfigs: Map<string, EdityConfig | null>;
@@ -93,7 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { settings } = useTheme();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProjectState] = useState<Project | null>(null);
-  const [fileTreeOpen, setFileTreeOpen] = useState(false);
+  const [sidebarPanel, setSidebarPanel] = useState<"files" | "git" | null>(null);
   const [edityConfigs, setEdityConfigs] = useState<
     Map<string, EdityConfig | null>
   >(new Map());
@@ -309,7 +309,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     : new Set<string>();
   const isProjectRunning = runningCommandIds.size > 0;
 
-  const toggleFileTree = useCallback(() => setFileTreeOpen((v) => !v), []);
+  const toggleSidebarPanel = useCallback((panel: "files" | "git") => {
+    setSidebarPanel((prev) => (prev === panel ? null : panel));
+  }, []);
 
   // Git branch info polling
   const [gitBranchInfo, setGitBranchInfo] = useState<GitBranchInfo | null>(null);
@@ -487,8 +489,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFocusedPane: tabManager.setFocusedPane,
       unsplit: tabManager.unsplit,
 
-      fileTreeOpen,
-      toggleFileTree,
+      sidebarPanel,
+      toggleSidebarPanel,
       edityConfig,
       projectConfigs: edityConfigs,
       saveEdityConfig,
@@ -532,8 +534,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       tabManager.moveTabToPane,
       tabManager.setFocusedPane,
       tabManager.unsplit,
-      fileTreeOpen,
-      toggleFileTree,
+      sidebarPanel,
+      toggleSidebarPanel,
       edityConfig,
       edityConfigs,
       saveEdityConfig,

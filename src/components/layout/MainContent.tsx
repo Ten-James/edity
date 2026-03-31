@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { FileTree } from "./FileTree";
+import { GitSidebar } from "./GitSidebar";
 import { PaneContainer } from "./PaneContainer";
 import {
   ResizablePanelGroup,
@@ -15,7 +16,7 @@ export function MainContent() {
     projects,
     activeProject,
     projectPanes,
-    fileTreeOpen,
+    sidebarPanel,
   } = useAppContext();
 
   // Group allTabs by paneId for fast lookup
@@ -96,7 +97,8 @@ export function MainContent() {
             </div>
           );
         })}
-        {fileTreeOpen && <FileTree />}
+        {sidebarPanel === "files" && <FileTree />}
+        {sidebarPanel === "git" && <GitSidebar />}
     </div>
   );
 }

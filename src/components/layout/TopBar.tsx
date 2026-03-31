@@ -18,8 +18,8 @@ const isDev = import.meta.env.DEV;
 export function TopBar() {
   const {
     activeProject,
-    fileTreeOpen,
-    toggleFileTree,
+    sidebarPanel,
+    toggleSidebarPanel,
     gitBranchInfo,
     gitDiffStats,
     createGitTab,
@@ -103,14 +103,27 @@ export function TopBar() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant={fileTreeOpen ? "secondary" : "ghost"}
+            variant={sidebarPanel === "git" ? "secondary" : "ghost"}
             size="icon-xs"
-            onClick={toggleFileTree}
+            onClick={() => toggleSidebarPanel("git")}
+          >
+            <IconGitBranch size={14} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Git</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant={sidebarPanel === "files" ? "secondary" : "ghost"}
+            size="icon-xs"
+            onClick={() => toggleSidebarPanel("files")}
           >
             <IconFolder size={14} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Toggle File Tree</TooltipContent>
+        <TooltipContent>Files</TooltipContent>
       </Tooltip>
     </div>
   );
