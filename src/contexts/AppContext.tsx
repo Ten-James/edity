@@ -1,9 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import type { GitBranchInfo, GitDiffStats } from "@/types/git";
 import type {
   Tab,
@@ -16,9 +11,22 @@ import type {
   BrowserTab,
   GitTab,
   ClaudeTab,
+  DataTab,
 } from "@/types/tab";
 
-export type { Tab, AllTab, Pane, SplitDirection, ProjectPaneState, TerminalTab, FileTab, BrowserTab, GitTab, ClaudeTab };
+export type {
+  Tab,
+  AllTab,
+  Pane,
+  SplitDirection,
+  ProjectPaneState,
+  TerminalTab,
+  FileTab,
+  BrowserTab,
+  GitTab,
+  ClaudeTab,
+  DataTab,
+};
 
 import type { Project, EdityConfig, RunCommand } from "@shared/types/project";
 import { dispatch } from "@/stores/eventBus";
@@ -53,6 +61,7 @@ export interface AppContextValue {
   updateBrowserUrl: (tabId: string, url: string) => void;
   createGitTab: () => void;
   createClaudeTab: () => void;
+  createDataTab: (connectionId?: string) => void;
 
   projectPanes: Map<string, ProjectPaneState>;
   panes: Pane[];
@@ -81,7 +90,10 @@ export interface AppContextValue {
   dirtyTabs: Set<string>;
   setTabDirty: (tabId: string, dirty: boolean) => void;
 
-  projectClaudeStatus: Map<string, "working" | "idle" | "notification" | "active" | null>;
+  projectClaudeStatus: Map<
+    string,
+    "working" | "idle" | "notification" | "active" | null
+  >;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -114,7 +126,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Derived layout state
-  const currentState = activeProject ? projectPanes.get(activeProject.id) : undefined;
+  const currentState = activeProject
+    ? projectPanes.get(activeProject.id)
+    : undefined;
   const panes = currentState?.panes ?? [];
   const focusedPaneId = currentState?.focusedPaneId ?? null;
   const splitDirection = currentState?.splitDirection ?? "horizontal";
@@ -122,9 +136,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const tabs = focusedPane?.tabs ?? [];
   const activeTabId = focusedPane?.activeTabId ?? null;
 
-  const edityConfig = activeProject ? edityConfigs.get(activeProject.id) ?? null : null;
+  const edityConfig = activeProject
+    ? (edityConfigs.get(activeProject.id) ?? null)
+    : null;
   const runningCommandIds = activeProject
-    ? runningProjects.get(activeProject.id) ?? new Set<string>()
+    ? (runningProjects.get(activeProject.id) ?? new Set<string>())
     : new Set<string>();
   const isProjectRunning = runningCommandIds.size > 0;
 
@@ -132,53 +148,107 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppContextValue = {
     projects,
     activeProject,
-    setActiveProject: (p) => dispatch({ type: "project-switch", projectId: p.id }),
-    addProject: async () => { dispatch({ type: "project-add" }); },
-    removeProject: async (id) => { dispatch({ type: "project-remove", projectId: id }); },
-    reorderProjects: (fromIndex, toIndex) => { dispatch({ type: "project-reorder", fromIndex, toIndex }); },
+    setActiveProject: (p) =>
+      dispatch({ type: "project-switch", projectId: p.id }),
+    addProject: async () => {
+      dispatch({ type: "project-add" });
+    },
+    removeProject: async (id) => {
+      dispatch({ type: "project-remove", projectId: id });
+    },
+    reorderProjects: (fromIndex, toIndex) => {
+      dispatch({ type: "project-reorder", fromIndex, toIndex });
+    },
 
     tabs,
     activeTabId,
     allTabs,
-    createTab: (initialCommand?) => { dispatch({ type: "tab-create-terminal", initialCommand }); return ""; },
-    closeTab: (id) => { dispatch({ type: "tab-close", tabId: id }); },
-    closeTabsByFilePath: (filePath) => { dispatch({ type: "tab-close-by-filepath", filePath }); },
-    setActiveTab: (id) => { dispatch({ type: "tab-set-active", tabId: id }); },
+    createTab: (initialCommand?) => {
+      dispatch({ type: "tab-create-terminal", initialCommand });
+      return "";
+    },
+    closeTab: (id) => {
+      dispatch({ type: "tab-close", tabId: id });
+    },
+    closeTabsByFilePath: (filePath) => {
+      dispatch({ type: "tab-close-by-filepath", filePath });
+    },
+    setActiveTab: (id) => {
+      dispatch({ type: "tab-set-active", tabId: id });
+    },
 
-    updateTabTitle: (tabId, title) => { dispatch({ type: "tab-update-title", tabId, title }); },
-    openFileTab: (filePath) => { dispatch({ type: "tab-open-file", filePath }); },
-    pinTab: (tabId) => { dispatch({ type: "tab-pin", tabId }); },
-    createBrowserTab: (initialUrl?) => { dispatch({ type: "tab-create-browser", initialUrl }); return ""; },
-    updateBrowserUrl: (tabId, url) => { dispatch({ type: "tab-update-browser-url", tabId, url }); },
-    createGitTab: () => { dispatch({ type: "tab-create-git" }); },
-    createClaudeTab: () => { dispatch({ type: "tab-create-claude" }); },
+    updateTabTitle: (tabId, title) => {
+      dispatch({ type: "tab-update-title", tabId, title });
+    },
+    openFileTab: (filePath) => {
+      dispatch({ type: "tab-open-file", filePath });
+    },
+    pinTab: (tabId) => {
+      dispatch({ type: "tab-pin", tabId });
+    },
+    createBrowserTab: (initialUrl?) => {
+      dispatch({ type: "tab-create-browser", initialUrl });
+      return "";
+    },
+    updateBrowserUrl: (tabId, url) => {
+      dispatch({ type: "tab-update-browser-url", tabId, url });
+    },
+    createGitTab: () => {
+      dispatch({ type: "tab-create-git" });
+    },
+    createClaudeTab: () => {
+      dispatch({ type: "tab-create-claude" });
+    },
+    createDataTab: (connectionId?) => {
+      dispatch({ type: "tab-create-data", connectionId });
+    },
 
     projectPanes,
     panes,
     focusedPaneId,
     splitDirection,
-    splitPane: (direction, tabId?) => { dispatch({ type: "layout-split", direction, tabId }); },
-    moveTabToPane: (tabId, targetPaneId) => { dispatch({ type: "layout-move-tab", tabId, targetPaneId }); },
-    setFocusedPane: (paneId) => { dispatch({ type: "layout-focus-pane", paneId }); },
-    unsplit: () => { dispatch({ type: "layout-unsplit" }); },
+    splitPane: (direction, tabId?) => {
+      dispatch({ type: "layout-split", direction, tabId });
+    },
+    moveTabToPane: (tabId, targetPaneId) => {
+      dispatch({ type: "layout-move-tab", tabId, targetPaneId });
+    },
+    setFocusedPane: (paneId) => {
+      dispatch({ type: "layout-focus-pane", paneId });
+    },
+    unsplit: () => {
+      dispatch({ type: "layout-unsplit" });
+    },
 
     sidebarPanel,
-    toggleSidebarPanel: (panel) => { dispatch({ type: "layout-toggle-sidebar", panel }); },
+    toggleSidebarPanel: (panel) => {
+      dispatch({ type: "layout-toggle-sidebar", panel });
+    },
 
     edityConfig,
     projectConfigs: edityConfigs,
-    saveEdityConfig: async (config, projectPath) => { useProjectStore.getState()._saveConfig(config, projectPath); },
-    runProject: (command?) => { dispatch({ type: "run-start", command }); },
-    stopProject: (commandId?) => { dispatch({ type: "run-stop", commandId }); },
+    saveEdityConfig: async (config, projectPath) => {
+      useProjectStore.getState()._saveConfig(config, projectPath);
+    },
+    runProject: (command?) => {
+      dispatch({ type: "run-start", command });
+    },
+    stopProject: (commandId?) => {
+      dispatch({ type: "run-stop", commandId });
+    },
     isProjectRunning,
     runningCommandIds,
 
     gitBranchInfo,
     gitDiffStats,
-    refreshGitBranchInfo: async () => { dispatch({ type: "git-refresh" }); },
+    refreshGitBranchInfo: async () => {
+      dispatch({ type: "git-refresh" });
+    },
 
     dirtyTabs,
-    setTabDirty: (tabId, dirty) => { dispatch({ type: "tab-set-dirty", tabId, dirty }); },
+    setTabDirty: (tabId, dirty) => {
+      dispatch({ type: "tab-set-dirty", tabId, dirty });
+    },
 
     projectClaudeStatus,
   };

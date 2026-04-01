@@ -72,10 +72,7 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
   if (git.isLoading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center">
-        <IconLoader2
-          size={20}
-          className="animate-spin text-muted-foreground"
-        />
+        <IconLoader2 size={20} className="animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -194,6 +191,9 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
                 stagedCount={git.staged.length}
                 isCommitting={git.isCommitting}
                 onCommit={git.commit}
+                ahead={gitBranchInfo?.ahead ?? 0}
+                isPushing={git.isPushing}
+                onPush={handlePush}
               />
             </div>
             <div className="flex-1">
@@ -210,7 +210,9 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
             <div
               className={cn(
                 "flex flex-col overflow-hidden h-full",
-                git.selectedCommit ? "w-[400px] border-r border-border shrink-0" : "flex-1",
+                git.selectedCommit
+                  ? "w-[400px] border-r border-border shrink-0"
+                  : "flex-1",
               )}
             >
               <GitLogPanel

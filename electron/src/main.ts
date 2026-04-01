@@ -22,6 +22,7 @@ import { registerProjectHandlers } from "./ipc/projects";
 import { ensureClaudeHooks, registerClaudeDetectionHandlers } from "./ipc/claude-detection";
 import { registerClaudeSdkHandlers, cleanupAllSessions } from "./ipc/claude-sdk";
 import { registerSettingsHandlers } from "./ipc/settings";
+import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
 
 // --- Custom Protocol ---
 
@@ -68,6 +69,7 @@ registerProjectHandlers();
 registerClaudeDetectionHandlers();
 registerClaudeSdkHandlers(() => mainWindow);
 registerSettingsHandlers();
+registerDataHandlers();
 
 // --- App Lifecycle ---
 
@@ -128,6 +130,7 @@ app.on("window-all-closed", () => {
 
   tabClaudeState.clear();
   cleanupAllSessions();
+  cleanupDataConnections();
 
   app.quit();
 });

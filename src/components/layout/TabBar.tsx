@@ -4,6 +4,7 @@ import {
   IconWorld,
   IconGitBranch,
   IconRobot,
+  IconDatabase,
   IconX,
   IconPlus,
   IconLayoutColumns,
@@ -40,6 +41,7 @@ export function TabBar({ paneId }: TabBarProps) {
     createBrowserTab,
     createGitTab,
     createClaudeTab,
+    createDataTab,
     closeTab,
     pinTab,
     dirtyTabs,
@@ -64,6 +66,8 @@ export function TabBar({ paneId }: TabBarProps) {
         return <IconGitBranch size={14} />;
       case "claude":
         return <IconRobot size={14} />;
+      case "data":
+        return <IconDatabase size={14} />;
     }
   }
 
@@ -89,7 +93,11 @@ export function TabBar({ paneId }: TabBarProps) {
                 )}
               >
                 {getTabIcon(tab)}
-                <span className={cn(tab.type === "file" && tab.isTemporary && "italic")}>
+                <span
+                  className={cn(
+                    tab.type === "file" && tab.isTemporary && "italic",
+                  )}
+                >
                   {tab.title}
                 </span>
                 {dirtyTabs.has(tab.id) && (
@@ -112,11 +120,15 @@ export function TabBar({ paneId }: TabBarProps) {
             <ContextMenuContent>
               {panes.length < 2 && (
                 <>
-                  <ContextMenuItem onClick={() => splitPane("horizontal", tab.id)}>
+                  <ContextMenuItem
+                    onClick={() => splitPane("horizontal", tab.id)}
+                  >
                     <IconLayoutColumns size={14} />
                     Split Right
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => splitPane("vertical", tab.id)}>
+                  <ContextMenuItem
+                    onClick={() => splitPane("vertical", tab.id)}
+                  >
                     <IconLayoutRows size={14} />
                     Split Down
                   </ContextMenuItem>
@@ -125,7 +137,9 @@ export function TabBar({ paneId }: TabBarProps) {
               )}
               {panes.length === 2 && otherPaneId && (
                 <>
-                  <ContextMenuItem onClick={() => moveTabToPane(tab.id, otherPaneId)}>
+                  <ContextMenuItem
+                    onClick={() => moveTabToPane(tab.id, otherPaneId)}
+                  >
                     <IconArrowMoveRight size={14} />
                     Move to Other Pane
                   </ContextMenuItem>
@@ -163,6 +177,10 @@ export function TabBar({ paneId }: TabBarProps) {
           <DropdownMenuItem onClick={() => createClaudeTab()}>
             <IconRobot size={14} />
             Claude
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => createDataTab()}>
+            <IconDatabase size={14} />
+            Data Viewer
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

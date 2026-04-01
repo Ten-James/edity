@@ -27,7 +27,18 @@ export interface ClaudeTab extends BaseTab {
   type: "claude";
 }
 
-export type Tab = TerminalTab | FileTab | BrowserTab | GitTab | ClaudeTab;
+export interface DataTab extends BaseTab {
+  type: "data";
+  connectionId?: string;
+}
+
+export type Tab =
+  | TerminalTab
+  | FileTab
+  | BrowserTab
+  | GitTab
+  | ClaudeTab
+  | DataTab;
 
 export type SplitDirection = "horizontal" | "vertical";
 

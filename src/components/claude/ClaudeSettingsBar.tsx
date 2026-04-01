@@ -1,4 +1,8 @@
-import type { ClaudeConversation, ClaudeSessionInfo, PermissionMode } from "@/types/claude";
+import type {
+  ClaudeConversation,
+  ClaudeSessionInfo,
+  PermissionMode,
+} from "@/types/claude";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -48,18 +52,29 @@ const MODES: { value: PermissionMode; label: string }[] = [
 
 function getModelLabel(model: string | null): string {
   if (!model) return "Sonnet 4.6";
-  const found = MODELS.find((m) => model.includes(m.value) || m.value.includes(model));
+  const found = MODELS.find(
+    (m) => model.includes(m.value) || m.value.includes(model),
+  );
   return found?.label ?? model;
 }
 
 function getModelValue(model: string | null): string {
   if (!model) return "claude-sonnet-4-6";
-  const found = MODELS.find((m) => model.includes(m.value) || m.value.includes(model));
+  const found = MODELS.find(
+    (m) => model.includes(m.value) || m.value.includes(model),
+  );
   return found?.value ?? model;
 }
 
 const OPENABLE_TOOLS = [
-  "Edit", "Bash", "Agent", "Skill", "Mcp", "NotebookEdit", "LSP", "AskUserQuestion",
+  "Edit",
+  "Bash",
+  "Agent",
+  "Skill",
+  "Mcp",
+  "NotebookEdit",
+  "LSP",
+  "AskUserQuestion",
 ];
 
 function getModeLabel(mode: PermissionMode): string {
@@ -81,7 +96,9 @@ export function ClaudeSettingsBar({
     const next = new Set(autoExpandSet);
     if (next.has(tool)) next.delete(tool);
     else next.add(tool);
-    updateSettings({ claude: { ...settings.claude, autoExpandTools: [...next] } });
+    updateSettings({
+      claude: { ...settings.claude, autoExpandTools: [...next] },
+    });
   };
 
   return (
@@ -89,7 +106,11 @@ export function ClaudeSettingsBar({
       {/* Model selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="xs" className="gap-1 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="xs"
+            className="gap-1 text-muted-foreground"
+          >
             <IconCpu size={12} />
             {getModelLabel(conversation.model)}
             <IconChevronDown size={10} />
@@ -110,10 +131,15 @@ export function ClaudeSettingsBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Permission mode selector */}
+      {/* Permission mode selector — disabled during active session */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="xs" className="gap-1 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="xs"
+            className="gap-1 text-muted-foreground"
+            disabled={conversation.sessionId !== null}
+          >
             <IconShield size={12} />
             {getModeLabel(conversation.permissionMode)}
             <IconChevronDown size={10} />
@@ -137,7 +163,11 @@ export function ClaudeSettingsBar({
       {/* Auto-expand tools */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="xs" className="gap-1 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="xs"
+            className="gap-1 text-muted-foreground"
+          >
             <IconEye size={12} />
             Expand
             <IconChevronDown size={10} />
@@ -161,7 +191,11 @@ export function ClaudeSettingsBar({
       {sessions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="xs" className="gap-1 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="xs"
+              className="gap-1 text-muted-foreground"
+            >
               <IconHistory size={12} />
               Sessions
               <IconChevronDown size={10} />
@@ -173,7 +207,11 @@ export function ClaudeSettingsBar({
               <DropdownMenuItem
                 key={s.sessionId}
                 onClick={() => onResumeSession(s.sessionId)}
-                className={conversation.sessionId === s.sessionId ? "font-medium text-foreground" : ""}
+                className={
+                  conversation.sessionId === s.sessionId
+                    ? "font-medium text-foreground"
+                    : ""
+                }
               >
                 <span className="truncate">{s.summary.slice(0, 100)}</span>
               </DropdownMenuItem>

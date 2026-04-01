@@ -65,6 +65,12 @@ export interface TabCreateClaudeEvent {
   type: "tab-create-claude";
 }
 
+/** Open (or focus) the singleton Data tab. */
+export interface TabCreateDataEvent {
+  type: "tab-create-data";
+  connectionId?: string;
+}
+
 /** Close a tab by ID. */
 export interface TabCloseEvent {
   type: "tab-close";
@@ -231,6 +237,7 @@ export type EdityEvent =
   | TabCreateBrowserEvent
   | TabCreateGitEvent
   | TabCreateClaudeEvent
+  | TabCreateDataEvent
   | TabCloseEvent
   | TabCloseByFilePathEvent
   | TabSetActiveEvent
@@ -263,4 +270,7 @@ export type EdityEvent =
   | UIOpenSettingsEvent;
 
 /** Extract the event interface for a specific event type string. */
-export type EventPayload<T extends EdityEvent["type"]> = Extract<EdityEvent, { type: T }>;
+export type EventPayload<T extends EdityEvent["type"]> = Extract<
+  EdityEvent,
+  { type: T }
+>;

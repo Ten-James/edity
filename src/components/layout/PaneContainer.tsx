@@ -4,6 +4,7 @@ import { FileViewer } from "@/components/FileViewer";
 import { BrowserView } from "@/components/BrowserView";
 import { GitView } from "@/components/git/GitView";
 import { ClaudeView } from "@/components/claude/ClaudeView";
+import { DataView } from "@/components/data/DataView";
 import { TabBar } from "./TabBar";
 import type { AllTab } from "@/types/tab";
 
@@ -79,6 +80,16 @@ export function PaneContainer({
                   key={tab.id}
                   isActive={isActive}
                   projectPath={tab.projectPath}
+                />
+              );
+            case "data":
+              return (
+                <DataView
+                  key={tab.id}
+                  tabId={tab.id}
+                  isActive={isActive}
+                  projectId={tab.projectId}
+                  connectionId={tab.connectionId}
                 />
               );
             default:

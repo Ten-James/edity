@@ -21,13 +21,29 @@ import {
 } from "@tabler/icons-react";
 
 export const TASK_TOOL_NAMES = new Set([
-  "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TaskOutput", "TaskStop", "TodoWrite",
+  "TaskCreate",
+  "TaskUpdate",
+  "TaskList",
+  "TaskGet",
+  "TaskOutput",
+  "TaskStop",
+  "TodoWrite",
 ]);
 
 export const INLINE_TOOLS = new Set([
-  "Read", "Write", "WebSearch", "WebFetch", "Glob", "Grep", "ToolSearch",
-  "EnterPlanMode", "ExitPlanMode", "EnterWorktree", "ExitWorktree",
-  "ListMcpResources", "ReadMcpResource",
+  "Read",
+  "Write",
+  "WebSearch",
+  "WebFetch",
+  "Glob",
+  "Grep",
+  "ToolSearch",
+  "EnterPlanMode",
+  "ExitPlanMode",
+  "EnterWorktree",
+  "ExitWorktree",
+  "ListMcpResources",
+  "ReadMcpResource",
 ]);
 
 export function getToolIcon(name: string): ReactNode {

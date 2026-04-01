@@ -3,6 +3,7 @@ import { useClaudeSession } from "@/hooks/useClaudeSession";
 import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
 import { ClaudePermissionPrompt } from "./ClaudePermissionPrompt";
+import { ClaudeQuestionPrompt } from "./ClaudeQuestionPrompt";
 import { ClaudeInputBar } from "./ClaudeInputBar";
 import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
 import { ClaudeTaskPopover } from "./ClaudeTaskPopover";
@@ -50,7 +51,10 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
   }, [isBusy, streamStart]);
 
   useEffect(() => {
-    if (!streamStart) { setElapsed(""); return; }
+    if (!streamStart) {
+      setElapsed("");
+      return;
+    }
     const tick = () => {
       const s = Math.floor((Date.now() - streamStart) / 1000);
       setElapsed(s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
@@ -67,9 +71,22 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
   }, [conversation.messages, conversation.status]);
 
   const taskTools = useMemo(
-    () => conversation.messages.flatMap((m) => m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name))),
+    () =>
+      conversation.messages.flatMap((m) =>
+        m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name)),
+      ),
     [conversation.messages],
   );
+
+  // Find active AskUserQuestion tool
+  const pendingQuestion = useMemo(() => {
+    for (const msg of [...conversation.messages].reverse()) {
+      for (const t of msg.toolUses) {
+        if (t.name === "AskUserQuestion" && t.status === "running") return t;
+      }
+    }
+    return null;
+  }, [conversation.messages]);
 
   const handleSend = async (text: string) => {
     if (!hasSession) {
@@ -92,7 +109,10 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
         onAbort={abort}
       />
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto scrollbar-thin"
+      >
         {!hasSession && conversation.messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -102,13 +122,19 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
           </div>
         ) : (
           <>
-            <ClaudeMessageList messages={conversation.messages} onSendMessage={handleSend} />
+            <ClaudeMessageList messages={conversation.messages} />
             {isBusy && (
               <div className="flex items-center gap-2 px-4 pb-4 text-xs text-muted-foreground">
                 <IconLoader2 size={12} className="animate-spin" />
-                <span>{conversation.status === "waiting_permission" ? "Waiting for approval" : "Working"}</span>
+                <span>
+                  {conversation.status === "waiting_permission"
+                    ? "Waiting for approval"
+                    : "Working"}
+                </span>
                 {elapsed && <span>{elapsed}</span>}
-                {conversation.numTurns > 0 && <span>{conversation.numTurns}t</span>}
+                {conversation.numTurns > 0 && (
+                  <span>{conversation.numTurns}t</span>
+                )}
               </div>
             )}
           </>
@@ -124,14 +150,21 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
 
       <div className="relative">
         <ClaudeTaskPopover taskTools={taskTools} />
-        <ClaudeInputBar
-          onSend={handleSend}
-          disabled={conversation.status === "streaming" || isWaitingPermission}
-          placeholder={
-            hasSession ? "Send a follow-up..." : "Ask Claude something..."
-          }
-          slashCommands={conversation.slashCommands}
-        />
+        {pendingQuestion ? (
+          <ClaudeQuestionPrompt
+            toolUse={pendingQuestion}
+            onAnswer={handleSend}
+          />
+        ) : (
+          <ClaudeInputBar
+            onSend={handleSend}
+            disabled={conversation.status === "streaming" || isWaitingPermission}
+            placeholder={
+              hasSession ? "Send a follow-up..." : "Ask Claude something..."
+            }
+            slashCommands={conversation.slashCommands}
+          />
+        )}
       </div>
 
       <ClaudeSettingsBar

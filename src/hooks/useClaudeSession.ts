@@ -15,14 +15,28 @@ import type {
 } from "@/types/claude";
 
 type Action =
-  | { type: "SYSTEM_INIT"; sessionId: string; model?: string; permissionMode?: PermissionMode; tools?: string[]; slashCommands?: string[] }
+  | {
+      type: "SYSTEM_INIT";
+      sessionId: string;
+      model?: string;
+      permissionMode?: PermissionMode;
+      tools?: string[];
+      slashCommands?: string[];
+    }
   | { type: "STREAM_EVENT"; message: ClaudeMessage & { type: "stream_event" } }
-  | { type: "ASSISTANT_MESSAGE"; message: ClaudeMessage & { type: "assistant" } }
+  | {
+      type: "ASSISTANT_MESSAGE";
+      message: ClaudeMessage & { type: "assistant" };
+    }
   | { type: "RESULT"; message: ClaudeMessage & { type: "result" } }
   | { type: "PERMISSION_REQUEST"; request: ClaudePermissionRequest }
   | { type: "PERMISSION_RESPONDED" }
   | { type: "USER_MESSAGE"; text: string }
   | { type: "ERROR"; message: string }
+  | { type: "SUBAGENT_TOOL_CALL"; parentToolUseId: string; toolUse: { id: string; name: string; input: Record<string, unknown> } }
+  | { type: "SUBAGENT_TOOL_RESULT"; parentToolUseId: string; toolUseId: string; content: string; isError: boolean }
+  | { type: "SUBAGENT_COMPLETED"; toolUseId: string }
+  | { type: "SUBAGENT_PROGRESS"; toolUseId: string; description: string }
   | { type: "SET_SESSION_ID"; sessionId: string }
   | { type: "SET_MODEL"; model: string }
   | { type: "SET_PERMISSION_MODE"; mode: PermissionMode }
@@ -38,11 +52,15 @@ interface ContentBlock {
   input?: Record<string, unknown>;
 }
 
-function convertSessionMessages(messages: ClaudeSessionMessage[]): ClaudeUIMessage[] {
+function convertSessionMessages(
+  messages: ClaudeSessionMessage[],
+): ClaudeUIMessage[] {
   return messages
     .filter((m) => m.type === "user" || m.type === "assistant")
     .map((m) => {
-      const msg = m.message as { content?: string | ContentBlock[] } | undefined;
+      const msg = m.message as
+        | { content?: string | ContentBlock[] }
+        | undefined;
       const content = msg?.content;
 
       let textContent = "";
@@ -99,7 +117,9 @@ function makeEmptyConversation(): ClaudeConversation {
   };
 }
 
-function ensureCurrentAssistant(messages: ClaudeUIMessage[]): ClaudeUIMessage[] {
+function ensureCurrentAssistant(
+  messages: ClaudeUIMessage[],
+): ClaudeUIMessage[] {
   const last = messages[messages.length - 1];
   if (last && last.role === "assistant" && last.isStreaming) return messages;
   return [
@@ -117,16 +137,37 @@ function ensureCurrentAssistant(messages: ClaudeUIMessage[]): ClaudeUIMessage[] 
 }
 
 /** Apply tool_use stream events (start/delta/stop) to a tool use array. Returns updated array or null if unhandled. */
-function applyToolUseEvent(toolUses: ClaudeToolUse[], event: StreamEventPayload): ClaudeToolUse[] | null {
-  if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
+function applyToolUseEvent(
+  toolUses: ClaudeToolUse[],
+  event: StreamEventPayload,
+): ClaudeToolUse[] | null {
+  if (
+    event.type === "content_block_start" &&
+    event.content_block.type === "tool_use"
+  ) {
     const block = event.content_block as ContentBlockToolUse;
-    return [...toolUses, { id: block.id, name: block.name, input: {}, inputJson: "", status: "running" }];
+    return [
+      ...toolUses,
+      {
+        id: block.id,
+        name: block.name,
+        input: {},
+        inputJson: "",
+        status: "running",
+      },
+    ];
   }
-  if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
+  if (
+    event.type === "content_block_delta" &&
+    event.delta.type === "input_json_delta"
+  ) {
     const updated = [...toolUses];
     const last = updated[updated.length - 1];
     if (last) {
-      updated[updated.length - 1] = { ...last, inputJson: last.inputJson + event.delta.partial_json };
+      updated[updated.length - 1] = {
+        ...last,
+        inputJson: last.inputJson + event.delta.partial_json,
+      };
     }
     return updated;
   }
@@ -135,15 +176,23 @@ function applyToolUseEvent(toolUses: ClaudeToolUse[], event: StreamEventPayload)
     const last = updated[updated.length - 1];
     if (last && last.inputJson && last.status === "running") {
       try {
-        updated[updated.length - 1] = { ...last, input: JSON.parse(last.inputJson) };
-      } catch { /* partial JSON */ }
+        updated[updated.length - 1] = {
+          ...last,
+          input: JSON.parse(last.inputJson),
+        };
+      } catch {
+        /* partial JSON */
+      }
     }
     return updated;
   }
   return null;
 }
 
-function reducer(state: ClaudeConversation, action: Action): ClaudeConversation {
+function reducer(
+  state: ClaudeConversation,
+  action: Action,
+): ClaudeConversation {
   switch (action.type) {
     case "SET_SESSION_ID":
       return { ...state, sessionId: action.sessionId };
@@ -161,32 +210,8 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
 
     case "STREAM_EVENT": {
       const event = action.message.event;
-      const parentId = action.message.parent_tool_use_id;
       const messages = ensureCurrentAssistant(state.messages);
       const current = { ...messages[messages.length - 1] };
-
-      // Sub-agent messages: route to parent tool use
-      if (parentId) {
-        const toolUses = [...current.toolUses];
-        const parentIdx = toolUses.findIndex((t) => t.id === parentId);
-        if (parentIdx !== -1) {
-          const parent = { ...toolUses[parentIdx] };
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            parent.subContent = (parent.subContent ?? "") + event.delta.text;
-          } else {
-            const updated = applyToolUseEvent(parent.subToolUses ?? [], event);
-            if (updated) parent.subToolUses = updated;
-          }
-          toolUses[parentIdx] = parent;
-          current.toolUses = toolUses;
-        }
-
-        return {
-          ...state,
-          status: "streaming",
-          messages: [...messages.slice(0, -1), current],
-        };
-      }
 
       // Main agent messages: text/thinking deltas go on the message, tool events on toolUses
       if (event.type === "content_block_delta") {
@@ -212,7 +237,8 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
       current.isStreaming = false;
       current.toolUses = current.toolUses.map((t) => ({
         ...t,
-        status: t.status === "running" ? "complete" as const : t.status,
+        // Agent tools stay "running" until SUBAGENT_COMPLETED
+        status: t.status === "running" && t.name !== "Agent" ? ("complete" as const) : t.status,
       }));
 
       return {
@@ -223,18 +249,40 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
 
     case "RESULT": {
       const msg = action.message as unknown as Record<string, unknown>;
-      const modelUsage = msg.modelUsage as Record<string, { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number; contextWindow?: number }> | undefined;
+      const modelUsage = msg.modelUsage as
+        | Record<
+            string,
+            {
+              inputTokens?: number;
+              outputTokens?: number;
+              cacheReadInputTokens?: number;
+              cacheCreationInputTokens?: number;
+              contextWindow?: number;
+            }
+          >
+        | undefined;
       let usage: ClaudeUsage | null = state.usage;
       if (modelUsage) {
-        let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreation = 0, contextWindow = 0;
+        let inputTokens = 0,
+          outputTokens = 0,
+          cacheRead = 0,
+          cacheCreation = 0,
+          contextWindow = 0;
         for (const u of Object.values(modelUsage)) {
           inputTokens += u.inputTokens ?? 0;
           outputTokens += u.outputTokens ?? 0;
           cacheRead += u.cacheReadInputTokens ?? 0;
           cacheCreation += u.cacheCreationInputTokens ?? 0;
-          if (u.contextWindow && u.contextWindow > contextWindow) contextWindow = u.contextWindow;
+          if (u.contextWindow && u.contextWindow > contextWindow)
+            contextWindow = u.contextWindow;
         }
-        usage = { inputTokens, outputTokens, cacheReadInputTokens: cacheRead, cacheCreationInputTokens: cacheCreation, contextWindow };
+        usage = {
+          inputTokens,
+          outputTokens,
+          cacheReadInputTokens: cacheRead,
+          cacheCreationInputTokens: cacheCreation,
+          contextWindow,
+        };
       }
       return {
         ...state,
@@ -277,14 +325,125 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
         ],
       };
 
-    case "ERROR":
+    case "SUBAGENT_TOOL_CALL": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const parentIdx = toolUses.findIndex((t) => t.id === action.parentToolUseId);
+      if (parentIdx === -1) return state;
+      const parent = { ...toolUses[parentIdx] };
+      const subTools = [...(parent.subToolUses ?? [])];
+      const existing = subTools.findIndex((t) => t.id === action.toolUse.id);
+      if (existing === -1) {
+        subTools.push({
+          id: action.toolUse.id,
+          name: action.toolUse.name,
+          input: action.toolUse.input,
+          inputJson: JSON.stringify(action.toolUse.input),
+          status: "running",
+        });
+      }
+      parent.subToolUses = subTools;
+      parent.status = "running";
+      toolUses[parentIdx] = parent;
+      updated.toolUses = toolUses;
+      messages[messages.length - 1] = updated;
+      return { ...state, status: "streaming", messages };
+    }
+
+    case "SUBAGENT_TOOL_RESULT": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const parentIdx = toolUses.findIndex((t) => t.id === action.parentToolUseId);
+      if (parentIdx === -1) return state;
+      const parent = { ...toolUses[parentIdx] };
+      const subTools = [...(parent.subToolUses ?? [])];
+      const toolIdx = subTools.findIndex((t) => t.id === action.toolUseId);
+      if (toolIdx !== -1) {
+        subTools[toolIdx] = { ...subTools[toolIdx], status: "complete", output: action.content };
+      }
+      parent.subToolUses = subTools;
+      toolUses[parentIdx] = parent;
+      updated.toolUses = toolUses;
+      messages[messages.length - 1] = updated;
+      return { ...state, messages };
+    }
+
+    case "SUBAGENT_COMPLETED": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const parentIdx = toolUses.findIndex((t) => t.id === action.toolUseId);
+      if (parentIdx !== -1) {
+        const parent = { ...toolUses[parentIdx] };
+        parent.status = "complete";
+        // Mark all remaining running sub-tools as complete
+        if (parent.subToolUses) {
+          parent.subToolUses = parent.subToolUses.map((t) =>
+            t.status === "running" ? { ...t, status: "complete" as const } : t,
+          );
+        }
+        toolUses[parentIdx] = parent;
+      }
+      updated.toolUses = toolUses;
+      messages[messages.length - 1] = updated;
+      return { ...state, messages };
+    }
+
+    case "SUBAGENT_PROGRESS": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const parentIdx = toolUses.findIndex((t) => t.id === action.toolUseId);
+      if (parentIdx === -1) return state;
+      const parent = { ...toolUses[parentIdx] };
+      parent.status = "running";
+      toolUses[parentIdx] = parent;
+      updated.toolUses = toolUses;
+      messages[messages.length - 1] = updated;
+      return { ...state, status: "streaming", messages };
+    }
+
+    case "ERROR": {
+      const hasStreaming = state.messages.some((m) => m.isStreaming);
+      if (hasStreaming) {
+        return {
+          ...state,
+          status: "error",
+          messages: state.messages.map((m) =>
+            m.isStreaming
+              ? { ...m, isStreaming: false, error: action.message }
+              : m,
+          ),
+        };
+      }
       return {
         ...state,
         status: "error",
-        messages: state.messages.map((m) =>
-          m.isStreaming ? { ...m, isStreaming: false, error: action.message } : m,
-        ),
+        messages: [
+          ...state.messages,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            textContent: "",
+            thinkingContent: "",
+            toolUses: [],
+            isStreaming: false,
+            error: action.message,
+            timestamp: Date.now(),
+          },
+        ],
       };
+    }
 
     case "SET_MODEL":
       return { ...state, model: action.model };
@@ -301,7 +460,11 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
       };
 
     case "RESET":
-      return { ...makeEmptyConversation(), model: state.model, permissionMode: state.permissionMode };
+      return {
+        ...makeEmptyConversation(),
+        model: state.model,
+        permissionMode: state.permissionMode,
+      };
 
     default:
       return state;
@@ -309,7 +472,11 @@ function reducer(state: ClaudeConversation, action: Action): ClaudeConversation 
 }
 
 export function useClaudeSession(projectPath: string) {
-  const [conversation, dispatch] = useReducer(reducer, undefined, makeEmptyConversation);
+  const [conversation, dispatch] = useReducer(
+    reducer,
+    undefined,
+    makeEmptyConversation,
+  );
   const sessionIdRef = useRef<string | null>(null);
   const [sessions, setSessions] = useState<ClaudeSessionInfo[]>([]);
 
@@ -320,45 +487,102 @@ export function useClaudeSession(projectPath: string) {
   const setupListener = useCallback((sid: string) => {
     // Clean up previous listener
     unlistenRef.current?.();
-    unlistenRef.current = window.electronAPI.on(`claude-msg-${sid}`, (data: unknown) => {
-      const payload = data as ClaudeMessage;
-      switch (payload.type) {
-        case "system": {
-          // Only handle init subtype, ignore status/session_state_changed
-          const raw = data as Record<string, unknown>;
-          if (raw.subtype !== "init") break;
-          // slash_commands may be string[] or {name, description}[] - normalize
-          const rawCmds = raw.slash_commands as unknown[];
-          const slashCommands = Array.isArray(rawCmds)
-            ? rawCmds.map((c) => (typeof c === "string" ? c : (c as { name: string }).name))
-            : [];
-          dispatch({
-            type: "SYSTEM_INIT",
-            sessionId: payload.session_id,
-            model: payload.model,
-            permissionMode: payload.permissionMode,
-            tools: payload.tools,
-            slashCommands,
-          });
-          break;
+    unlistenRef.current = window.electronAPI.on(
+      `claude-msg-${sid}`,
+      (data: unknown) => {
+        const raw = data as Record<string, unknown>;
+        const msgType = raw.type as string;
+        switch (msgType) {
+          case "system": {
+            // Handle sub-agent lifecycle
+            if (raw.subtype === "task_progress" || raw.subtype === "task_started") {
+              const toolUseId = raw.tool_use_id as string | undefined;
+              const desc = raw.description as string | undefined;
+              if (toolUseId && desc) {
+                dispatch({ type: "SUBAGENT_PROGRESS", toolUseId, description: desc });
+              }
+              break;
+            }
+            if (raw.subtype === "task_notification") {
+              const toolUseId = raw.tool_use_id as string | undefined;
+              if (toolUseId) {
+                dispatch({ type: "SUBAGENT_COMPLETED", toolUseId });
+              }
+              break;
+            }
+            if (raw.subtype !== "init") break;
+            // slash_commands may be string[] or {name, description}[] - normalize
+            const rawCmds = raw.slash_commands as unknown[];
+            const slashCommands = Array.isArray(rawCmds)
+              ? rawCmds.map((c) =>
+                  typeof c === "string" ? c : (c as { name: string }).name,
+                )
+              : [];
+            dispatch({
+              type: "SYSTEM_INIT",
+              sessionId: raw.session_id as string,
+              model: raw.model as string | undefined,
+              permissionMode: raw.permissionMode as PermissionMode | undefined,
+              tools: raw.tools as string[] | undefined,
+              slashCommands,
+            });
+            break;
+          }
+          case "stream_event":
+            dispatch({ type: "STREAM_EVENT", message: data as ClaudeMessage & { type: "stream_event" } });
+            break;
+          case "assistant": {
+            const parentId = raw.parent_tool_use_id as string | null;
+            if (parentId) {
+              // Sub-agent assistant message — extract tool_use blocks
+              const msg = raw.message as Record<string, unknown> | undefined;
+              const content = (msg?.content ?? []) as ContentBlock[];
+              for (const block of content) {
+                if (block.type === "tool_use" && block.id && block.name) {
+                  dispatch({
+                    type: "SUBAGENT_TOOL_CALL",
+                    parentToolUseId: parentId,
+                    toolUse: { id: block.id, name: block.name, input: block.input ?? {} },
+                  });
+                }
+              }
+            } else {
+              dispatch({ type: "ASSISTANT_MESSAGE", message: data as ClaudeMessage & { type: "assistant" } });
+            }
+            break;
+          }
+          case "user": {
+            // Sub-agent tool results
+            const parentId = raw.parent_tool_use_id as string | null;
+            if (parentId) {
+              const msg = raw.message as Record<string, unknown> | undefined;
+              const content = (msg?.content ?? []) as Array<Record<string, unknown>>;
+              for (const block of content) {
+                if (block.type === "tool_result" && block.tool_use_id) {
+                  dispatch({
+                    type: "SUBAGENT_TOOL_RESULT",
+                    parentToolUseId: parentId,
+                    toolUseId: String(block.tool_use_id),
+                    content: String(block.content ?? ""),
+                    isError: block.is_error === true,
+                  });
+                }
+              }
+            }
+            break;
+          }
+          case "result":
+            dispatch({ type: "RESULT", message: data as ClaudeMessage & { type: "result" } });
+            break;
+          case "permission_request":
+            dispatch({ type: "PERMISSION_REQUEST", request: data as ClaudePermissionRequest });
+            break;
+          case "error":
+            dispatch({ type: "ERROR", message: (raw.message as string) ?? "Unknown error" });
+            break;
         }
-        case "stream_event":
-          dispatch({ type: "STREAM_EVENT", message: payload });
-          break;
-        case "assistant":
-          dispatch({ type: "ASSISTANT_MESSAGE", message: payload });
-          break;
-        case "result":
-          dispatch({ type: "RESULT", message: payload });
-          break;
-        case "permission_request":
-          dispatch({ type: "PERMISSION_REQUEST", request: payload });
-          break;
-        case "error":
-          dispatch({ type: "ERROR", message: payload.message });
-          break;
-      }
-    });
+      },
+    );
   }, []);
 
   const teardownListener = useCallback(() => {
@@ -375,7 +599,9 @@ export function useClaudeSession(projectPath: string) {
   // Load sessions on mount + cleanup listener on unmount
   useEffect(() => {
     refreshSessions();
-    return () => { teardownListener(); };
+    return () => {
+      teardownListener();
+    };
   }, [refreshSessions, teardownListener]);
 
   const startSession = useCallback(
@@ -386,15 +612,25 @@ export function useClaudeSession(projectPath: string) {
       dispatch({ type: "SET_SESSION_ID", sessionId });
       dispatch({ type: "USER_MESSAGE", text: prompt });
 
-      await invoke("claude_start", {
-        sessionId,
-        projectPath,
-        prompt,
-        model: conversation.model,
-        permissionMode: conversation.permissionMode,
-      });
+      try {
+        await invoke("claude_start", {
+          sessionId,
+          projectPath,
+          prompt,
+          model: conversation.model,
+          permissionMode: conversation.permissionMode,
+        });
+      } catch (err) {
+        console.error("[claude] Failed to start session:", err);
+        dispatch({ type: "ERROR", message: (err as Error).message || String(err) });
+      }
     },
-    [projectPath, conversation.model, conversation.permissionMode, setupListener],
+    [
+      projectPath,
+      conversation.model,
+      conversation.permissionMode,
+      setupListener,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -403,13 +639,18 @@ export function useClaudeSession(projectPath: string) {
       if (!sid) return;
       dispatch({ type: "USER_MESSAGE", text: message });
 
-      await invoke("claude_send", {
-        sessionId: sid,
-        projectPath,
-        message,
-        model: conversation.model,
-        permissionMode: conversation.permissionMode,
-      });
+      try {
+        await invoke("claude_send", {
+          sessionId: sid,
+          projectPath,
+          message,
+          model: conversation.model,
+          permissionMode: conversation.permissionMode,
+        });
+      } catch (err) {
+        console.error("[claude] Failed to send message:", err);
+        dispatch({ type: "ERROR", message: (err as Error).message || String(err) });
+      }
     },
     [projectPath, conversation.model, conversation.permissionMode],
   );
@@ -420,12 +661,20 @@ export function useClaudeSession(projectPath: string) {
       setupListener(sessionId);
       dispatch({ type: "RESET" });
 
-      const history = await invoke<ClaudeSessionMessage[]>("claude_get_session_messages", {
-        sessionId,
-        projectPath,
-      });
-      const messages = convertSessionMessages(history);
-      dispatch({ type: "LOAD_HISTORY", sessionId, messages });
+      try {
+        const history = await invoke<ClaudeSessionMessage[]>(
+          "claude_get_session_messages",
+          {
+            sessionId,
+            projectPath,
+          },
+        );
+        const messages = convertSessionMessages(history);
+        dispatch({ type: "LOAD_HISTORY", sessionId, messages });
+      } catch (err) {
+        console.error("[claude] Failed to load session:", err);
+        dispatch({ type: "ERROR", message: `Failed to load session: ${(err as Error).message || err}` });
+      }
     },
     [projectPath, setupListener],
   );
@@ -435,7 +684,12 @@ export function useClaudeSession(projectPath: string) {
       const sid = sessionIdRef.current;
       if (!sid) return;
       dispatch({ type: "PERMISSION_RESPONDED" });
-      await invoke("claude_approve", { sessionId: sid, toolUseID, behavior });
+      try {
+        await invoke("claude_approve", { sessionId: sid, toolUseID, behavior });
+      } catch (err) {
+        console.error("[claude] Permission response failed:", err);
+        dispatch({ type: "ERROR", message: `Permission response failed: ${(err as Error).message || err}` });
+      }
     },
     [],
   );
@@ -443,13 +697,21 @@ export function useClaudeSession(projectPath: string) {
   const interrupt = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    await invoke("claude_interrupt", { sessionId: sid });
+    try {
+      await invoke("claude_interrupt", { sessionId: sid });
+    } catch (err) {
+      console.error("[claude] Interrupt failed:", err);
+    }
   }, []);
 
   const abort = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
-    await invoke("claude_abort", { sessionId: sid });
+    try {
+      await invoke("claude_abort", { sessionId: sid });
+    } catch (err) {
+      console.error("[claude] Abort failed:", err);
+    }
     dispatch({ type: "RESET" });
     sessionIdRef.current = null;
     teardownListener();

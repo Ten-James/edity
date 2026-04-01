@@ -13,8 +13,14 @@ interface ToolInputProps {
 // --- Edit: inline diff ---
 
 export function EditDiff({ input, inputJson }: ToolInputProps) {
-  const oldStr = input.old_string != null ? String(input.old_string) : extractJsonField(inputJson, "old_string");
-  const newStr = input.new_string != null ? String(input.new_string) : extractJsonField(inputJson, "new_string");
+  const oldStr =
+    input.old_string != null
+      ? String(input.old_string)
+      : extractJsonField(inputJson, "old_string");
+  const newStr =
+    input.new_string != null
+      ? String(input.new_string)
+      : extractJsonField(inputJson, "new_string");
 
   if (!oldStr && !newStr) return null;
 
@@ -49,9 +55,10 @@ export function EditDiff({ input, inputJson }: ToolInputProps) {
 
 export function BashCommand({ input, inputJson }: ToolInputProps) {
   const command = input.command ? String(input.command) : null;
-  const partialCommand = !command && inputJson
-    ? inputJson.match(/"command"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
-    : null;
+  const partialCommand =
+    !command && inputJson
+      ? inputJson.match(/"command"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1]
+      : null;
   const display = command ?? partialCommand;
   if (!display) return null;
 
@@ -65,9 +72,7 @@ export function AgentBody({ toolUse }: { toolUse: ClaudeToolUse }) {
     <div className="px-3 py-2 flex flex-col gap-2">
       {toolUse.subContent && (
         <div className="prose prose-sm dark:prose-invert max-w-none text-xs [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded">
-          <Markdown remarkPlugins={[remarkGfm]}>
-            {toolUse.subContent}
-          </Markdown>
+          <Markdown remarkPlugins={[remarkGfm]}>{toolUse.subContent}</Markdown>
         </div>
       )}
       {toolUse.subToolUses && toolUse.subToolUses.length > 0 && (
@@ -94,7 +99,9 @@ export function McpBody({ input }: { input: Record<string, unknown> }) {
   if (!input.input) return null;
   return (
     <CodeBlock className="max-h-40">
-      {typeof input.input === "string" ? input.input : JSON.stringify(input.input, null, 2)}
+      {typeof input.input === "string"
+        ? input.input
+        : JSON.stringify(input.input, null, 2)}
     </CodeBlock>
   );
 }
@@ -159,9 +166,10 @@ export function AskUserQuestionBody({
 // --- Fallback: formatted JSON ---
 
 export function FormattedJson({ input, inputJson }: ToolInputProps) {
-  const json = Object.keys(input).length > 0
-    ? JSON.stringify(input, null, 2)
-    : inputJson || "{}";
+  const json =
+    Object.keys(input).length > 0
+      ? JSON.stringify(input, null, 2)
+      : inputJson || "{}";
 
   return <CodeBlock>{json}</CodeBlock>;
 }
@@ -177,21 +185,26 @@ function computeInlineDiff(oldLines: string[], newLines: string[]): DiffLine[] {
   const m = oldLines.length;
   const n = newLines.length;
 
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array<number>(n + 1).fill(0),
+  );
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = oldLines[i - 1] === newLines[j - 1]
-        ? dp[i - 1][j - 1] + 1
-        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      dp[i][j] =
+        oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
     }
   }
 
   const result: DiffLine[] = [];
-  let i = m, j = n;
+  let i = m,
+    j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
       result.push({ type: "context", content: oldLines[i - 1] });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       result.push({ type: "added", content: newLines[j - 1] });
       j--;

@@ -31,7 +31,8 @@
     ],
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk/**/*",
-      "node_modules/node-pty/**/*"
+      "node_modules/node-pty/**/*",
+      "node_modules/better-sqlite3/**/*"
     ],
     "mac": {
       "icon": "icon.png",
@@ -50,6 +51,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -70,10 +72,12 @@
     "@tailwindcss/vite": "^4.2.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "fix-path": "^5.0.0",
+    "ioredis": "^5.10.1",
     "node-pty": "^1.0.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",

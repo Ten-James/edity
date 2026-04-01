@@ -10,6 +10,7 @@ import {
   IconWorldWww,
   IconGitBranch,
   IconBrandOpenai,
+  IconDatabase,
   IconLayoutSidebarLeftExpand,
   IconLayoutColumns,
   IconLayoutRows,
@@ -42,7 +43,8 @@ function getActiveTabId(): string | null {
   if (!activeProject) return null;
   const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
   if (!state) return null;
-  const pane = state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
+  const pane =
+    state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
   return pane?.activeTabId ?? null;
 }
 
@@ -51,7 +53,8 @@ function getFocusedPaneTabs() {
   if (!activeProject) return [];
   const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
   if (!state) return [];
-  const pane = state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
+  const pane =
+    state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
   return pane?.tabs ?? [];
 }
 
@@ -153,6 +156,13 @@ export const COMMANDS: Command[] = [
     icon: IconBrandOpenai,
     execute: () => dispatch({ type: "tab-create-claude" }),
   },
+  {
+    id: "tab.open-data",
+    label: "Open Data Viewer",
+    category: "Tab",
+    icon: IconDatabase,
+    execute: () => dispatch({ type: "tab-create-data" }),
+  },
 
   // Pane
   {
@@ -253,7 +263,9 @@ export const COMMANDS: Command[] = [
     when: () => {
       const proj = useProjectStore.getState().activeProject;
       if (!proj) return false;
-      return (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) === 0;
+      return (
+        (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) === 0
+      );
     },
     execute: () => dispatch({ type: "run-start" }),
   },
@@ -265,7 +277,9 @@ export const COMMANDS: Command[] = [
     when: () => {
       const proj = useProjectStore.getState().activeProject;
       if (!proj) return false;
-      return (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) > 0;
+      return (
+        (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) > 0
+      );
     },
     execute: () => dispatch({ type: "run-stop" }),
   },

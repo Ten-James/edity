@@ -80,12 +80,18 @@ function sendToRenderer(session: ClaudeSession, message: unknown): void {
 }
 
 async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterable<unknown>): Promise<void> {
+  let hadResult = false;
+  let hadError = false;
   try {
     for await (const message of queryIterator) {
+      const msg = message as { type?: string };
+      if (msg.type === "result") hadResult = true;
       sendToRenderer(session, message);
     }
   } catch (err: unknown) {
+    hadError = true;
     if ((err as Error).name === "AbortError") return;
+    console.error("[claude-sdk] Session loop error:", err);
     sendToRenderer(session, {
       type: "error",
       message: (err as Error).message || "Unknown error",
@@ -95,6 +101,11 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
     if (session.batchTimer) {
       clearTimeout(session.batchTimer);
       session.batchTimer = null;
+    }
+    // If we never got a result or error message, send a synthetic result
+    // so the renderer doesn't stay stuck in "streaming" state
+    if (!hadResult && !hadError) {
+      sendToRenderer(session, { type: "result" });
     }
     for (const [, cb] of session.permissionCallbacks) {
       cb.resolve({ behavior: "deny", message: "Session ended" });
@@ -190,7 +201,8 @@ async function listSessions(args: { projectPath: string }): Promise<ClaudeSessio
       cwd: s.cwd,
       gitBranch: s.gitBranch,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[claude-sdk] Failed to list sessions:", err);
     return [];
   }
 }
@@ -207,7 +219,8 @@ async function getSessionMessages(args: { sessionId: string; projectPath: string
       session_id: m.session_id,
       message: m.message,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[claude-sdk] Failed to get session messages:", err);
     return [];
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconCheck } from "@tabler/icons-react";
+import { IconCheck, IconArrowUp } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,12 +8,18 @@ interface GitCommitPanelProps {
   stagedCount: number;
   isCommitting: boolean;
   onCommit: (message: string) => Promise<unknown>;
+  ahead: number;
+  isPushing: boolean;
+  onPush: () => Promise<void>;
 }
 
 export function GitCommitPanel({
   stagedCount,
   isCommitting,
   onCommit,
+  ahead,
+  isPushing,
+  onPush,
 }: GitCommitPanelProps) {
   const [message, setMessage] = useState("");
 
@@ -39,26 +45,60 @@ export function GitCommitPanel({
     }
   };
 
+  const hasChangesToCommit = stagedCount > 0;
+  const hasCommitsToPush = ahead > 0;
+
   return (
     <div className="border-t border-border p-2 flex flex-col gap-2">
-      <Textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Commit message..."
-        className="min-h-[60px] max-h-[120px] text-xs resize-none"
-      />
-      <Button
-        size="sm"
-        className="w-full gap-1 text-xs"
-        disabled={!message.trim() || stagedCount === 0 || isCommitting}
-        onClick={handleCommit}
-      >
-        <IconCheck size={14} />
-        {isCommitting
-          ? "Committing..."
-          : `Commit (${stagedCount} file${stagedCount !== 1 ? "s" : ""})`}
-      </Button>
+      {hasChangesToCommit && (
+        <>
+          <Textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Commit message..."
+            className="min-h-[60px] max-h-[120px] text-xs resize-none"
+          />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              className="flex-1 gap-1 text-xs"
+              disabled={!message.trim() || isCommitting}
+              onClick={handleCommit}
+            >
+              <IconCheck size={14} />
+              {isCommitting
+                ? "Committing..."
+                : `Commit (${stagedCount} file${stagedCount !== 1 ? "s" : ""})`}
+            </Button>
+            {hasCommitsToPush && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="gap-1 text-xs"
+                disabled={isPushing}
+                onClick={onPush}
+              >
+                <IconArrowUp size={14} />
+                {ahead}
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+      {!hasChangesToCommit && hasCommitsToPush && (
+        <Button
+          size="sm"
+          className="w-full gap-1 text-xs"
+          disabled={isPushing}
+          onClick={onPush}
+        >
+          <IconArrowUp size={14} />
+          {isPushing
+            ? "Pushing..."
+            : `Push (${ahead} commit${ahead !== 1 ? "s" : ""})`}
+        </Button>
+      )}
     </div>
   );
 }

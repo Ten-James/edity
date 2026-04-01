@@ -9,6 +9,7 @@ import type {
   BrowserTab,
   GitTab,
   ClaudeTab,
+  DataTab,
   AllTab,
   Pane,
   ProjectPaneState,
@@ -46,7 +47,10 @@ function makeDefaultState(): ProjectPaneState {
   };
 }
 
-function findPaneForTab(state: ProjectPaneState, tabId: string): Pane | undefined {
+function findPaneForTab(
+  state: ProjectPaneState,
+  tabId: string,
+): Pane | undefined {
   return state.panes.find((p) => p.tabs.some((t) => t.id === tabId));
 }
 
@@ -61,7 +65,10 @@ function updatePaneInState(
   };
 }
 
-function removeTabFromState(state: ProjectPaneState, tabId: string): ProjectPaneState {
+function removeTabFromState(
+  state: ProjectPaneState,
+  tabId: string,
+): ProjectPaneState {
   const pane = findPaneForTab(state, tabId);
   if (!pane) return state;
   const remaining = pane.tabs.filter((t) => t.id !== tabId);
@@ -79,7 +86,8 @@ function removeTabFromState(state: ProjectPaneState, tabId: string): ProjectPane
   let newActive = pane.activeTabId;
   if (pane.activeTabId === tabId) {
     const closedIdx = pane.tabs.findIndex((t) => t.id === tabId);
-    newActive = remaining[Math.min(closedIdx, remaining.length - 1)]?.id ?? null;
+    newActive =
+      remaining[Math.min(closedIdx, remaining.length - 1)]?.id ?? null;
   }
   return updatePaneInState(state, pane.id, () => ({
     ...pane,
@@ -189,7 +197,12 @@ export function useAllTabs(): AllTab[] {
     if (!project) continue;
     for (const pane of state.panes) {
       for (const tab of pane.tabs) {
-        result.push({ ...tab, projectId, projectPath: project.path, paneId: pane.id } as AllTab);
+        result.push({
+          ...tab,
+          projectId,
+          projectPath: project.path,
+          paneId: pane.id,
+        } as AllTab);
       }
     }
   }
@@ -203,7 +216,10 @@ function getActiveProjectId(): string | null {
 }
 
 function updateProjectPanes(
-  updater: (prev: Map<string, ProjectPaneState>, projectId: string) => Map<string, ProjectPaneState>,
+  updater: (
+    prev: Map<string, ProjectPaneState>,
+    projectId: string,
+  ) => Map<string, ProjectPaneState>,
 ) {
   const projectId = getActiveProjectId();
   if (!projectId) return;
@@ -252,17 +268,23 @@ subscribe((event) => {
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId) ?? makeDefaultState();
         const targetPaneId = state.focusedPaneId;
-        const targetPane = state.panes.find((p) => p.id === targetPaneId) ?? state.panes[0];
+        const targetPane =
+          state.panes.find((p) => p.id === targetPaneId) ?? state.panes[0];
         if (!targetPane) return s;
 
         // Check if file already open in any pane
         for (const p of state.panes) {
-          const existing = p.tabs.find((t) => t.type === "file" && t.filePath === filePath);
+          const existing = p.tabs.find(
+            (t) => t.type === "file" && t.filePath === filePath,
+          );
           if (existing) {
             const next = new Map(s.projectPanes);
             next.set(
               projectId,
-              updatePaneInState(state, p.id, (pn) => ({ ...pn, activeTabId: existing.id })),
+              updatePaneInState(state, p.id, (pn) => ({
+                ...pn,
+                activeTabId: existing.id,
+              })),
             );
             return { projectPanes: next };
           }
@@ -276,7 +298,9 @@ subscribe((event) => {
           isTemporary: true,
         };
 
-        const tempIdx = targetPane.tabs.findIndex((t) => t.type === "file" && t.isTemporary);
+        const tempIdx = targetPane.tabs.findIndex(
+          (t) => t.type === "file" && t.isTemporary,
+        );
         const next = new Map(s.projectPanes);
 
         if (tempIdx !== -1) {
@@ -328,7 +352,11 @@ subscribe((event) => {
           s.projectPanes,
           projectId,
           (t) => t.type === "git",
-          (): GitTab => ({ id: crypto.randomUUID(), title: "Git", type: "git" }),
+          (): GitTab => ({
+            id: crypto.randomUUID(),
+            title: "Git",
+            type: "git",
+          }),
         ),
       }));
       break;
@@ -342,7 +370,30 @@ subscribe((event) => {
           s.projectPanes,
           projectId,
           (t) => t.type === "claude",
-          (): ClaudeTab => ({ id: crypto.randomUUID(), title: "Claude", type: "claude" }),
+          (): ClaudeTab => ({
+            id: crypto.randomUUID(),
+            title: "Claude",
+            type: "claude",
+          }),
+        ),
+      }));
+      break;
+    }
+
+    case "tab-create-data": {
+      const projectId = getActiveProjectId();
+      if (!projectId) break;
+      useLayoutStore.setState((s) => ({
+        projectPanes: openOrCreateSingletonTab(
+          s.projectPanes,
+          projectId,
+          (t) => t.type === "data",
+          (): DataTab => ({
+            id: crypto.randomUUID(),
+            title: "Data",
+            type: "data",
+            connectionId: event.connectionId,
+          }),
         ),
       }));
       break;
@@ -381,7 +432,8 @@ subscribe((event) => {
           for (const tab of pane.tabs) {
             if (
               tab.type === "file" &&
-              (tab.filePath === event.filePath || tab.filePath.startsWith(event.filePath + "/"))
+              (tab.filePath === event.filePath ||
+                tab.filePath.startsWith(event.filePath + "/"))
             ) {
               matchingIds.push(tab.id);
             }
@@ -413,7 +465,10 @@ subscribe((event) => {
         const next = new Map(s.projectPanes);
         next.set(
           projectId,
-          updatePaneInState(state, pane.id, (p) => ({ ...p, activeTabId: event.tabId })),
+          updatePaneInState(state, pane.id, (p) => ({
+            ...p,
+            activeTabId: event.tabId,
+          })),
         );
         return { projectPanes: next };
       });
@@ -428,14 +483,20 @@ subscribe((event) => {
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
-        const pane = state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
+        const pane =
+          state.panes.find((p) => p.id === state.focusedPaneId) ??
+          state.panes[0];
         if (!pane || pane.tabs.length < 2 || !pane.activeTabId) return s;
         const idx = pane.tabs.findIndex((t) => t.id === pane.activeTabId);
-        const nextTab = pane.tabs[(idx + direction + pane.tabs.length) % pane.tabs.length];
+        const nextTab =
+          pane.tabs[(idx + direction + pane.tabs.length) % pane.tabs.length];
         const next = new Map(s.projectPanes);
         next.set(
           projectId,
-          updatePaneInState(state, pane.id, (p) => ({ ...p, activeTabId: nextTab.id })),
+          updatePaneInState(state, pane.id, (p) => ({
+            ...p,
+            activeTabId: nextTab.id,
+          })),
         );
         return { projectPanes: next };
       });
@@ -444,8 +505,13 @@ subscribe((event) => {
 
     case "tab-pin": {
       useLayoutStore.setState((s) => ({
-        projectPanes: updateTabAcrossProjects(s.projectPanes, event.tabId, (tab) =>
-          tab.type === "file" && tab.isTemporary ? { ...tab, isTemporary: false } : null,
+        projectPanes: updateTabAcrossProjects(
+          s.projectPanes,
+          event.tabId,
+          (tab) =>
+            tab.type === "file" && tab.isTemporary
+              ? { ...tab, isTemporary: false }
+              : null,
         ),
       }));
       break;
@@ -453,8 +519,11 @@ subscribe((event) => {
 
     case "tab-update-title": {
       useLayoutStore.setState((s) => ({
-        projectPanes: updateTabAcrossProjects(s.projectPanes, event.tabId, (tab) =>
-          tab.title === event.title ? null : { ...tab, title: event.title },
+        projectPanes: updateTabAcrossProjects(
+          s.projectPanes,
+          event.tabId,
+          (tab) =>
+            tab.title === event.title ? null : { ...tab, title: event.title },
         ),
       }));
       break;
@@ -462,8 +531,13 @@ subscribe((event) => {
 
     case "tab-update-browser-url": {
       useLayoutStore.setState((s) => ({
-        projectPanes: updateTabAcrossProjects(s.projectPanes, event.tabId, (tab) =>
-          tab.type === "browser" && tab.url !== event.url ? { ...tab, url: event.url } : null,
+        projectPanes: updateTabAcrossProjects(
+          s.projectPanes,
+          event.tabId,
+          (tab) =>
+            tab.type === "browser" && tab.url !== event.url
+              ? { ...tab, url: event.url }
+              : null,
         ),
       }));
       break;
@@ -487,7 +561,9 @@ subscribe((event) => {
         const state = s.projectPanes.get(projectId);
         if (!state || state.panes.length >= 2) return s;
 
-        const sourcePane = state.panes.find((p) => p.id === state.focusedPaneId);
+        const sourcePane = state.panes.find(
+          (p) => p.id === state.focusedPaneId,
+        );
         if (!sourcePane) return s;
 
         let newPaneTabs: Tab[] | undefined;
@@ -497,13 +573,20 @@ subscribe((event) => {
           const tab = sourcePane.tabs.find((t) => t.id === event.tabId);
           if (tab) {
             newPaneTabs = [tab];
-            const remaining = sourcePane.tabs.filter((t) => t.id !== event.tabId);
-            const newTabs = remaining.length > 0 ? remaining : [makeTerminalTab()];
+            const remaining = sourcePane.tabs.filter(
+              (t) => t.id !== event.tabId,
+            );
+            const newTabs =
+              remaining.length > 0 ? remaining : [makeTerminalTab()];
             const newActive =
               remaining.length > 0 && sourcePane.activeTabId !== event.tabId
                 ? sourcePane.activeTabId
                 : newTabs[0].id;
-            updatedSourcePane = { ...sourcePane, tabs: newTabs, activeTabId: newActive };
+            updatedSourcePane = {
+              ...sourcePane,
+              tabs: newTabs,
+              activeTabId: newActive,
+            };
           }
         }
 
@@ -563,7 +646,9 @@ subscribe((event) => {
         if (!targetPane) return s;
 
         const tab = sourcePane.tabs.find((t) => t.id === event.tabId)!;
-        const remainingSource = sourcePane.tabs.filter((t) => t.id !== event.tabId);
+        const remainingSource = sourcePane.tabs.filter(
+          (t) => t.id !== event.tabId,
+        );
 
         let newSourceActive = sourcePane.activeTabId;
         if (sourcePane.activeTabId === event.tabId) {

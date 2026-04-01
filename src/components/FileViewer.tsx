@@ -1,7 +1,13 @@
 import { useFileContent } from "@/hooks/useFileContent";
 import { MonacoEditor } from "@/components/viewer/MonacoEditor";
+import { MarkdownViewer } from "@/components/viewer/MarkdownViewer";
 import { ImageViewer } from "@/components/viewer/ImageViewer";
 import { formatSize } from "@/lib/utils";
+
+function isMarkdownFile(filePath: string): boolean {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  return ext === "md" || ext === "mdx";
+}
 
 interface FileViewerProps {
   tabId: string;
@@ -31,7 +37,15 @@ export function FileViewer({ tabId, filePath, isActive }: FileViewerProps) {
 
       {!loading && !error && content && (
         <>
-          {content.type === "Text" && (
+          {content.type === "Text" && isMarkdownFile(filePath) && (
+            <MarkdownViewer
+              tabId={tabId}
+              content={content.content}
+              filePath={filePath}
+            />
+          )}
+
+          {content.type === "Text" && !isMarkdownFile(filePath) && (
             <MonacoEditor
               tabId={tabId}
               content={content.content}
