@@ -3,9 +3,15 @@ import * as path from "path";
 import { pathToFileURL } from "url";
 import type { ClaudeSessionInfo, ClaudeSessionMessage } from "../../../shared/types/ipc";
 
+interface PermissionCallback {
+  resolve: (value: unknown) => void;
+  input?: unknown;
+  toolName?: string;
+}
+
 interface ClaudeSession {
   abortController: AbortController;
-  permissionCallbacks: Map<string, { resolve: (value: unknown) => void }>;
+  permissionCallbacks: Map<string, PermissionCallback>;
   mainWindow: BrowserWindow;
   sessionId: string;
   batchBuffer: unknown[];
@@ -79,6 +85,12 @@ function sendToRenderer(session: ClaudeSession, message: unknown): void {
   }
 }
 
+function isInterrupted(err: unknown): boolean {
+  if ((err as Error).name === "AbortError") return true;
+  const msg = String((err as Error).message ?? "");
+  return msg.includes("aborted") || msg.includes("interrupted") || msg.includes("all fibers interrupted");
+}
+
 async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterable<unknown>): Promise<void> {
   let hadResult = false;
   let hadError = false;
@@ -90,7 +102,7 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
     }
   } catch (err: unknown) {
     hadError = true;
-    if ((err as Error).name === "AbortError") return;
+    if (isInterrupted(err)) return;
     console.error("[claude-sdk] Session loop error:", err);
     sendToRenderer(session, {
       type: "error",
@@ -102,10 +114,8 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
       clearTimeout(session.batchTimer);
       session.batchTimer = null;
     }
-    // If we never got a result or error message, send a synthetic result
-    // so the renderer doesn't stay stuck in "streaming" state
     if (!hadResult && !hadError) {
-      sendToRenderer(session, { type: "result" });
+      sendToRenderer(session, { type: "result", subtype: "success" });
     }
     for (const [, cb] of session.permissionCallbacks) {
       cb.resolve({ behavior: "deny", message: "Session ended" });
@@ -157,16 +167,36 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
       canUseTool: (toolName: string, input: unknown, options: any) => {
         return new Promise((resolve) => {
           const toolUseID = options?.toolUseID || crypto.randomUUID();
-          session.permissionCallbacks.set(toolUseID, { resolve });
-          sendToRenderer(session, {
-            type: "permission_request",
-            toolName,
-            input,
-            toolUseID,
-            title: options?.title,
-            displayName: options?.displayName,
-            description: options?.description,
-          });
+          session.permissionCallbacks.set(toolUseID, { resolve, input, toolName });
+
+          // Handle abort signal from SDK
+          if (options?.signal) {
+            options.signal.addEventListener("abort", () => {
+              if (session.permissionCallbacks.has(toolUseID)) {
+                session.permissionCallbacks.delete(toolUseID);
+                resolve({ behavior: "deny", message: "Aborted" });
+              }
+            }, { once: true });
+          }
+
+          if (toolName === "AskUserQuestion") {
+            sendToRenderer(session, {
+              type: "ask_user_question",
+              toolName,
+              input,
+              toolUseID,
+            });
+          } else {
+            sendToRenderer(session, {
+              type: "permission_request",
+              toolName,
+              input,
+              toolUseID,
+              title: options?.title,
+              displayName: options?.displayName,
+              description: options?.description,
+            });
+          }
         });
       },
     };
@@ -252,6 +282,7 @@ export function registerClaudeSdkHandlers(getMainWindow: () => BrowserWindow | n
     return startSession(win, { sessionId, projectPath, prompt: message, model, permissionMode, resume: sessionId });
   });
 
+  // Regular permission approval (allow/deny)
   ipcMain.handle("claude_approve", (_event, args: { sessionId: string; toolUseID: string; behavior: string; message?: string }) => {
     const session = claudeSessions.get(args.sessionId);
     if (!session) return { ok: false, error: "Session not found" };
@@ -259,6 +290,24 @@ export function registerClaudeSdkHandlers(getMainWindow: () => BrowserWindow | n
     if (!callback) return { ok: false, error: "Permission callback not found" };
     session.permissionCallbacks.delete(args.toolUseID);
     callback.resolve(args.behavior === "allow" ? { behavior: "allow" } : { behavior: "deny", message: args.message || "User denied" });
+    return { ok: true };
+  });
+
+  // AskUserQuestion answer — returns updatedInput with questions + answers
+  ipcMain.handle("claude_answer_question", (_event, args: { sessionId: string; toolUseID: string; answers: Record<string, string> }) => {
+    const session = claudeSessions.get(args.sessionId);
+    if (!session) return { ok: false, error: "Session not found" };
+    const callback = session.permissionCallbacks.get(args.toolUseID);
+    if (!callback) return { ok: false, error: "Question callback not found" };
+    session.permissionCallbacks.delete(args.toolUseID);
+    const originalInput = callback.input as Record<string, unknown> | undefined;
+    callback.resolve({
+      behavior: "allow",
+      updatedInput: {
+        questions: originalInput?.questions ?? [],
+        answers: args.answers,
+      },
+    });
     return { ok: true };
   });
 

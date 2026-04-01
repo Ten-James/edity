@@ -1,37 +1,29 @@
 import { useState } from "react";
-import type { ClaudeToolUse } from "@/types/claude";
+import type { PendingQuestion } from "@/types/claude";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { IconQuestionMark } from "@tabler/icons-react";
 
-interface QuestionOption {
-  label: string;
-  description?: string;
-}
-
-interface Question {
-  question: string;
-  header?: string;
-  options?: QuestionOption[];
-}
-
 interface ClaudeQuestionPromptProps {
-  toolUse: ClaudeToolUse;
-  onAnswer: (answer: string) => void;
+  pendingQuestion: PendingQuestion;
+  onAnswer: (answers: Record<string, string>) => void;
 }
 
-export function ClaudeQuestionPrompt({ toolUse, onAnswer }: ClaudeQuestionPromptProps) {
+export function ClaudeQuestionPrompt({ pendingQuestion, onAnswer }: ClaudeQuestionPromptProps) {
   const [freeText, setFreeText] = useState("");
-  const questions = (toolUse.input.questions ?? []) as Question[];
-  const question = questions[0];
+  const question = pendingQuestion.questions[0];
 
   if (!question) return null;
 
   const handleSubmit = () => {
     const trimmed = freeText.trim();
     if (!trimmed) return;
-    onAnswer(trimmed);
+    onAnswer({ [question.id]: trimmed });
     setFreeText("");
+  };
+
+  const handleOptionClick = (label: string) => {
+    onAnswer({ [question.id]: label });
   };
 
   return (
@@ -56,7 +48,7 @@ export function ClaudeQuestionPrompt({ toolUse, onAnswer }: ClaudeQuestionPrompt
               variant="outline"
               size="sm"
               className="text-xs"
-              onClick={() => onAnswer(opt.label)}
+              onClick={() => handleOptionClick(opt.label)}
               title={opt.description}
             >
               {opt.label}

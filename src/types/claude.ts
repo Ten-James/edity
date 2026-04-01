@@ -145,11 +145,24 @@ export interface ClaudeUsage {
   contextWindow: number;
 }
 
+export interface PendingQuestion {
+  toolUseID: string;
+  questions: Array<{
+    id: string;
+    header: string;
+    question: string;
+    options: Array<{ label: string; description?: string }>;
+    multiSelect: boolean;
+  }>;
+}
+
 export interface ClaudeConversation {
   sessionId: string | null;
   messages: ClaudeUIMessage[];
   status: ClaudeSessionStatus;
   pendingPermission: ClaudePermissionRequest | null;
+  pendingQuestion: PendingQuestion | null;
+  sessionState: "running" | "compacting" | null;
   totalCost: number;
   numTurns: number;
   durationMs: number;

@@ -24,6 +24,7 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
     sendMessage,
     resumeSession,
     respondPermission,
+    answerQuestion,
     interrupt,
     abort,
     setModel,
@@ -78,22 +79,18 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
     [conversation.messages],
   );
 
-  // Find active AskUserQuestion tool
-  const pendingQuestion = useMemo(() => {
-    for (const msg of [...conversation.messages].reverse()) {
-      for (const t of msg.toolUses) {
-        if (t.name === "AskUserQuestion" && t.status === "running") return t;
-      }
-    }
-    return null;
-  }, [conversation.messages]);
-
   const handleSend = async (text: string) => {
     if (!hasSession) {
       await startSession(text);
     } else {
       await sendMessage(text);
     }
+  };
+
+  const handleAnswerQuestion = async (answers: Record<string, string>) => {
+    const q = conversation.pendingQuestion;
+    if (!q) return;
+    await answerQuestion(q.toolUseID, answers);
   };
 
   return (
@@ -123,13 +120,15 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
         ) : (
           <>
             <ClaudeMessageList messages={conversation.messages} />
-            {isBusy && (
+            {isBusy && !conversation.pendingQuestion && (
               <div className="flex items-center gap-2 px-4 pb-4 text-xs text-muted-foreground">
                 <IconLoader2 size={12} className="animate-spin" />
                 <span>
                   {conversation.status === "waiting_permission"
                     ? "Waiting for approval"
-                    : "Working"}
+                    : conversation.sessionState === "compacting"
+                      ? "Compacting context..."
+                      : "Working"}
                 </span>
                 {elapsed && <span>{elapsed}</span>}
                 {conversation.numTurns > 0 && (
@@ -150,10 +149,10 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
 
       <div className="relative">
         <ClaudeTaskPopover taskTools={taskTools} />
-        {pendingQuestion ? (
+        {conversation.pendingQuestion ? (
           <ClaudeQuestionPrompt
-            toolUse={pendingQuestion}
-            onAnswer={handleSend}
+            pendingQuestion={conversation.pendingQuestion}
+            onAnswer={handleAnswerQuestion}
           />
         ) : (
           <ClaudeInputBar

@@ -37,6 +37,10 @@ type Action =
   | { type: "SUBAGENT_TOOL_RESULT"; parentToolUseId: string; toolUseId: string; content: string; isError: boolean }
   | { type: "SUBAGENT_COMPLETED"; toolUseId: string }
   | { type: "SUBAGENT_PROGRESS"; toolUseId: string; description: string }
+  | { type: "TOOL_RESULT"; toolUseId: string; content: string; isError: boolean }
+  | { type: "ASK_USER_QUESTION"; toolUseID: string; input: Record<string, unknown> }
+  | { type: "QUESTION_ANSWERED" }
+  | { type: "SESSION_STATE"; sessionState: "running" | "compacting" | null }
   | { type: "SET_SESSION_ID"; sessionId: string }
   | { type: "SET_MODEL"; model: string }
   | { type: "SET_PERMISSION_MODE"; mode: PermissionMode }
@@ -106,6 +110,8 @@ function makeEmptyConversation(): ClaudeConversation {
     messages: [],
     status: "idle",
     pendingPermission: null,
+    pendingQuestion: null,
+    sessionState: null,
     totalCost: 0,
     numTurns: 0,
     durationMs: 0,
@@ -284,16 +290,41 @@ function reducer(
           contextWindow,
         };
       }
+      const isError = msg.subtype !== undefined && msg.subtype !== "success";
+      const errorMsg = isError
+        ? String((msg.errors as string[] | undefined)?.[0] ?? (msg.result as string | undefined) ?? "Execution failed")
+        : undefined;
+
+      let messages = state.messages.map((m) =>
+        m.isStreaming ? { ...m, isStreaming: false } : m,
+      );
+      if (isError && errorMsg) {
+        messages = [
+          ...messages,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            textContent: "",
+            thinkingContent: "",
+            toolUses: [],
+            isStreaming: false,
+            error: errorMsg,
+            timestamp: Date.now(),
+          },
+        ];
+      }
+
       return {
         ...state,
-        status: "idle",
+        status: isError ? "error" : "idle",
+        pendingPermission: null,
+        pendingQuestion: null,
+        sessionState: null,
         totalCost: (msg.total_cost_usd as number) ?? state.totalCost,
         numTurns: (msg.num_turns as number) ?? state.numTurns,
         durationMs: (msg.duration_ms as number) ?? state.durationMs,
         usage,
-        messages: state.messages.map((m) =>
-          m.isStreaming ? { ...m, isStreaming: false } : m,
-        ),
+        messages,
       };
     }
 
@@ -413,12 +444,63 @@ function reducer(
       return { ...state, status: "streaming", messages };
     }
 
+    case "TOOL_RESULT": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const idx = toolUses.findIndex((t) => t.id === action.toolUseId);
+      if (idx !== -1) {
+        toolUses[idx] = {
+          ...toolUses[idx],
+          status: action.isError ? "error" : "complete",
+          output: action.content,
+        };
+        updated.toolUses = toolUses;
+        messages[messages.length - 1] = updated;
+      }
+      return { ...state, messages };
+    }
+
+    case "ASK_USER_QUESTION": {
+      const rawQuestions = Array.isArray(action.input.questions) ? action.input.questions : [];
+      const questions = rawQuestions.map((q: Record<string, unknown>, i: number) => ({
+        id: typeof q.header === "string" ? q.header : `q-${i}`,
+        header: typeof q.header === "string" ? q.header : `Question ${i + 1}`,
+        question: typeof q.question === "string" ? q.question : "",
+        options: Array.isArray(q.options)
+          ? (q.options as Array<Record<string, unknown>>).map((o) => ({
+              label: String(o.label ?? ""),
+              description: typeof o.description === "string" ? o.description : undefined,
+            }))
+          : [],
+        multiSelect: typeof q.multiSelect === "boolean" ? q.multiSelect : false,
+      }));
+      return {
+        ...state,
+        pendingQuestion: { toolUseID: action.toolUseID, questions },
+      };
+    }
+
+    case "QUESTION_ANSWERED":
+      return { ...state, pendingQuestion: null };
+
+    case "SESSION_STATE":
+      return { ...state, sessionState: action.sessionState };
+
     case "ERROR": {
       const hasStreaming = state.messages.some((m) => m.isStreaming);
+      const base = {
+        status: "error" as const,
+        pendingPermission: null,
+        pendingQuestion: null,
+        sessionState: null,
+      };
       if (hasStreaming) {
         return {
           ...state,
-          status: "error",
+          ...base,
           messages: state.messages.map((m) =>
             m.isStreaming
               ? { ...m, isStreaming: false, error: action.message }
@@ -428,7 +510,7 @@ function reducer(
       }
       return {
         ...state,
-        status: "error",
+        ...base,
         messages: [
           ...state.messages,
           {
@@ -510,6 +592,14 @@ export function useClaudeSession(projectPath: string) {
               }
               break;
             }
+            if (raw.subtype === "status") {
+              const status = raw.status as string | undefined;
+              dispatch({
+                type: "SESSION_STATE",
+                sessionState: status === "compacting" ? "compacting" : "running",
+              });
+              break;
+            }
             if (raw.subtype !== "init") break;
             // slash_commands may be string[] or {name, description}[] - normalize
             const rawCmds = raw.slash_commands as unknown[];
@@ -552,11 +642,11 @@ export function useClaudeSession(projectPath: string) {
             break;
           }
           case "user": {
-            // Sub-agent tool results
             const parentId = raw.parent_tool_use_id as string | null;
+            const msg = raw.message as Record<string, unknown> | undefined;
+            const content = (msg?.content ?? []) as Array<Record<string, unknown>>;
             if (parentId) {
-              const msg = raw.message as Record<string, unknown> | undefined;
-              const content = (msg?.content ?? []) as Array<Record<string, unknown>>;
+              // Sub-agent tool results
               for (const block of content) {
                 if (block.type === "tool_result" && block.tool_use_id) {
                   dispatch({
@@ -568,11 +658,30 @@ export function useClaudeSession(projectPath: string) {
                   });
                 }
               }
+            } else {
+              // Main agent tool results
+              for (const block of content) {
+                if (block.type === "tool_result" && block.tool_use_id) {
+                  dispatch({
+                    type: "TOOL_RESULT",
+                    toolUseId: String(block.tool_use_id),
+                    content: String(block.content ?? ""),
+                    isError: block.is_error === true,
+                  });
+                }
+              }
             }
             break;
           }
           case "result":
             dispatch({ type: "RESULT", message: data as ClaudeMessage & { type: "result" } });
+            break;
+          case "ask_user_question":
+            dispatch({
+              type: "ASK_USER_QUESTION",
+              toolUseID: raw.toolUseID as string,
+              input: raw.input as Record<string, unknown>,
+            });
             break;
           case "permission_request":
             dispatch({ type: "PERMISSION_REQUEST", request: data as ClaudePermissionRequest });
@@ -694,6 +803,21 @@ export function useClaudeSession(projectPath: string) {
     [],
   );
 
+  const answerQuestion = useCallback(
+    async (toolUseID: string, answers: Record<string, string>) => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+      dispatch({ type: "QUESTION_ANSWERED" });
+      try {
+        await invoke("claude_answer_question", { sessionId: sid, toolUseID, answers });
+      } catch (err) {
+        console.error("[claude] Answer question failed:", err);
+        dispatch({ type: "ERROR", message: `Failed to answer question: ${(err as Error).message || err}` });
+      }
+    },
+    [],
+  );
+
   const interrupt = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
@@ -732,6 +856,7 @@ export function useClaudeSession(projectPath: string) {
     sendMessage,
     resumeSession,
     respondPermission,
+    answerQuestion,
     interrupt,
     abort,
     setModel,
