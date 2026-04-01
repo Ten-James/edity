@@ -1,4 +1,7 @@
-import type { AppContextValue } from "@/contexts/AppContext";
+import { dispatch } from "@/stores/eventBus";
+import { useProjectStore } from "@/stores/projectStore";
+import { useLayoutStore } from "@/stores/layoutStore";
+import { useRunStore } from "@/stores/runStore";
 import {
   IconTerminal2,
   IconX,
@@ -23,35 +26,48 @@ import {
   IconGitMerge,
 } from "@tabler/icons-react";
 
-export interface CommandContext extends Pick<AppContextValue,
-  | "projects" | "activeProject" | "setActiveProject" | "addProject"
-  | "tabs" | "activeTabId" | "createTab" | "closeTab" | "setActiveTab"
-  | "openFileTab" | "createBrowserTab" | "createGitTab" | "createClaudeTab"
-  | "splitPane" | "unsplit" | "panes" | "focusedPaneId" | "setFocusedPane"
-  | "toggleSidebarPanel" | "sidebarPanel"
-  | "runProject" | "stopProject" | "isProjectRunning"
-> {
-  openCommandPalette: () => void;
-  closeCommandPalette: () => void;
-  toggleTheme: () => void;
-  openSettings: () => void;
-}
-
-function cycleItem<T>(items: T[], currentId: string | null, getId: (t: T) => string, direction: 1 | -1): T | null {
-  if (!currentId || items.length < 2) return null;
-  const idx = items.findIndex((t) => getId(t) === currentId);
-  return items[(idx + direction + items.length) % items.length];
-}
-
 export interface Command {
   id: string;
   label: string;
   category: string;
   icon?: React.ComponentType<{ size?: number }>;
   defaultKeybinding?: string;
-  when?: (ctx: CommandContext) => boolean;
+  when?: () => boolean;
   alwaysActive?: boolean;
-  execute: (ctx: CommandContext) => void;
+  execute: () => void;
+}
+
+function getActiveTabId(): string | null {
+  const activeProject = useProjectStore.getState().activeProject;
+  if (!activeProject) return null;
+  const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
+  if (!state) return null;
+  const pane = state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
+  return pane?.activeTabId ?? null;
+}
+
+function getFocusedPaneTabs() {
+  const activeProject = useProjectStore.getState().activeProject;
+  if (!activeProject) return [];
+  const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
+  if (!state) return [];
+  const pane = state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
+  return pane?.tabs ?? [];
+}
+
+function getPaneCount(): number {
+  const activeProject = useProjectStore.getState().activeProject;
+  if (!activeProject) return 0;
+  const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
+  return state?.panes.length ?? 0;
+}
+
+function cycleProject(direction: 1 | -1) {
+  const { projects, activeProject } = useProjectStore.getState();
+  if (projects.length < 2 || !activeProject) return;
+  const idx = projects.findIndex((p) => p.id === activeProject.id);
+  const next = projects[(idx + direction + projects.length) % projects.length];
+  dispatch({ type: "project-switch", projectId: next.id });
 }
 
 export const COMMANDS: Command[] = [
@@ -63,7 +79,7 @@ export const COMMANDS: Command[] = [
     icon: IconSearch,
     defaultKeybinding: "Mod+p",
     alwaysActive: true,
-    execute: (ctx) => ctx.openCommandPalette(),
+    execute: () => dispatch({ type: "ui-open-palette" }),
   },
   {
     id: "settings.open",
@@ -72,7 +88,7 @@ export const COMMANDS: Command[] = [
     icon: IconSettings,
     defaultKeybinding: "Mod+,",
     alwaysActive: true,
-    execute: (ctx) => ctx.openSettings(),
+    execute: () => dispatch({ type: "ui-open-settings" }),
   },
 
   // Tab
@@ -82,7 +98,7 @@ export const COMMANDS: Command[] = [
     category: "Tab",
     icon: IconTerminal2,
     defaultKeybinding: "Mod+t",
-    execute: (ctx) => ctx.createTab(),
+    execute: () => dispatch({ type: "tab-create-terminal" }),
   },
   {
     id: "tab.close",
@@ -90,9 +106,10 @@ export const COMMANDS: Command[] = [
     category: "Tab",
     icon: IconX,
     defaultKeybinding: "Mod+w",
-    when: (ctx) => ctx.activeTabId !== null,
-    execute: (ctx) => {
-      if (ctx.activeTabId) ctx.closeTab(ctx.activeTabId);
+    when: () => getActiveTabId() !== null,
+    execute: () => {
+      const tabId = getActiveTabId();
+      if (tabId) dispatch({ type: "tab-close", tabId });
     },
   },
   {
@@ -102,11 +119,8 @@ export const COMMANDS: Command[] = [
     icon: IconArrowRight,
     defaultKeybinding: "Ctrl+Tab",
     alwaysActive: true,
-    when: (ctx) => ctx.tabs.length > 1,
-    execute: (ctx) => {
-      const next = cycleItem(ctx.tabs, ctx.activeTabId, (t) => t.id, 1);
-      if (next) ctx.setActiveTab(next.id);
-    },
+    when: () => getFocusedPaneTabs().length > 1,
+    execute: () => dispatch({ type: "tab-next" }),
   },
   {
     id: "tab.prev",
@@ -115,32 +129,29 @@ export const COMMANDS: Command[] = [
     icon: IconArrowLeft,
     defaultKeybinding: "Ctrl+Shift+Tab",
     alwaysActive: true,
-    when: (ctx) => ctx.tabs.length > 1,
-    execute: (ctx) => {
-      const prev = cycleItem(ctx.tabs, ctx.activeTabId, (t) => t.id, -1);
-      if (prev) ctx.setActiveTab(prev.id);
-    },
+    when: () => getFocusedPaneTabs().length > 1,
+    execute: () => dispatch({ type: "tab-prev" }),
   },
   {
     id: "tab.new-browser",
     label: "New Browser Tab",
     category: "Tab",
     icon: IconWorldWww,
-    execute: (ctx) => ctx.createBrowserTab(),
+    execute: () => dispatch({ type: "tab-create-browser" }),
   },
   {
     id: "tab.open-git",
     label: "Open Git",
     category: "Tab",
     icon: IconGitBranch,
-    execute: (ctx) => ctx.createGitTab(),
+    execute: () => dispatch({ type: "tab-create-git" }),
   },
   {
     id: "tab.open-claude",
     label: "Open Claude",
     category: "Tab",
     icon: IconBrandOpenai,
-    execute: (ctx) => ctx.createClaudeTab(),
+    execute: () => dispatch({ type: "tab-create-claude" }),
   },
 
   // Pane
@@ -150,7 +161,7 @@ export const COMMANDS: Command[] = [
     category: "Pane",
     icon: IconLayoutColumns,
     defaultKeybinding: "Mod+\\",
-    execute: (ctx) => ctx.splitPane("horizontal"),
+    execute: () => dispatch({ type: "layout-split", direction: "horizontal" }),
   },
   {
     id: "pane.split-down",
@@ -158,15 +169,15 @@ export const COMMANDS: Command[] = [
     category: "Pane",
     icon: IconLayoutRows,
     defaultKeybinding: "Mod+Shift+\\",
-    execute: (ctx) => ctx.splitPane("vertical"),
+    execute: () => dispatch({ type: "layout-split", direction: "vertical" }),
   },
   {
     id: "pane.unsplit",
     label: "Unsplit Panes",
     category: "Pane",
     icon: IconLayoutList,
-    when: (ctx) => ctx.panes.length > 1,
-    execute: (ctx) => ctx.unsplit(),
+    when: () => getPaneCount() > 1,
+    execute: () => dispatch({ type: "layout-unsplit" }),
   },
   {
     id: "pane.focus-other",
@@ -174,11 +185,8 @@ export const COMMANDS: Command[] = [
     category: "Pane",
     icon: IconArrowsSplit2,
     defaultKeybinding: "Mod+Shift+f",
-    when: (ctx) => ctx.panes.length > 1,
-    execute: (ctx) => {
-      const other = ctx.panes.find((p) => p.id !== ctx.focusedPaneId);
-      if (other) ctx.setFocusedPane(other.id);
-    },
+    when: () => getPaneCount() > 1,
+    execute: () => dispatch({ type: "layout-focus-other-pane" }),
   },
 
   // View
@@ -189,7 +197,7 @@ export const COMMANDS: Command[] = [
     icon: IconLayoutSidebarLeftExpand,
     defaultKeybinding: "Mod+b",
     alwaysActive: true,
-    execute: (ctx) => ctx.toggleSidebarPanel("files"),
+    execute: () => dispatch({ type: "layout-toggle-sidebar", panel: "files" }),
   },
   {
     id: "sidebar.toggle-git",
@@ -198,14 +206,14 @@ export const COMMANDS: Command[] = [
     icon: IconGitMerge,
     defaultKeybinding: "Mod+Shift+g",
     alwaysActive: true,
-    execute: (ctx) => ctx.toggleSidebarPanel("git"),
+    execute: () => dispatch({ type: "layout-toggle-sidebar", panel: "git" }),
   },
   {
     id: "theme.toggle",
     label: "Toggle Light/Dark Mode",
     category: "View",
     icon: IconSun,
-    execute: (ctx) => ctx.toggleTheme(),
+    execute: () => dispatch({ type: "settings-toggle-mode" }),
   },
 
   // Project
@@ -215,11 +223,8 @@ export const COMMANDS: Command[] = [
     category: "Project",
     icon: IconChevronRight,
     defaultKeybinding: "Mod+}",
-    when: (ctx) => ctx.projects.length > 1,
-    execute: (ctx) => {
-      const next = cycleItem(ctx.projects, ctx.activeProject?.id ?? null, (p) => p.id, 1);
-      if (next) ctx.setActiveProject(next);
-    },
+    when: () => useProjectStore.getState().projects.length > 1,
+    execute: () => cycleProject(1),
   },
   {
     id: "project.prev",
@@ -227,18 +232,15 @@ export const COMMANDS: Command[] = [
     category: "Project",
     icon: IconChevronLeft,
     defaultKeybinding: "Mod+{",
-    when: (ctx) => ctx.projects.length > 1,
-    execute: (ctx) => {
-      const prev = cycleItem(ctx.projects, ctx.activeProject?.id ?? null, (p) => p.id, -1);
-      if (prev) ctx.setActiveProject(prev);
-    },
+    when: () => useProjectStore.getState().projects.length > 1,
+    execute: () => cycleProject(-1),
   },
   {
     id: "project.add",
     label: "Add Project",
     category: "Project",
     icon: IconFolderPlus,
-    execute: (ctx) => ctx.addProject(),
+    execute: () => dispatch({ type: "project-add" }),
   },
 
   // Run
@@ -248,15 +250,23 @@ export const COMMANDS: Command[] = [
     category: "Run",
     icon: IconPlayerPlay,
     defaultKeybinding: "Mod+Shift+r",
-    when: (ctx) => !ctx.isProjectRunning,
-    execute: (ctx) => ctx.runProject(),
+    when: () => {
+      const proj = useProjectStore.getState().activeProject;
+      if (!proj) return false;
+      return (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) === 0;
+    },
+    execute: () => dispatch({ type: "run-start" }),
   },
   {
     id: "run.stop",
     label: "Stop Project",
     category: "Run",
     icon: IconPlayerStop,
-    when: (ctx) => ctx.isProjectRunning,
-    execute: (ctx) => ctx.stopProject(),
+    when: () => {
+      const proj = useProjectStore.getState().activeProject;
+      if (!proj) return false;
+      return (useRunStore.getState().runningProjects.get(proj.id)?.size ?? 0) > 0;
+    },
+    execute: () => dispatch({ type: "run-stop" }),
   },
 ];

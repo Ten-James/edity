@@ -4,22 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GitDiffViewer } from "./GitDiffViewer";
 import { cn } from "@/lib/utils";
+import { statusColor } from "@/lib/git-utils";
 import type { GitCommitDetail as GitCommitDetailType } from "@/types/git";
-
-function statusColor(code: string) {
-  switch (code) {
-    case "M":
-      return "text-orange-400";
-    case "A":
-      return "text-green-400";
-    case "D":
-      return "text-red-400";
-    case "R":
-      return "text-blue-400";
-    default:
-      return "text-muted-foreground";
-  }
-}
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   IconPlayerPlay,
   IconPlayerStop,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAppContext } from "@/contexts/AppContext";
 import { SetupDialog } from "@/components/SetupDialog";
-import { invoke } from "@/lib/ipc";
+import { useScriptDetection } from "@/hooks/useScriptDetection";
 import { getRunCommands, getDefaultRunCommand } from "@/lib/run-commands";
 import type { RunCommand } from "@shared/types/project";
 import type { DetectedScript } from "@shared/types/ipc";
@@ -37,20 +37,8 @@ export function RunButton() {
     runningCommandIds,
   } = useAppContext();
 
-  const [detectedScripts, setDetectedScripts] = useState<DetectedScript[]>([]);
+  const detectedScripts = useScriptDetection(activeProject?.path);
   const [setupOpen, setSetupOpen] = useState(false);
-
-  useEffect(() => {
-    if (!activeProject) {
-      setDetectedScripts([]);
-      return;
-    }
-    invoke<DetectedScript[]>("detect_project_scripts", {
-      projectPath: activeProject.path,
-    })
-      .then(setDetectedScripts)
-      .catch(() => setDetectedScripts([]));
-  }, [activeProject]);
 
   const configuredCommands = getRunCommands(edityConfig);
   const defaultCommand = getDefaultRunCommand(edityConfig);

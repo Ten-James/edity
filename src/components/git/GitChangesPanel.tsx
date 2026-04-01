@@ -2,6 +2,7 @@ import { IconArrowBackUp, IconCircleFilled, IconCircle } from "@tabler/icons-rea
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { statusColor } from "@/lib/git-utils";
 import type { GitFileStatus } from "@/types/git";
 
 interface ChangeFile {
@@ -19,23 +20,6 @@ interface GitChangesPanelProps {
   onStage: (paths: string[]) => void;
   onUnstage: (paths: string[]) => void;
   onDiscard: (paths: string[]) => void;
-}
-
-function statusColor(code: string) {
-  switch (code) {
-    case "M":
-      return "text-orange-400";
-    case "A":
-      return "text-green-400";
-    case "D":
-      return "text-red-400";
-    case "R":
-      return "text-blue-400";
-    case "?":
-      return "text-muted-foreground";
-    default:
-      return "text-muted-foreground";
-  }
 }
 
 export function GitChangesPanel({

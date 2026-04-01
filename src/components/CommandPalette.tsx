@@ -1,4 +1,3 @@
-import type { RefObject } from "react";
 import {
   CommandDialog,
   CommandInput,
@@ -8,22 +7,20 @@ import {
   CommandItem,
   CommandShortcut,
 } from "@/components/ui/command";
-import { COMMANDS, type CommandContext } from "@/lib/commands";
+import { COMMANDS } from "@/lib/commands";
 import { formatKeybinding, getEffectiveKeybinding } from "@/lib/keybindings";
-import { useTheme } from "@/components/theme/ThemeProvider";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  commandCtx: RefObject<CommandContext>;
 }
 
-export function CommandPalette({ open, onOpenChange, commandCtx }: CommandPaletteProps) {
-  const { settings } = useTheme();
-  const ctx = commandCtx.current;
+export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+  const keybindings = useSettingsStore((s) => s.settings.keybindings);
 
   const visibleCommands = COMMANDS.filter(
-    (cmd) => cmd.id !== "palette.open" && (!cmd.when || cmd.when(ctx)),
+    (cmd) => cmd.id !== "palette.open" && (!cmd.when || cmd.when()),
   );
 
   const grouped = new Map<string, typeof visibleCommands>();
@@ -37,7 +34,7 @@ export function CommandPalette({ open, onOpenChange, commandCtx }: CommandPalett
     const cmd = COMMANDS.find((c) => c.id === cmdId);
     if (!cmd) return;
     onOpenChange(false);
-    requestAnimationFrame(() => cmd.execute(commandCtx.current));
+    requestAnimationFrame(() => cmd.execute());
   }
 
   return (
@@ -48,7 +45,7 @@ export function CommandPalette({ open, onOpenChange, commandCtx }: CommandPalett
         {Array.from(grouped.entries()).map(([category, cmds]) => (
           <CommandGroup key={category} heading={category}>
             {cmds.map((cmd) => {
-              const binding = getEffectiveKeybinding(cmd, settings.keybindings);
+              const binding = getEffectiveKeybinding(cmd, keybindings);
               return (
                 <CommandItem
                   key={cmd.id}

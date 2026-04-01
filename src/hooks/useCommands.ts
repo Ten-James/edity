@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useAppContext } from "@/contexts/AppContext";
-import { useTheme } from "@/components/theme/ThemeProvider";
-import { COMMANDS, type CommandContext } from "@/lib/commands";
+import { subscribe } from "@/stores/eventBus";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { COMMANDS } from "@/lib/commands";
 import { eventToKeyCombo, matchKeybinding, resolveKeybindings } from "@/lib/keybindings";
 
 function isEditorFocused(): boolean {
@@ -14,44 +14,34 @@ function isEditorFocused(): boolean {
 }
 
 export function useCommands() {
-  const appCtx = useAppContext();
-  const { toggleMode, settings } = useTheme();
-
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const ctxRef = useRef<CommandContext>(null!);
-
-  const {
-    projects, activeProject, setActiveProject, addProject,
-    tabs, activeTabId, createTab, closeTab, setActiveTab,
-    openFileTab, createBrowserTab, createGitTab, createClaudeTab,
-    splitPane, unsplit, panes, focusedPaneId, setFocusedPane,
-    toggleSidebarPanel, sidebarPanel,
-    runProject, stopProject, isProjectRunning,
-  } = appCtx;
-
-  const commandCtx: CommandContext = {
-    projects, activeProject, setActiveProject, addProject,
-    tabs, activeTabId, createTab, closeTab, setActiveTab,
-    openFileTab, createBrowserTab, createGitTab, createClaudeTab,
-    splitPane, unsplit, panes, focusedPaneId, setFocusedPane,
-    toggleSidebarPanel, sidebarPanel,
-    runProject, stopProject, isProjectRunning,
-    openCommandPalette: () => setPaletteOpen(true),
-    closeCommandPalette: () => setPaletteOpen(false),
-    toggleTheme: toggleMode,
-    openSettings: () => setSettingsOpen(true),
-  };
-
-  ctxRef.current = commandCtx;
-
-  const keybindingsRef = useRef(resolveKeybindings(COMMANDS, settings.keybindings));
+  const keybindings = useSettingsStore((s) => s.settings.keybindings);
+  const keybindingsRef = useRef(resolveKeybindings(COMMANDS, keybindings));
 
   useEffect(() => {
-    keybindingsRef.current = resolveKeybindings(COMMANDS, settings.keybindings);
-  }, [settings.keybindings]);
+    keybindingsRef.current = resolveKeybindings(COMMANDS, keybindings);
+  }, [keybindings]);
 
+  // Listen for UI events from the bus
+  useEffect(() => {
+    return subscribe((event) => {
+      switch (event.type) {
+        case "ui-open-palette":
+          setPaletteOpen(true);
+          break;
+        case "ui-close-palette":
+          setPaletteOpen(false);
+          break;
+        case "ui-open-settings":
+          setSettingsOpen(true);
+          break;
+      }
+    });
+  }, []);
+
+  // Global keydown handler
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const eventCombo = eventToKeyCombo(e);
@@ -61,15 +51,12 @@ export function useCommands() {
         const binding = keybindingsRef.current.get(cmd.id);
         if (!binding) continue;
         if (!matchKeybinding(eventCombo, binding)) continue;
-
         if (editorFocused && !cmd.alwaysActive) continue;
-
-        const ctx = ctxRef.current;
-        if (cmd.when && !cmd.when(ctx)) continue;
+        if (cmd.when && !cmd.when()) continue;
 
         e.preventDefault();
         e.stopPropagation();
-        cmd.execute(ctx);
+        cmd.execute();
         return;
       }
     }
@@ -78,11 +65,5 @@ export function useCommands() {
     return () => window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
-  return {
-    paletteOpen,
-    setPaletteOpen,
-    settingsOpen,
-    setSettingsOpen,
-    commandCtx: ctxRef,
-  };
+  return { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen };
 }

@@ -10,7 +10,7 @@ import { getFileIcon } from "@/lib/file-icons";
 import { useAppContext } from "@/contexts/AppContext";
 import { invoke } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import type { FileEntry, FileTreeContextMenu } from "./FileTree";
+import type { FileEntry, FileTreeContextMenu } from "@/hooks/useFileTree";
 
 function statusIndicatorColor(status: string) {
   switch (status) {

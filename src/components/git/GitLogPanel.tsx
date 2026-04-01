@@ -2,21 +2,9 @@ import { useEffect, useMemo } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { timeAgo } from "@/lib/git-utils";
 import { computeGraph, getColorHex } from "@/lib/git-graph";
 import type { GitLogEntry } from "@/types/git";
-
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor(Date.now() / 1000 - timestamp);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
 
 const ROW_HEIGHT = 28;
 const COL_WIDTH = 16;

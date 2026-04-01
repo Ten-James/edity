@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import {
   IconFolder,
   IconGitBranch,
@@ -10,7 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppContext } from "@/contexts/AppContext";
-import { invoke, listen } from "@/lib/ipc";
+import { useTopBar } from "@/hooks/useTopBar";
 import { RunButton } from "@/components/layout/RunButton";
 
 const isDev = import.meta.env.DEV;
@@ -25,16 +24,7 @@ export function TopBar() {
     createGitTab,
   } = useAppContext();
 
-  const [homedir, setHomedir] = useState<string>("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    invoke<string>("get_homedir").then(setHomedir);
-    let unlisten: (() => void) | undefined;
-    listen<boolean>("fullscreen-changed", (e) => setIsFullscreen(e.payload))
-      .then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
-  }, []);
+  const { isFullscreen, formatProjectPath } = useTopBar();
 
   const onMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) return;
@@ -54,11 +44,7 @@ export function TopBar() {
       )}
 
       <span className="text-[11px] font-medium text-muted-foreground truncate">
-        {activeProject
-          ? homedir && activeProject.path.startsWith(homedir)
-            ? "~" + activeProject.path.slice(homedir.length)
-            : activeProject.path
-          : "No Project"}
+        {activeProject ? formatProjectPath(activeProject.path) : "No Project"}
       </span>
 
       {gitBranchInfo && (

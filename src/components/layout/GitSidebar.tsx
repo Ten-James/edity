@@ -16,37 +16,13 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useGitState } from "@/hooks/useGitState";
 import type { GitFileStatus } from "@/types/git";
 import { cn } from "@/lib/utils";
-
-function statusColor(code: string) {
-  switch (code) {
-    case "M": return "text-orange-400";
-    case "A": return "text-green-400";
-    case "D": return "text-red-400";
-    case "R": return "text-blue-400";
-    case "?": return "text-muted-foreground";
-    default: return "text-muted-foreground";
-  }
-}
+import { statusColor, timeAgo, relPath } from "@/lib/git-utils";
 
 function fileStatus(f: GitFileStatus): { label: string; staged: boolean } {
   if (f.indexStatus && f.indexStatus !== "?" && f.indexStatus !== " ") {
     return { label: f.indexStatus, staged: true };
   }
   return { label: f.workTreeStatus || "?", staged: false };
-}
-
-function relPath(fullPath: string, projectPath: string): string {
-  return fullPath.startsWith(projectPath + "/")
-    ? fullPath.slice(projectPath.length + 1)
-    : fullPath;
-}
-
-function timeAgo(ts: number): string {
-  const s = Math.floor((Date.now() - ts * 1000) / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
 }
 
 export function GitSidebar() {
