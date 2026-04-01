@@ -23,6 +23,9 @@ import { ensureClaudeHooks, registerClaudeDetectionHandlers } from "./ipc/claude
 import { registerClaudeSdkHandlers, cleanupAllSessions } from "./ipc/claude-sdk";
 import { registerSettingsHandlers } from "./ipc/settings";
 import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
+import { setupDevLogger, flushAndClose } from "./lib/logger";
+
+setupDevLogger();
 
 // --- Custom Protocol ---
 
@@ -131,6 +134,7 @@ app.on("window-all-closed", () => {
   tabClaudeState.clear();
   cleanupAllSessions();
   cleanupDataConnections();
+  flushAndClose();
 
   app.quit();
 });

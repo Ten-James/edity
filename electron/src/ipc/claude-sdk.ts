@@ -2,6 +2,9 @@ import { ipcMain, BrowserWindow, app } from "electron";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import type { ClaudeSessionInfo, ClaudeSessionMessage } from "../../../shared/types/ipc";
+import { createLogger } from "../lib/logger";
+
+const log = createLogger("claude-sdk");
 
 interface PermissionCallback {
   resolve: (value: unknown) => void;
@@ -44,7 +47,7 @@ async function loadSDK() {
       const sdkUrl = pathToFileURL(getSdkPath("sdk.mjs")).href;
       sdkModule = await dynamicImport(sdkUrl);
     } catch (err) {
-      console.error("[claude-sdk] Failed to load SDK:", err);
+      log.error("Failed to load SDK:", err);
       throw err;
     }
   }
@@ -62,7 +65,8 @@ function flushBatch(session: ClaudeSession): void {
 }
 
 function sendToRenderer(session: ClaudeSession, message: unknown): void {
-  const msg = message as { type?: string };
+  const msg = message as { type?: string; parent_tool_use_id?: string; subtype?: string };
+  log.debug("→", message);
   if (msg.type === "stream_event") {
     session.batchBuffer.push(message);
     if (!session.batchTimer) {
@@ -103,7 +107,7 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
   } catch (err: unknown) {
     hadError = true;
     if (isInterrupted(err)) return;
-    console.error("[claude-sdk] Session loop error:", err);
+    log.error("Session loop error:", err);
     sendToRenderer(session, {
       type: "error",
       message: (err as Error).message || "Unknown error",
@@ -207,7 +211,7 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
     const queryIterator = sdk.query({ prompt, options: queryOptions });
     runSessionLoop(session, queryIterator);
   } catch (err: unknown) {
-    console.error("[claude-sdk] Failed to start session:", err);
+    log.error("Failed to start session:", err);
     sendToRenderer(session, {
       type: "error",
       message: `Failed to start Claude session: ${(err as Error).message}`,

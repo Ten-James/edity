@@ -59,9 +59,9 @@ export function ClaudeHeader({
       {isActive && (
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs"
           onClick={onInterrupt}
-          title="Interrupt"
+          title="Interrupt current turn"
         >
           <IconPlayerStop size={14} />
         </Button>
@@ -69,7 +69,7 @@ export function ClaudeHeader({
       {conversation.sessionId && (
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs"
           className="text-muted-foreground hover:text-destructive"
           onClick={onAbort}
           title="End session"

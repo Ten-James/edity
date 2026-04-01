@@ -845,6 +845,7 @@ export function useClaudeSession(projectPath: string) {
   const interrupt = useCallback(async () => {
     const sid = sessionIdRef.current;
     if (!sid) return;
+    dispatch({ type: "ERROR", message: "Interrupted by user" });
     try {
       await invoke("claude_interrupt", { sessionId: sid });
     } catch (err) {
@@ -854,15 +855,17 @@ export function useClaudeSession(projectPath: string) {
 
   const abort = useCallback(async () => {
     const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      await invoke("claude_abort", { sessionId: sid });
-    } catch (err) {
-      console.error("[claude] Abort failed:", err);
-    }
-    dispatch({ type: "RESET" });
-    sessionIdRef.current = null;
+    // Always reset local state regardless of backend
     teardownListener();
+    sessionIdRef.current = null;
+    dispatch({ type: "RESET" });
+    if (sid) {
+      try {
+        await invoke("claude_abort", { sessionId: sid });
+      } catch (err) {
+        console.error("[claude] Abort failed:", err);
+      }
+    }
   }, [teardownListener]);
 
   const setModel = useCallback((model: string) => {
