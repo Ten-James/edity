@@ -67,22 +67,51 @@ export function BashCommand({ input, inputJson }: ToolInputProps) {
 
 // --- Agent: sub-content + sub-tool calls ---
 
+import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const COLLAPSED_COUNT = 5;
+
 export function AgentBody({ toolUse }: { toolUse: ClaudeToolUse }) {
+  const [showAll, setShowAll] = useState(false);
+  const subTools = toolUse.subToolUses ?? [];
+  const hasMore = subTools.length > COLLAPSED_COUNT;
+  const visibleTools = showAll ? subTools : subTools.slice(-COLLAPSED_COUNT);
+  const hiddenCount = subTools.length - COLLAPSED_COUNT;
+
   return (
-    <div className="px-3 py-2 flex flex-col gap-2">
-      {toolUse.subContent && (
-        <div className="prose prose-sm dark:prose-invert max-w-none text-xs [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded">
-          <Markdown remarkPlugins={[remarkGfm]}>{toolUse.subContent}</Markdown>
-        </div>
-      )}
-      {toolUse.subToolUses && toolUse.subToolUses.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {toolUse.subToolUses.map((sub) => (
-            <ClaudeToolCall key={sub.id} toolUse={sub} />
-          ))}
-        </div>
-      )}
-    </div>
+    <ScrollArea className="max-h-64">
+      <div className="px-3 py-2 flex flex-col gap-1">
+        {subTools.length > 0 && (
+          <>
+            {hasMore && !showAll && (
+              <button
+                onClick={() => setShowAll(true)}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5"
+              >
+                Show {hiddenCount} more...
+              </button>
+            )}
+            {hasMore && showAll && (
+              <button
+                onClick={() => setShowAll(false)}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5"
+              >
+                Show less
+              </button>
+            )}
+            {visibleTools.map((sub) => (
+              <ClaudeToolCall key={sub.id} toolUse={sub} />
+            ))}
+          </>
+        )}
+        {toolUse.subContent && (
+          <div className="prose prose-sm dark:prose-invert max-w-none text-xs [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded">
+            <Markdown remarkPlugins={[remarkGfm]}>{toolUse.subContent}</Markdown>
+          </div>
+        )}
+      </div>
+    </ScrollArea>
   );
 }
 

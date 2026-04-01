@@ -60,7 +60,8 @@ export function ClaudeToolCall({
   toolUse,
   autoExpand = false,
 }: ClaudeToolCallProps) {
-  const { openFileTab } = useAppContext();
+  const { openFileTab, activeProject } = useAppContext();
+  const projectPath = activeProject?.path ?? "";
   const isQuestion = toolUse.name === "AskUserQuestion";
   const isActiveAgent = toolUse.name === "Agent" && getEffectiveStatus(toolUse) === "running";
   const [open, setOpen] = useState(autoExpand || isQuestion || isActiveAgent);
@@ -68,9 +69,12 @@ export function ClaudeToolCall({
   useEffect(() => {
     if (isActiveAgent) setOpen(true);
   }, [isActiveAgent]);
-  const summary =
+  const rawSummary =
     getToolSummary(toolUse.name, toolUse.input, toolUse.inputJson) ??
     toolUse.name;
+  const summary = projectPath && rawSummary.startsWith(projectPath + "/")
+    ? rawSummary.slice(projectPath.length + 1)
+    : rawSummary;
   const isInline = INLINE_TOOLS.has(toolUse.name);
 
   // AskUserQuestion renders as inline question text

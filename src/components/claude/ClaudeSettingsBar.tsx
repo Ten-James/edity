@@ -20,8 +20,11 @@ import {
   IconHistory,
   IconRefresh,
   IconCpu,
-  IconShield,
+  IconShieldCheck,
+  IconShieldOff,
   IconEye,
+  IconMap,
+  IconHammer,
 } from "@tabler/icons-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 
@@ -40,14 +43,6 @@ const MODELS = [
   { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
   { value: "claude-sonnet-4-6[1m]", label: "Sonnet 4.6 (1M)" },
   { value: "claude-opus-4-6[1m]", label: "Opus 4.6 (1M)" },
-];
-
-const MODES: { value: PermissionMode; label: string }[] = [
-  { value: "default", label: "Default" },
-  { value: "acceptEdits", label: "Accept Edits" },
-  { value: "plan", label: "Plan" },
-  { value: "bypassPermissions", label: "Full Auto" },
-  { value: "dontAsk", label: "Don't Ask" },
 ];
 
 function getModelLabel(model: string | null): string {
@@ -77,10 +72,6 @@ const OPENABLE_TOOLS = [
   "AskUserQuestion",
 ];
 
-function getModeLabel(mode: PermissionMode): string {
-  return MODES.find((m) => m.value === mode)?.label ?? mode;
-}
-
 export function ClaudeSettingsBar({
   conversation,
   sessions,
@@ -91,6 +82,8 @@ export function ClaudeSettingsBar({
 }: ClaudeSettingsBarProps) {
   const { settings, updateSettings } = useTheme();
   const autoExpandSet = new Set(settings.claude.autoExpandTools);
+  const hasSession = conversation.sessionId !== null;
+  const isFullAuto = conversation.permissionMode === "bypassPermissions";
 
   const toggleTool = (tool: string) => {
     const next = new Set(autoExpandSet);
@@ -101,8 +94,49 @@ export function ClaudeSettingsBar({
     });
   };
 
+  const toggleAutoMode = () => {
+    onModeChange(isFullAuto ? "default" : "bypassPermissions");
+  };
+
   return (
     <div className="flex items-center gap-1 px-3 pb-2">
+      {/* Mode: Plan / Build / Agents */}
+      <div className="flex items-center border border-border overflow-hidden">
+        <Button
+          variant={conversation.permissionMode === "plan" ? "secondary" : "ghost"}
+          size="xs"
+          className="rounded-none gap-1 text-muted-foreground h-6 px-2"
+          disabled={hasSession}
+          onClick={() => onModeChange("plan")}
+        >
+          <IconMap size={11} />
+          Plan
+        </Button>
+        <Button
+          variant={conversation.permissionMode !== "plan" ? "secondary" : "ghost"}
+          size="xs"
+          className="rounded-none gap-1 text-muted-foreground h-6 px-2"
+          disabled={hasSession}
+          onClick={() => onModeChange(isFullAuto ? "bypassPermissions" : "default")}
+        >
+          <IconHammer size={11} />
+          Build
+        </Button>
+      </div>
+
+      {/* Permission toggle: Default / Full Auto */}
+      <Button
+        variant="ghost"
+        size="xs"
+        className="gap-1 text-muted-foreground"
+        disabled={hasSession || conversation.permissionMode === "plan"}
+        onClick={toggleAutoMode}
+        title={isFullAuto ? "Full Auto — no permission prompts" : "Default — asks for permission"}
+      >
+        {isFullAuto ? <IconShieldOff size={12} /> : <IconShieldCheck size={12} />}
+        {isFullAuto ? "Auto" : "Safe"}
+      </Button>
+
       {/* Model selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -131,35 +165,6 @@ export function ClaudeSettingsBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Permission mode selector — disabled during active session */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="gap-1 text-muted-foreground"
-            disabled={conversation.sessionId !== null}
-          >
-            <IconShield size={12} />
-            {getModeLabel(conversation.permissionMode)}
-            <IconChevronDown size={10} />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start">
-          <DropdownMenuLabel>Permission Mode</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={conversation.permissionMode}
-            onValueChange={(v) => onModeChange(v as PermissionMode)}
-          >
-            {MODES.map((m) => (
-              <DropdownMenuRadioItem key={m.value} value={m.value}>
-                {m.label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
       {/* Auto-expand tools */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -169,7 +174,6 @@ export function ClaudeSettingsBar({
             className="gap-1 text-muted-foreground"
           >
             <IconEye size={12} />
-            Expand
             <IconChevronDown size={10} />
           </Button>
         </DropdownMenuTrigger>
@@ -187,6 +191,8 @@ export function ClaudeSettingsBar({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <div className="flex-1" />
+
       {/* Session history */}
       {sessions.length > 0 && (
         <DropdownMenu>
@@ -197,11 +203,10 @@ export function ClaudeSettingsBar({
               className="gap-1 text-muted-foreground"
             >
               <IconHistory size={12} />
-              Sessions
               <IconChevronDown size={10} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-[360px]">
+          <DropdownMenuContent side="top" align="end" className="w-[360px]">
             <DropdownMenuLabel>Session History</DropdownMenuLabel>
             {sessions.slice(0, 15).map((s) => (
               <DropdownMenuItem
