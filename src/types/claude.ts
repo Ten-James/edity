@@ -124,6 +124,7 @@ export interface ClaudeToolUse {
   status: "pending" | "running" | "complete" | "error";
   subContent?: string;
   subToolUses?: ClaudeToolUse[];
+  progressDescription?: string;
 }
 
 export interface ClaudeUIMessage {

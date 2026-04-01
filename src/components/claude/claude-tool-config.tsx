@@ -28,6 +28,7 @@ export const TASK_TOOL_NAMES = new Set([
   "TaskOutput",
   "TaskStop",
   "TodoWrite",
+  "AskUserQuestion",
 ]);
 
 export const INLINE_TOOLS = new Set([

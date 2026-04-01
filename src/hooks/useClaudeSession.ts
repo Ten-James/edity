@@ -37,6 +37,7 @@ type Action =
   | { type: "SUBAGENT_TOOL_RESULT"; parentToolUseId: string; toolUseId: string; content: string; isError: boolean }
   | { type: "SUBAGENT_COMPLETED"; toolUseId: string }
   | { type: "SUBAGENT_PROGRESS"; toolUseId: string; description: string }
+  | { type: "SUBAGENT_TEXT"; parentToolUseId: string; text: string }
   | { type: "TOOL_RESULT"; toolUseId: string; content: string; isError: boolean }
   | { type: "ASK_USER_QUESTION"; toolUseID: string; input: Record<string, unknown> }
   | { type: "QUESTION_ANSWERED" }
@@ -438,10 +439,27 @@ function reducer(
       if (parentIdx === -1) return state;
       const parent = { ...toolUses[parentIdx] };
       parent.status = "running";
+      parent.progressDescription = action.description;
       toolUses[parentIdx] = parent;
       updated.toolUses = toolUses;
       messages[messages.length - 1] = updated;
       return { ...state, status: "streaming", messages };
+    }
+
+    case "SUBAGENT_TEXT": {
+      const messages = [...state.messages];
+      const current = messages[messages.length - 1];
+      if (!current || current.role !== "assistant") return state;
+      const updated = { ...current };
+      const toolUses = [...updated.toolUses];
+      const parentIdx = toolUses.findIndex((t) => t.id === action.parentToolUseId);
+      if (parentIdx === -1) return state;
+      const parent = { ...toolUses[parentIdx] };
+      parent.subContent = (parent.subContent ?? "") + action.text;
+      toolUses[parentIdx] = parent;
+      updated.toolUses = toolUses;
+      messages[messages.length - 1] = updated;
+      return { ...state, messages };
     }
 
     case "TOOL_RESULT": {
@@ -624,9 +642,10 @@ export function useClaudeSession(projectPath: string) {
           case "assistant": {
             const parentId = raw.parent_tool_use_id as string | null;
             if (parentId) {
-              // Sub-agent assistant message — extract tool_use blocks
+              // Sub-agent assistant message — extract tool_use and text blocks
               const msg = raw.message as Record<string, unknown> | undefined;
               const content = (msg?.content ?? []) as ContentBlock[];
+              let text = "";
               for (const block of content) {
                 if (block.type === "tool_use" && block.id && block.name) {
                   dispatch({
@@ -634,7 +653,12 @@ export function useClaudeSession(projectPath: string) {
                     parentToolUseId: parentId,
                     toolUse: { id: block.id, name: block.name, input: block.input ?? {} },
                   });
+                } else if (block.type === "text" && block.text) {
+                  text += block.text;
                 }
+              }
+              if (text) {
+                dispatch({ type: "SUBAGENT_TEXT", parentToolUseId: parentId, text });
               }
             } else {
               dispatch({ type: "ASSISTANT_MESSAGE", message: data as ClaudeMessage & { type: "assistant" } });

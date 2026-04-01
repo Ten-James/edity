@@ -129,7 +129,12 @@ export function ClaudeToolCall({
           {getToolIcon(toolUse.name)}
         </span>
         {toolUse.name === "Agent" && summary ? (
-          <span className="truncate font-medium">{summary}</span>
+          <>
+            <span className="truncate font-medium">{summary}</span>
+            {toolUse.progressDescription && getEffectiveStatus(toolUse) === "running" && (
+              <span className="truncate text-muted-foreground text-[10px]">{toolUse.progressDescription}</span>
+            )}
+          </>
         ) : (
           <>
             <span className="font-medium">{toolUse.name}</span>
