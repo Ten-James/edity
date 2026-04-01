@@ -239,19 +239,75 @@ function reducer(
     }
 
     case "ASSISTANT_MESSAGE": {
-      const messages = ensureCurrentAssistant(state.messages);
-      const current = { ...messages[messages.length - 1] };
-      current.isStreaming = false;
-      current.toolUses = current.toolUses.map((t) => ({
-        ...t,
-        // Agent tools stay "running" until SUBAGENT_COMPLETED
-        status: t.status === "running" && t.name !== "Agent" ? ("complete" as const) : t.status,
-      }));
+      // SDK sends multiple assistant messages per turn (one with text, another with tools).
+      // Always merge into the last assistant message instead of creating a new one.
+      const raw = action.message as unknown as Record<string, unknown>;
+      const msg = raw.message as Record<string, unknown> | undefined;
+      const content = (msg?.content ?? []) as ContentBlock[];
 
-      return {
-        ...state,
-        messages: [...messages.slice(0, -1), current],
-      };
+      let textContent = "";
+      let thinkingContent = "";
+      const snapshotTools: ClaudeToolUse[] = [];
+
+      for (const block of content) {
+        if (block.type === "text" && block.text) {
+          textContent += block.text;
+        } else if (block.type === "thinking" && block.thinking) {
+          thinkingContent += block.thinking;
+        } else if (block.type === "tool_use" && block.id && block.name) {
+          snapshotTools.push({
+            id: block.id,
+            name: block.name,
+            input: block.input ?? {},
+            inputJson: JSON.stringify(block.input ?? {}),
+            status: block.name === "Agent" ? "running" : "complete",
+          });
+        }
+      }
+
+      // Find or create the assistant message to merge into
+      let messages = [...state.messages];
+      let currentIdx = -1;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "assistant") { currentIdx = i; break; }
+      }
+      if (currentIdx === -1) {
+        // No assistant message yet — create one
+        messages = ensureCurrentAssistant(messages);
+        currentIdx = messages.length - 1;
+      }
+      const current = { ...messages[currentIdx] };
+
+      // Merge content — append, don't overwrite (multiple assistant messages per turn)
+      if (textContent) current.textContent = (current.textContent ? current.textContent + "\n" : "") + textContent;
+      if (thinkingContent) current.thinkingContent = (current.thinkingContent || "") + thinkingContent;
+
+      // Merge tools: add new ones, preserve existing sub-agent state
+      for (const newTool of snapshotTools) {
+        const existingIdx = current.toolUses.findIndex((t) => t.id === newTool.id);
+        if (existingIdx === -1) {
+          current.toolUses = [...current.toolUses, newTool];
+        } else {
+          const existing = current.toolUses[existingIdx];
+          const merged = {
+            ...newTool,
+            status: existing.status,
+            subToolUses: existing.subToolUses,
+            subContent: existing.subContent,
+            progressDescription: existing.progressDescription,
+          };
+          const updated = [...current.toolUses];
+          updated[existingIdx] = merged;
+          current.toolUses = updated;
+        }
+      }
+
+      // Don't set isStreaming=false here — RESULT will do that.
+      // Setting it here causes ensureCurrentAssistant to create a new message
+      // when stream_events arrive between multiple assistant messages in one turn.
+      messages[currentIdx] = current;
+
+      return { ...state, messages };
     }
 
     case "RESULT": {

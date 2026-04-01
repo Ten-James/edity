@@ -59,6 +59,7 @@ function flushBatch(session: ClaudeSession): void {
   const messages = session.batchBuffer.splice(0);
   if (session.mainWindow && !session.mainWindow.isDestroyed()) {
     for (const msg of messages) {
+      log.debug("→", msg);
       session.mainWindow.webContents.send(`claude-msg-${session.sessionId}`, msg);
     }
   }
@@ -66,7 +67,8 @@ function flushBatch(session: ClaudeSession): void {
 
 function sendToRenderer(session: ClaudeSession, message: unknown): void {
   const msg = message as { type?: string; parent_tool_use_id?: string; subtype?: string };
-  log.debug("→", message);
+
+  // Batch stream_events for performance, don't log (too verbose)
   if (msg.type === "stream_event") {
     session.batchBuffer.push(message);
     if (!session.batchTimer) {
@@ -78,12 +80,14 @@ function sendToRenderer(session: ClaudeSession, message: unknown): void {
     return;
   }
 
+  // Flush pending stream_events before sending other message types
   flushBatch(session);
   if (session.batchTimer) {
     clearTimeout(session.batchTimer);
     session.batchTimer = null;
   }
 
+  log.debug("→", message);
   if (session.mainWindow && !session.mainWindow.isDestroyed()) {
     session.mainWindow.webContents.send(`claude-msg-${session.sessionId}`, message);
   }

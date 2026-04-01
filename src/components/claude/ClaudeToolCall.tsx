@@ -33,13 +33,10 @@ interface ClaudeToolCallProps {
 
 function getToolBody(toolUse: ClaudeToolUse) {
   const { name, input, inputJson } = toolUse;
-  const hasAgent =
-    toolUse.subContent ||
-    (toolUse.subToolUses && toolUse.subToolUses.length > 0);
 
   switch (name) {
     case "Agent":
-      return hasAgent ? <AgentBody toolUse={toolUse} /> : null;
+      return <AgentBody toolUse={toolUse} />;
     case "Bash":
       return <BashCommand input={input} inputJson={inputJson} />;
     case "Edit":
