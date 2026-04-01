@@ -59,10 +59,9 @@ export function useGitState(projectPath: string) {
   const refreshStatus = useCallback(async () => {
     const cwd = cwdRef.current;
     try {
-      const statusResult = await invoke<GitResult & { files?: GitFileStatus[] }>(
-        "git_status",
-        { cwd },
-      );
+      const statusResult = await invoke<
+        GitResult & { files?: GitFileStatus[] }
+      >("git_status", { cwd });
 
       // Guard against stale response if project changed
       if (cwd !== cwdRef.current) return;
@@ -119,7 +118,9 @@ export function useGitState(projectPath: string) {
 
       // Check if file is untracked/new — show full content instead of empty diff
       const isUntracked = state.untracked.some((f) => f.path === path);
-      const isNewStaged = staged && state.staged.some((f) => f.path === path && f.indexStatus === "A");
+      const isNewStaged =
+        staged &&
+        state.staged.some((f) => f.path === path && f.indexStatus === "A");
 
       if (isUntracked || isNewStaged) {
         try {
@@ -150,7 +151,7 @@ export function useGitState(projectPath: string) {
         );
         setState((s) => ({
           ...s,
-          selectedDiff: result.ok ? (result.diff as string) ?? "" : null,
+          selectedDiff: result.ok ? ((result.diff as string) ?? "") : null,
         }));
       } catch {
         setState((s) => ({ ...s, selectedDiff: null }));
@@ -298,21 +299,21 @@ export function useGitState(projectPath: string) {
     [loadBranches],
   );
 
-  const loadLog = useCallback(
-    async (count = 50, skip = 0) => {
-      const result = await invoke<GitResult & { entries?: GitLogEntry[] }>(
-        "git_log",
-        { cwd: cwdRef.current, count, skip },
-      );
-      if (result.ok) {
-        setState((s) => ({
-          ...s,
-          log: skip === 0 ? (result.entries ?? []) : [...s.log, ...(result.entries ?? [])],
-        }));
-      }
-    },
-    [],
-  );
+  const loadLog = useCallback(async (count = 50, skip = 0) => {
+    const result = await invoke<GitResult & { entries?: GitLogEntry[] }>(
+      "git_log",
+      { cwd: cwdRef.current, count, skip },
+    );
+    if (result.ok) {
+      setState((s) => ({
+        ...s,
+        log:
+          skip === 0
+            ? (result.entries ?? [])
+            : [...s.log, ...(result.entries ?? [])],
+      }));
+    }
+  }, []);
 
   const selectCommit = useCallback(async (hash: string) => {
     try {

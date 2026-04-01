@@ -6,11 +6,19 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Ensure interactive elements are clickable inside drag regions */
-button, input, select, textarea, a, [role="tab"], [role="button"] {
+button,
+input,
+select,
+textarea,
+a,
+[role="tab"],
+[role="button"] {
   -webkit-app-region: no-drag;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -20,7 +28,7 @@ html, body, #root {
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Inter Variable', sans-serif;
+  --font-sans: "Inter Variable", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -63,37 +71,37 @@ html, body, #root {
 
 :root {
   --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.20 0.005 260);
+  --foreground: oklch(0.2 0.005 260);
   --card: oklch(0.97 0.002 260);
-  --card-foreground: oklch(0.20 0.005 260);
+  --card-foreground: oklch(0.2 0.005 260);
   --popover: oklch(0.97 0.002 260);
-  --popover-foreground: oklch(0.20 0.005 260);
-  --primary: oklch(0.50 0.15 250);
+  --popover-foreground: oklch(0.2 0.005 260);
+  --primary: oklch(0.5 0.15 250);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.95 0.002 260);
-  --secondary-foreground: oklch(0.20 0.005 260);
+  --secondary-foreground: oklch(0.2 0.005 260);
   --muted: oklch(0.95 0.002 260);
-  --muted-foreground: oklch(0.50 0.01 260);
+  --muted-foreground: oklch(0.5 0.01 260);
   --accent: oklch(0.93 0.003 260);
-  --accent-foreground: oklch(0.20 0.005 260);
+  --accent-foreground: oklch(0.2 0.005 260);
   --destructive: oklch(0.55 0.22 25);
   --border: oklch(0 0 0 / 8%);
   --input: oklch(0 0 0 / 8%);
-  --ring: oklch(0.50 0.15 250);
+  --ring: oklch(0.5 0.15 250);
   --chart-1: oklch(0.65 0.15 250);
-  --chart-2: oklch(0.60 0.15 160);
+  --chart-2: oklch(0.6 0.15 160);
   --chart-3: oklch(0.55 0.15 300);
   --chart-4: oklch(0.65 0.12 50);
-  --chart-5: oklch(0.50 0.10 200);
+  --chart-5: oklch(0.5 0.1 200);
   --radius: 0.625rem;
   --sidebar: oklch(0.96 0.002 260);
-  --sidebar-foreground: oklch(0.40 0.005 260);
-  --sidebar-primary: oklch(0.50 0.15 250);
+  --sidebar-foreground: oklch(0.4 0.005 260);
+  --sidebar-primary: oklch(0.5 0.15 250);
   --sidebar-primary-foreground: oklch(0.98 0 0);
   --sidebar-accent: oklch(0.93 0.003 260);
-  --sidebar-accent-foreground: oklch(0.20 0.005 260);
+  --sidebar-accent-foreground: oklch(0.2 0.005 260);
   --sidebar-border: oklch(0 0 0 / 6%);
-  --sidebar-ring: oklch(0.50 0.15 250);
+  --sidebar-ring: oklch(0.5 0.15 250);
 }
 
 .dark {
@@ -105,21 +113,21 @@ html, body, #root {
   --popover-foreground: oklch(0.87 0.005 260);
   --primary: oklch(0.65 0.15 250);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.20 0.005 260);
+  --secondary: oklch(0.2 0.005 260);
   --secondary-foreground: oklch(0.87 0.005 260);
-  --muted: oklch(0.20 0.005 260);
+  --muted: oklch(0.2 0.005 260);
   --muted-foreground: oklch(0.55 0.01 260);
   --accent: oklch(0.22 0.008 260);
   --accent-foreground: oklch(0.87 0.005 260);
-  --destructive: oklch(0.60 0.20 25);
+  --destructive: oklch(0.6 0.2 25);
   --border: oklch(1 0 0 / 6%);
   --input: oklch(1 0 0 / 8%);
   --ring: oklch(0.65 0.15 250);
   --chart-1: oklch(0.65 0.15 250);
-  --chart-2: oklch(0.60 0.15 160);
+  --chart-2: oklch(0.6 0.15 160);
   --chart-3: oklch(0.55 0.15 300);
   --chart-4: oklch(0.65 0.12 50);
-  --chart-5: oklch(0.50 0.10 200);
+  --chart-5: oklch(0.5 0.1 200);
   --sidebar: oklch(0.12 0.005 260);
   --sidebar-foreground: oklch(0.55 0.005 260);
   --sidebar-primary: oklch(0.65 0.15 250);

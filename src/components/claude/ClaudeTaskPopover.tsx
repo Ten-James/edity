@@ -43,7 +43,8 @@ function extractTasks(tools: ClaudeToolUse[]): TaskInfo[] {
     if (tool.name === "TaskUpdate" && tool.input.taskId) {
       const target = byIndex.get(String(tool.input.taskId));
       if (target) {
-        if (tool.input.status) target.status = tool.input.status as TaskInfo["status"];
+        if (tool.input.status)
+          target.status = tool.input.status as TaskInfo["status"];
         if (tool.input.subject) target.subject = String(tool.input.subject);
       }
     }
@@ -59,7 +60,9 @@ function TaskStatusIcon({ status }: { status: TaskInfo["status"] }) {
     case "in_progress":
       return <IconLoader2 size={12} className="animate-spin text-blue-500" />;
     case "pending":
-      return <div className="h-3 w-3 rounded-full border border-muted-foreground" />;
+      return (
+        <div className="h-3 w-3 rounded-full border border-muted-foreground" />
+      );
     default:
       return <IconX size={12} className="text-muted-foreground" />;
   }
@@ -84,7 +87,9 @@ export function ClaudeTaskPopover({ taskTools }: ClaudeTaskPopoverProps) {
         >
           <IconChecklist size={14} className="text-muted-foreground shrink-0" />
           <span className="font-medium">Tasks</span>
-          <span className="text-muted-foreground ml-1">{completed}/{total}</span>
+          <span className="text-muted-foreground ml-1">
+            {completed}/{total}
+          </span>
           <span className="ml-auto">
             {open ? <IconChevronDown size={12} /> : <IconChevronUp size={12} />}
           </span>
@@ -97,7 +102,13 @@ export function ClaudeTaskPopover({ taskTools }: ClaudeTaskPopoverProps) {
                 <span className="shrink-0 mt-0.5">
                   <TaskStatusIcon status={task.status} />
                 </span>
-                <span className={task.status === "completed" ? "text-muted-foreground line-through" : ""}>
+                <span
+                  className={
+                    task.status === "completed"
+                      ? "text-muted-foreground line-through"
+                      : ""
+                  }
+                >
                   {task.subject}
                 </span>
               </div>

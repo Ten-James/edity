@@ -49,7 +49,8 @@ export function RunButton() {
   );
 
   const hasAnyCommand = defaultCommand || extraScripts.length > 0;
-  const hasDropdownItems = configuredCommands.length > 0 || extraScripts.length > 0;
+  const hasDropdownItems =
+    configuredCommands.length > 0 || extraScripts.length > 0;
 
   if (!activeProject) return null;
 
@@ -115,7 +116,7 @@ export function RunButton() {
           <TooltipContent>
             {isProjectRunning
               ? "Stop all running processes"
-              : defaultCommand?.command ?? "No run command configured"}
+              : (defaultCommand?.command ?? "No run command configured")}
           </TooltipContent>
         </Tooltip>
 

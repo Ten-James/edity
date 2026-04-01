@@ -69,7 +69,9 @@ function applyProjectTypes(monacoInstance: Monaco, projectTypes: ProjectTypes) {
   const defaults = [ts.typescriptDefaults, ts.javascriptDefaults];
   for (const d of defaults) {
     d.setCompilerOptions(
-      compilerOptions as Parameters<typeof ts.typescriptDefaults.setCompilerOptions>[0],
+      compilerOptions as Parameters<
+        typeof ts.typescriptDefaults.setCompilerOptions
+      >[0],
     );
     d.setDiagnosticsOptions({
       noSemanticValidation: false,
@@ -89,7 +91,11 @@ interface UseMonacoEditorOptions {
   filePath: string;
 }
 
-export function useMonacoEditor({ tabId, content, filePath }: UseMonacoEditorOptions) {
+export function useMonacoEditor({
+  tabId,
+  content,
+  filePath,
+}: UseMonacoEditorOptions) {
   const mode = useSettingsStore((s) => s.mode);
   const activeTheme = useSettingsStore((s) => s.activeTheme);
   const activeProject = useProjectStore((s) => s.activeProject);
@@ -138,7 +144,10 @@ export function useMonacoEditor({ tabId, content, filePath }: UseMonacoEditorOpt
     monacoRef.current = monacoInstance;
     savedContentRef.current = content;
 
-    editor.updateOptions({ lightbulb: { enabled: "onCode" } } as Record<string, unknown>);
+    editor.updateOptions({ lightbulb: { enabled: "onCode" } } as Record<
+      string,
+      unknown
+    >);
 
     editor.addCommand(
       // eslint-disable-next-line no-bitwise
@@ -180,7 +189,11 @@ export function useMonacoEditor({ tabId, content, filePath }: UseMonacoEditorOpt
   };
 
   function handleChange(value: string | undefined) {
-    dispatch({ type: "tab-set-dirty", tabId, dirty: value !== savedContentRef.current });
+    dispatch({
+      type: "tab-set-dirty",
+      tabId,
+      dirty: value !== savedContentRef.current,
+    });
   }
 
   return {

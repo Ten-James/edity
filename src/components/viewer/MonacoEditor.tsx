@@ -9,11 +9,12 @@ interface MonacoEditorProps {
 }
 
 export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
-  const { mode, handleMount, handleBeforeMount, handleChange } = useMonacoEditor({
-    tabId,
-    content,
-    filePath,
-  });
+  const { mode, handleMount, handleBeforeMount, handleChange } =
+    useMonacoEditor({
+      tabId,
+      content,
+      filePath,
+    });
 
   const language = detectLanguage(filePath);
 

@@ -21,7 +21,12 @@ interface UseTerminalOptions {
   initialCommand?: string;
 }
 
-export function useTerminal({ tabId, isActive, cwd, initialCommand }: UseTerminalOptions) {
+export function useTerminal({
+  tabId,
+  isActive,
+  cwd,
+  initialCommand,
+}: UseTerminalOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -31,18 +36,26 @@ export function useTerminal({ tabId, isActive, cwd, initialCommand }: UseTermina
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const name = await invoke<string | null>("get_foreground_process", { tabId });
+        const name = await invoke<string | null>("get_foreground_process", {
+          tabId,
+        });
         if (!name) return;
 
-        const status = await invoke<ClaudeStatus | null>("get_claude_status", { tabId });
+        const status = await invoke<ClaudeStatus | null>("get_claude_status", {
+          tabId,
+        });
         if (status) {
           const label =
-            status.status === "active" ? "Claude Code" : `Claude Code (${status.status})`;
+            status.status === "active"
+              ? "Claude Code"
+              : `Claude Code (${status.status})`;
           dispatch({ type: "tab-update-title", tabId, title: label });
         } else {
           dispatch({ type: "tab-update-title", tabId, title: name });
         }
-      } catch { /* PTY may not be ready yet */ }
+      } catch {
+        /* PTY may not be ready yet */
+      }
     }, 2000);
     return () => clearInterval(interval);
   }, [tabId]);
@@ -69,10 +82,16 @@ export function useTerminal({ tabId, isActive, cwd, initialCommand }: UseTermina
 
     const unlisten = window.electronAPI.on(
       `pty-output-${tabId}`,
-      (data: unknown) => { term.write(data as string); },
+      (data: unknown) => {
+        term.write(data as string);
+      },
     );
 
-    invoke("spawn_shell", { tabId, cwd: cwd ?? null, initialCommand: initialCommand ?? null });
+    invoke("spawn_shell", {
+      tabId,
+      cwd: cwd ?? null,
+      initialCommand: initialCommand ?? null,
+    });
 
     term.onData((data: string) => {
       invoke("write_to_pty", { tabId, data });
@@ -114,7 +133,11 @@ export function useTerminal({ tabId, isActive, cwd, initialCommand }: UseTermina
       setTimeout(() => {
         fitAddonRef.current?.fit();
         if (termRef.current) {
-          invoke("resize_pty", { tabId, cols: termRef.current.cols, rows: termRef.current.rows });
+          invoke("resize_pty", {
+            tabId,
+            cols: termRef.current.cols,
+            rows: termRef.current.rows,
+          });
           termRef.current.focus();
         }
       }, 0);

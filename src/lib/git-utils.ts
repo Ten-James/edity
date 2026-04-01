@@ -1,11 +1,17 @@
 export function statusColor(code: string): string {
   switch (code) {
-    case "M": return "text-orange-400";
-    case "A": return "text-green-400";
-    case "D": return "text-red-400";
-    case "R": return "text-blue-400";
-    case "?": return "text-muted-foreground";
-    default: return "text-muted-foreground";
+    case "M":
+      return "text-orange-400";
+    case "A":
+      return "text-green-400";
+    case "D":
+      return "text-red-400";
+    case "R":
+      return "text-blue-400";
+    case "?":
+      return "text-muted-foreground";
+    default:
+      return "text-muted-foreground";
   }
 }
 

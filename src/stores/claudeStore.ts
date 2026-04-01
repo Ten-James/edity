@@ -54,7 +54,9 @@ export const useClaudeStore = create<ClaudeState>((set, get) => ({
         }
 
         set({ projectStatuses: perProject });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
 
     poll();
@@ -73,7 +75,9 @@ export const useClaudeStore = create<ClaudeState>((set, get) => ({
         osc.start();
         osc.stop(ctx.currentTime + 0.15);
         osc.onended = () => ctx.close();
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }).then((cleanup) => {
       set({ _notificationCleanup: cleanup });
     });
@@ -103,6 +107,8 @@ subscribe((event) => {
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
       osc.onended = () => ctx.close();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 });

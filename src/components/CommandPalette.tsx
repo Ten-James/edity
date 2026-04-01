@@ -55,7 +55,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   {cmd.icon && <cmd.icon size={16} />}
                   <span>{cmd.label}</span>
                   {binding && (
-                    <CommandShortcut>{formatKeybinding(binding)}</CommandShortcut>
+                    <CommandShortcut>
+                      {formatKeybinding(binding)}
+                    </CommandShortcut>
                   )}
                 </CommandItem>
               );

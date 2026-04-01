@@ -40,12 +40,19 @@ export function useFileTree() {
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState("");
-  const [gitStatusMap, setGitStatusMap] = useState<Map<string, string>>(new Map());
+  const [gitStatusMap, setGitStatusMap] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [gitFilter, setGitFilter] = useState<GitFilter>("all");
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<FileTreeContextMenu | null>(null);
-  const [renaming, setRenaming] = useState<{ path: string; name: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<FileTreeContextMenu | null>(
+    null,
+  );
+  const [renaming, setRenaming] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
   const [creating, setCreating] = useState<{
     parentDir: string;
     type: "file" | "directory";
@@ -89,12 +96,16 @@ export function useFileTree() {
     }
 
     let unlisten: (() => void) | null = null;
-    invoke("watch_project_dir", { projectPath: activeProject.path }).catch(() => {});
+    invoke("watch_project_dir", { projectPath: activeProject.path }).catch(
+      () => {},
+    );
 
     listen("directory-changed", () => {
       refreshTree();
       setRefreshSignal((s) => s + 1);
-    }).then((fn) => { unlisten = fn; });
+    }).then((fn) => {
+      unlisten = fn;
+    });
 
     return () => {
       if (unlisten) unlisten();
@@ -131,7 +142,10 @@ export function useFileTree() {
 
     let successCount = 0;
     for (const targetPath of paths) {
-      const result = await invoke<{ ok: boolean; error?: string }>("delete_path", { targetPath });
+      const result = await invoke<{ ok: boolean; error?: string }>(
+        "delete_path",
+        { targetPath },
+      );
       if (result.ok) {
         dispatch({ type: "tab-close-by-filepath", filePath: targetPath });
         successCount++;
@@ -141,7 +155,9 @@ export function useFileTree() {
     }
     setSelectedPaths(new Set());
     if (successCount > 0) {
-      toast.success(successCount === 1 ? "Deleted" : `Deleted ${successCount} items`);
+      toast.success(
+        successCount === 1 ? "Deleted" : `Deleted ${successCount} items`,
+      );
     }
   }
 
@@ -159,10 +175,13 @@ export function useFileTree() {
       setRenaming(null);
       return;
     }
-    const result = await invoke<{ ok: boolean; error?: string }>("rename_path", {
-      oldPath: renaming.path,
-      newPath,
-    });
+    const result = await invoke<{ ok: boolean; error?: string }>(
+      "rename_path",
+      {
+        oldPath: renaming.path,
+        newPath,
+      },
+    );
     if (result.ok) {
       dispatch({ type: "tab-close-by-filepath", filePath: renaming.path });
       toast.success("Renamed");
@@ -176,7 +195,10 @@ export function useFileTree() {
     if (!contextMenu) return;
     const parentDir = contextMenu.entry.is_dir
       ? contextMenu.entry.path
-      : contextMenu.entry.path.substring(0, contextMenu.entry.path.lastIndexOf("/"));
+      : contextMenu.entry.path.substring(
+          0,
+          contextMenu.entry.path.lastIndexOf("/"),
+        );
     setCreating({ parentDir, type, name: "" });
     setContextMenu(null);
   }
@@ -187,11 +209,15 @@ export function useFileTree() {
       return;
     }
     const fullPath = `${creating.parentDir}/${creating.name.trim()}`;
-    const handler = creating.type === "file" ? "create_file" : "create_directory";
-    const args = creating.type === "file" ? { filePath: fullPath } : { dirPath: fullPath };
+    const handler =
+      creating.type === "file" ? "create_file" : "create_directory";
+    const args =
+      creating.type === "file" ? { filePath: fullPath } : { dirPath: fullPath };
     const result = await invoke<{ ok: boolean; error?: string }>(handler, args);
     if (result.ok) {
-      toast.success(creating.type === "file" ? "File created" : "Folder created");
+      toast.success(
+        creating.type === "file" ? "File created" : "Folder created",
+      );
       if (creating.type === "file") {
         dispatch({ type: "tab-open-file", filePath: fullPath });
       }
@@ -226,7 +252,11 @@ export function useFileTree() {
     if (e.target !== e.currentTarget || !activeProject) return;
     e.preventDefault();
     setContextMenu({
-      entry: { name: activeProject.name, path: activeProject.path, is_dir: true },
+      entry: {
+        name: activeProject.name,
+        path: activeProject.path,
+        is_dir: true,
+      },
       x: e.clientX,
       y: e.clientY,
     });
@@ -240,7 +270,11 @@ export function useFileTree() {
         if (!e.is_dir || !activeProject) return false;
         const rel = e.path.replace(activeProject.path + "/", "");
         for (const [filePath] of gitStatusMap) {
-          if (filePath.startsWith(rel + "/") && filePath.toLowerCase().includes(lf)) return true;
+          if (
+            filePath.startsWith(rel + "/") &&
+            filePath.toLowerCase().includes(lf)
+          )
+            return true;
         }
         return true;
       })

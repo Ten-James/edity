@@ -6,7 +6,13 @@ export function parseDiff(raw: string, filePath: string): FileDiff {
   const lines = raw.split("\n");
 
   if (raw.includes("Binary files") && raw.includes("differ")) {
-    return { filePath, hunks: [], isBinary: true, isNew: false, isDeleted: false };
+    return {
+      filePath,
+      hunks: [],
+      isBinary: true,
+      isNew: false,
+      isDeleted: false,
+    };
   }
 
   const isNew = raw.includes("new file mode");

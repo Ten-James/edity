@@ -93,7 +93,10 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
   const navigate = useCallback(
     (url: string) => {
       let normalized = url.trim();
-      if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+      if (
+        !normalized.startsWith("http://") &&
+        !normalized.startsWith("https://")
+      ) {
         normalized = `https://${normalized}`;
       }
       setUrlInput(normalized);
@@ -121,19 +124,36 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
       style={{ display: isActive ? "flex" : "none" }}
     >
       <div className="flex h-10 items-center gap-1 px-2 border-b border-border bg-card shrink-0">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={goBack}
+        >
           <IconArrowLeft size={14} />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goForward}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={goForward}
+        >
           <IconArrowRight size={14} />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={reload}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={reload}
+        >
           <IconRefresh size={14} />
         </Button>
         <Input
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") navigate(urlInput); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") navigate(urlInput);
+          }}
           className="flex-1 h-7 text-xs"
           placeholder="Enter URL..."
         />
@@ -147,7 +167,10 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
 
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
-          <span className="fixed w-0 h-0" style={{ left: menuPos.x, top: menuPos.y }} />
+          <span
+            className="fixed w-0 h-0"
+            style={{ left: menuPos.x, top: menuPos.y }}
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">
           <DropdownMenuItem onClick={goBack}>

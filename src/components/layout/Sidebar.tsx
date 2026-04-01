@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { IconPlus, IconSun, IconMoon, IconSettings, IconTrash } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconSun,
+  IconMoon,
+  IconSettings,
+  IconTrash,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -68,7 +74,9 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                         <div
                           className={cn(
                             "flex flex-col items-center gap-1",
-                            dragOverIdx === idx && dragIdx !== idx && "border-t-2 border-primary",
+                            dragOverIdx === idx &&
+                              dragIdx !== idx &&
+                              "border-t-2 border-primary",
                           )}
                           draggable
                           onDragStart={() => setDragIdx(idx)}
@@ -77,7 +85,11 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                             setDragOverIdx(idx);
                           }}
                           onDragEnd={() => {
-                            if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+                            if (
+                              dragIdx !== null &&
+                              dragOverIdx !== null &&
+                              dragIdx !== dragOverIdx
+                            ) {
                               reorderProjects(dragIdx, dragOverIdx);
                             }
                             setDragIdx(null);
@@ -91,14 +103,21 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                             onClick={() => setActiveProject(project)}
                             className={cn(
                               "flex h-8 w-8 items-center justify-center text-[11px] font-semibold transition-colors",
-                              !isActive && "text-muted-foreground hover:bg-accent hover:text-foreground",
+                              !isActive &&
+                                "text-muted-foreground hover:bg-accent hover:text-foreground",
                               dragIdx === idx && "opacity-50",
                             )}
                             style={
                               isActive && color
-                                ? { backgroundColor: color.hex, color: color.textHex }
+                                ? {
+                                    backgroundColor: color.hex,
+                                    color: color.textHex,
+                                  }
                                 : isActive
-                                  ? { backgroundColor: "var(--accent)", color: "var(--foreground)" }
+                                  ? {
+                                      backgroundColor: "var(--accent)",
+                                      color: "var(--foreground)",
+                                    }
                                   : undefined
                             }
                           >
@@ -110,7 +129,8 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                                 "h-1 w-1 rounded-full transition-colors",
                                 claudeStatus === "working" && "bg-blue-500",
                                 claudeStatus === "idle" && "bg-green-500",
-                                claudeStatus === "notification" && "bg-red-500 animate-pulse",
+                                claudeStatus === "notification" &&
+                                  "bg-red-500 animate-pulse",
                                 claudeStatus === "active" && "bg-blue-500",
                               )}
                             />
@@ -183,7 +203,6 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
           projectPath={editProject.path}
         />
       )}
-
     </>
   );
 }

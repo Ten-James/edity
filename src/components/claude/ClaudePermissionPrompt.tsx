@@ -14,7 +14,9 @@ export function ClaudePermissionPrompt({
   onRespond,
 }: ClaudePermissionPromptProps) {
   const description =
-    request.description || request.title || `${request.toolName} wants to execute`;
+    request.description ||
+    request.title ||
+    `${request.toolName} wants to execute`;
 
   const filePath = getFilePath(request.input);
   const detail = getPermissionDetail(request);
@@ -40,9 +42,7 @@ export function ClaudePermissionPrompt({
           </div>
         </div>
 
-        {detail && (
-          <CodeBlock className="max-h-64">{detail}</CodeBlock>
-        )}
+        {detail && <CodeBlock className="max-h-64">{detail}</CodeBlock>}
 
         <div className="flex items-center gap-2">
           <Button

@@ -20,7 +20,8 @@ subscribe((event) => {
     case "run-start": {
       const proj = useProjectStore.getState().activeProject;
       if (!proj) break;
-      const config = useProjectStore.getState().edityConfigs.get(proj.id) ?? null;
+      const config =
+        useProjectStore.getState().edityConfigs.get(proj.id) ?? null;
       const cmd = event.command ?? getDefaultRunCommand(config);
       if (!cmd) break;
 
@@ -78,7 +79,10 @@ subscribe((event) => {
       if (event.commandId) {
         const key = `${proj.id}:${event.commandId}`;
         useRunStore.getState()._exitListeners.get(key)?.();
-        invoke("kill_project_command", { projectId: proj.id, commandId: event.commandId });
+        invoke("kill_project_command", {
+          projectId: proj.id,
+          commandId: event.commandId,
+        });
         useRunStore.setState((s) => {
           const next = new Map(s.runningProjects);
           const set = new Set(next.get(proj.id) ?? []);

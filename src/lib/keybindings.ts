@@ -12,7 +12,13 @@ export const isMac = navigator.platform.startsWith("Mac");
 
 export function parseKeybinding(str: string): KeyCombo {
   const parts = str.split("+");
-  const combo: KeyCombo = { mod: false, shift: false, alt: false, ctrl: false, key: "" };
+  const combo: KeyCombo = {
+    mod: false,
+    shift: false,
+    alt: false,
+    ctrl: false,
+    key: "",
+  };
 
   for (const part of parts) {
     const lower = part.toLowerCase();
@@ -77,7 +83,12 @@ export function formatKeybinding(str: string): string {
 }
 
 const MODIFIER_KEYS = new Set([
-  "shift", "control", "alt", "meta", "capslock", "fn",
+  "shift",
+  "control",
+  "alt",
+  "meta",
+  "capslock",
+  "fn",
 ]);
 
 export function eventToKeybindingString(e: KeyboardEvent): string | null {

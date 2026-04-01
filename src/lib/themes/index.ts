@@ -1,11 +1,24 @@
 import type { ColorTheme } from "@shared/types/settings";
 import { edityLight, edityDark } from "./edity";
-import { catppuccinLatte, catppuccinFrappe, catppuccinMacchiato, catppuccinMocha } from "./catppuccin";
+import {
+  catppuccinLatte,
+  catppuccinFrappe,
+  catppuccinMacchiato,
+  catppuccinMocha,
+} from "./catppuccin";
 import { rosePine, rosePineMoon, rosePineDawn } from "./rose-pine";
 import {
-  tokyoNight, tokyoNightStorm, dracula, nord,
-  gruvboxDark, gruvboxLight, oneDarkPro,
-  solarizedDark, solarizedLight, githubDark, githubLight,
+  tokyoNight,
+  tokyoNightStorm,
+  dracula,
+  nord,
+  gruvboxDark,
+  gruvboxLight,
+  oneDarkPro,
+  solarizedDark,
+  solarizedLight,
+  githubDark,
+  githubLight,
 } from "./others";
 
 export const THEMES: ColorTheme[] = [

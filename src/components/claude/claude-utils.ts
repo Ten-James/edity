@@ -11,7 +11,9 @@ export function getToolSummary(
 
   switch (toolName) {
     case "Bash":
-      return input.description ? String(input.description) : extractFieldFromJson(inputJson, "description");
+      return input.description
+        ? String(input.description)
+        : extractFieldFromJson(inputJson, "description");
     case "Read":
     case "Edit":
     case "Write":
@@ -24,23 +26,35 @@ export function getToolSummary(
     case "WebFetch":
       return input.url ? String(input.url) : null;
     case "Agent":
-      return input.description ? String(input.description) : input.prompt ? String(input.prompt).slice(0, 80) : null;
+      return input.description
+        ? String(input.description)
+        : input.prompt
+          ? String(input.prompt).slice(0, 80)
+          : null;
     case "AskUserQuestion":
       return input.question ? String(input.question).slice(0, 80) : null;
     case "Skill":
-      return input.skill ? String(input.skill) : extractFieldFromJson(inputJson, "skill");
+      return input.skill
+        ? String(input.skill)
+        : extractFieldFromJson(inputJson, "skill");
     case "NotebookEdit":
       return filePath;
     case "LSP":
       return input.command ? String(input.command) : null;
     case "Mcp":
-      return input.tool_name ? String(input.tool_name) : extractFieldFromJson(inputJson, "tool_name");
+      return input.tool_name
+        ? String(input.tool_name)
+        : extractFieldFromJson(inputJson, "tool_name");
     case "ListMcpResources":
       return null;
     case "ReadMcpResource":
-      return input.uri ? String(input.uri) : extractFieldFromJson(inputJson, "uri");
+      return input.uri
+        ? String(input.uri)
+        : extractFieldFromJson(inputJson, "uri");
     case "ToolSearch":
-      return input.query ? String(input.query) : extractFieldFromJson(inputJson, "query");
+      return input.query
+        ? String(input.query)
+        : extractFieldFromJson(inputJson, "query");
     case "EnterPlanMode":
     case "ExitPlanMode":
     case "EnterWorktree":
@@ -58,7 +72,10 @@ export function getFilePath(input: Record<string, unknown>): string | null {
 }
 
 /** Try to extract a string field from partial inputJson during streaming. */
-function extractFieldFromJson(inputJson?: string, field?: string): string | null {
+function extractFieldFromJson(
+  inputJson?: string,
+  field?: string,
+): string | null {
   if (!inputJson || !field) return null;
   const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]+)"`);
   const match = inputJson.match(regex);

@@ -14,7 +14,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       toastOptions={{
         unstyled: true,
         classNames: {
-          toast: "flex items-center gap-2 px-3 py-2.5 text-xs bg-popover text-popover-foreground border border-border ring-1 ring-foreground/10 w-full",
+          toast:
+            "flex items-center gap-2 px-3 py-2.5 text-xs bg-popover text-popover-foreground border border-border ring-1 ring-foreground/10 w-full",
           title: "text-xs font-medium",
           description: "text-xs text-muted-foreground",
           success: "text-green-500 [&>svg]:text-green-500",

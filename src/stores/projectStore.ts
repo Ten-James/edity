@@ -26,7 +26,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       for (const p of projects) {
         get()._loadConfig(p);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 
   _loadConfig: async (project) => {
@@ -58,7 +60,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           next.set(project.id, config);
           return { edityConfigs: next };
         });
-        dispatch({ type: "project-config-saved", projectId: project.id, config });
+        dispatch({
+          type: "project-config-saved",
+          projectId: project.id,
+          config,
+        });
       }
       toast.success("Configuration saved");
     } catch {
@@ -71,7 +77,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 subscribe((event) => {
   switch (event.type) {
     case "project-switch": {
-      const project = useProjectStore.getState().projects.find((p) => p.id === event.projectId);
+      const project = useProjectStore
+        .getState()
+        .projects.find((p) => p.id === event.projectId);
       if (project) {
         useProjectStore.setState({ activeProject: project });
       }
@@ -81,14 +89,15 @@ subscribe((event) => {
     case "project-add": {
       (async () => {
         try {
-          const result = await invoke<{ canceled: boolean; filePaths: string[] }>(
-            "show-open-dialog",
-            { properties: ["openDirectory"] },
-          );
+          const result = await invoke<{
+            canceled: boolean;
+            filePaths: string[];
+          }>("show-open-dialog", { properties: ["openDirectory"] });
           if (result.canceled || result.filePaths.length === 0) return;
 
           const selected = result.filePaths[0];
-          const folderName = selected.split("/").filter(Boolean).pop() ?? "Project";
+          const folderName =
+            selected.split("/").filter(Boolean).pop() ?? "Project";
           const project = await invoke<Project>("add_project", {
             name: folderName,
             path: selected,
@@ -101,7 +110,9 @@ subscribe((event) => {
           useProjectStore.getState()._loadConfig(project);
           // Notify other stores (layoutStore will create panes)
           dispatch({ type: "project-switch", projectId: project.id });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })();
       break;
     }
@@ -113,12 +124,16 @@ subscribe((event) => {
           useProjectStore.setState((s) => {
             const projects = s.projects.filter((p) => p.id !== event.projectId);
             const activeProject =
-              s.activeProject?.id === event.projectId ? (projects[0] ?? null) : s.activeProject;
+              s.activeProject?.id === event.projectId
+                ? (projects[0] ?? null)
+                : s.activeProject;
             const edityConfigs = new Map(s.edityConfigs);
             edityConfigs.delete(event.projectId);
             return { projects, activeProject, edityConfigs };
           });
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })();
       break;
     }
@@ -128,7 +143,9 @@ subscribe((event) => {
         const next = [...s.projects];
         const [moved] = next.splice(event.fromIndex, 1);
         next.splice(event.toIndex, 0, moved);
-        invoke("reorder_projects", { ids: next.map((p) => p.id) }).catch(() => {});
+        invoke("reorder_projects", { ids: next.map((p) => p.id) }).catch(
+          () => {},
+        );
         return { projects: next };
       });
       break;

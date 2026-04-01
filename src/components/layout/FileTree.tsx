@@ -102,7 +102,9 @@ export function FileTree() {
               if (e.key === "Escape") tree.setCreating(null);
             }}
             onBlur={tree.handleCreateSubmit}
-            placeholder={tree.creating.type === "file" ? "filename.ext" : "folder name"}
+            placeholder={
+              tree.creating.type === "file" ? "filename.ext" : "folder name"
+            }
             className="h-6 text-xs"
           />
         </div>
@@ -134,7 +136,10 @@ export function FileTree() {
 
       <div className="flex items-center gap-0.5 px-1.5 py-1 border-t border-border">
         {GIT_FILTERS.map((f) => {
-          const count = f.value === "all" ? null : tree.gitCounts[f.value as keyof typeof tree.gitCounts];
+          const count =
+            f.value === "all"
+              ? null
+              : tree.gitCounts[f.value as keyof typeof tree.gitCounts];
           const isActive = tree.gitFilter === f.value;
           return (
             <Button
@@ -161,7 +166,9 @@ export function FileTree() {
           variant="ghost"
           size="xs"
           onClick={() => tree.setShowIgnored((v) => !v)}
-          title={tree.showIgnored ? "Hiding gitignored files" : "Showing all files"}
+          title={
+            tree.showIgnored ? "Hiding gitignored files" : "Showing all files"
+          }
           className={cn(
             "ml-auto p-0.5 h-auto transition-colors",
             tree.showIgnored
@@ -173,9 +180,20 @@ export function FileTree() {
         </Button>
       </div>
 
-      <DropdownMenu open={menuOpen} onOpenChange={(open) => { if (!open) tree.setContextMenu(null); }}>
+      <DropdownMenu
+        open={menuOpen}
+        onOpenChange={(open) => {
+          if (!open) tree.setContextMenu(null);
+        }}
+      >
         <DropdownMenuTrigger asChild>
-          <span className="fixed w-0 h-0" style={{ left: tree.contextMenu?.x ?? 0, top: tree.contextMenu?.y ?? 0 }} />
+          <span
+            className="fixed w-0 h-0"
+            style={{
+              left: tree.contextMenu?.x ?? 0,
+              top: tree.contextMenu?.y ?? 0,
+            }}
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">
           {tree.contextMenu && !tree.contextMenu.entry.is_dir && (
@@ -202,9 +220,13 @@ export function FileTree() {
             Copy Path
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={tree.handleDelete} className="text-red-400 focus:text-red-400">
+          <DropdownMenuItem
+            onClick={tree.handleDelete}
+            className="text-red-400 focus:text-red-400"
+          >
             <IconTrash size={14} />
-            Delete{tree.selectedPaths.size > 1 ? ` (${tree.selectedPaths.size})` : ""}
+            Delete
+            {tree.selectedPaths.size > 1 ? ` (${tree.selectedPaths.size})` : ""}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

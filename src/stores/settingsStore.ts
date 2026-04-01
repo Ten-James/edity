@@ -23,14 +23,19 @@ interface SettingsState {
 
 function resolveTheme(mode: Mode, settings: GlobalSettings): ColorTheme {
   const id = mode === "light" ? settings.lightTheme : settings.darkTheme;
-  return getThemeById(id) ?? getThemeById(mode === "light" ? "edity-light" : "edity-dark")!;
+  return (
+    getThemeById(id) ??
+    getThemeById(mode === "light" ? "edity-light" : "edity-dark")!
+  );
 }
 
 function loadCachedSettings(): GlobalSettings {
   try {
     const cached = localStorage.getItem("edity-settings");
     if (cached) return { ...DEFAULT_SETTINGS, ...JSON.parse(cached) };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { ...DEFAULT_SETTINGS };
 }
 
@@ -79,7 +84,10 @@ function applyThemeCssVars(vars: ThemeCssVars) {
   const el = document.documentElement;
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
     const value = vars[key as keyof ThemeCssVars];
-    el.style.setProperty(cssVar, value ?? (key === "radius" ? DEFAULT_RADIUS : ""));
+    el.style.setProperty(
+      cssVar,
+      value ?? (key === "radius" ? DEFAULT_RADIUS : ""),
+    );
   }
 }
 
@@ -128,7 +136,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const theme = resolveTheme(get().mode, merged);
       applyThemeCssVars(theme.cssVars);
       set({ settings: merged, activeTheme: theme });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   },
 }));
 

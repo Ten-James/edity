@@ -104,10 +104,7 @@ export function GitBranchPanel({
                   <IconGitBranch size={13} className="shrink-0" />
                   <span className="flex-1 truncate">{branch.name}</span>
                   {branch.isCurrent && (
-                    <IconCheck
-                      size={13}
-                      className="shrink-0 text-green-400"
-                    />
+                    <IconCheck size={13} className="shrink-0 text-green-400" />
                   )}
                   {!branch.isCurrent && (
                     <Button
@@ -123,7 +120,9 @@ export function GitBranchPanel({
                         if (result.ok) {
                           toast.success("Deleted branch: " + branch.name);
                         } else {
-                          toast.error(result.error ?? "Failed to delete branch");
+                          toast.error(
+                            result.error ?? "Failed to delete branch",
+                          );
                         }
                       }}
                       title="Delete branch"

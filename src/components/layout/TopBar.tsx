@@ -1,7 +1,4 @@
-import {
-  IconFolder,
-  IconGitBranch,
-} from "@tabler/icons-react";
+import { IconFolder, IconGitBranch } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -66,19 +63,28 @@ export function TopBar() {
               {gitBranchInfo.behind}↓
             </span>
           )}
-          {gitDiffStats && (gitDiffStats.additions > 0 || gitDiffStats.deletions > 0 || gitDiffStats.changedFiles > 0) && (
-            <span className="flex items-center gap-1 ml-1 text-[10px]">
-              {gitDiffStats.additions > 0 && (
-                <span className="text-green-500">+{gitDiffStats.additions}</span>
-              )}
-              {gitDiffStats.deletions > 0 && (
-                <span className="text-red-500">-{gitDiffStats.deletions}</span>
-              )}
-              {gitDiffStats.changedFiles > 0 && (
-                <span className="text-muted-foreground">^{gitDiffStats.changedFiles}</span>
-              )}
-            </span>
-          )}
+          {gitDiffStats &&
+            (gitDiffStats.additions > 0 ||
+              gitDiffStats.deletions > 0 ||
+              gitDiffStats.changedFiles > 0) && (
+              <span className="flex items-center gap-1 ml-1 text-[10px]">
+                {gitDiffStats.additions > 0 && (
+                  <span className="text-green-500">
+                    +{gitDiffStats.additions}
+                  </span>
+                )}
+                {gitDiffStats.deletions > 0 && (
+                  <span className="text-red-500">
+                    -{gitDiffStats.deletions}
+                  </span>
+                )}
+                {gitDiffStats.changedFiles > 0 && (
+                  <span className="text-muted-foreground">
+                    ^{gitDiffStats.changedFiles}
+                  </span>
+                )}
+              </span>
+            )}
         </Button>
       )}
 

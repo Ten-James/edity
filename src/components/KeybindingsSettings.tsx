@@ -14,7 +14,10 @@ interface KeybindingsSettingsProps {
   onChange: (keybindings: Record<string, string>) => void;
 }
 
-export function KeybindingsSettings({ keybindings, onChange }: KeybindingsSettingsProps) {
+export function KeybindingsSettings({
+  keybindings,
+  onChange,
+}: KeybindingsSettingsProps) {
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const recordingRef = useRef<string | null>(null);
   recordingRef.current = recordingId;
@@ -58,7 +61,8 @@ export function KeybindingsSettings({ keybindings, onChange }: KeybindingsSettin
     }
 
     window.addEventListener("keydown", handler, { capture: true });
-    return () => window.removeEventListener("keydown", handler, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handler, { capture: true });
   }, [recordingId, keybindings, onChange]);
 
   const grouped = new Map<string, typeof COMMANDS>();
@@ -93,13 +97,19 @@ export function KeybindingsSettings({ keybindings, onChange }: KeybindingsSettin
                   className="flex items-center justify-between py-1 px-1 -mx-1 rounded-sm hover:bg-muted/50"
                 >
                   <div className="flex items-center gap-2 text-xs min-w-0">
-                    {cmd.icon && <span className="shrink-0 text-muted-foreground"><cmd.icon size={14} /></span>}
+                    {cmd.icon && (
+                      <span className="shrink-0 text-muted-foreground">
+                        <cmd.icon size={14} />
+                      </span>
+                    )}
                     <span className="truncate">{cmd.label}</span>
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0 ml-2">
                     <button
-                      onClick={() => setRecordingId(isRecording ? null : cmd.id)}
+                      onClick={() =>
+                        setRecordingId(isRecording ? null : cmd.id)
+                      }
                       className={cn(
                         "h-6 min-w-[80px] px-2 text-[11px] border rounded-sm text-center transition-colors",
                         isRecording
@@ -135,7 +145,8 @@ export function KeybindingsSettings({ keybindings, onChange }: KeybindingsSettin
         </div>
       ))}
       <p className="text-[10px] text-muted-foreground">
-        Click a shortcut to record new keys. Press Escape to cancel, Backspace to clear.
+        Click a shortcut to record new keys. Press Escape to cancel, Backspace
+        to clear.
       </p>
     </div>
   );

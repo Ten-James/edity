@@ -70,10 +70,14 @@ export function GitSidebar() {
           {gitBranchInfo?.current ?? "unknown"}
         </span>
         {gitBranchInfo && gitBranchInfo.ahead > 0 && (
-          <span className="text-[10px] text-green-500">{gitBranchInfo.ahead}↑</span>
+          <span className="text-[10px] text-green-500">
+            {gitBranchInfo.ahead}↑
+          </span>
         )}
         {gitBranchInfo && gitBranchInfo.behind > 0 && (
-          <span className="text-[10px] text-orange-500">{gitBranchInfo.behind}↓</span>
+          <span className="text-[10px] text-orange-500">
+            {gitBranchInfo.behind}↓
+          </span>
         )}
       </div>
 
@@ -95,7 +99,11 @@ export function GitSidebar() {
             onClick={() => git.pull()}
             disabled={git.isPulling}
           >
-            {git.isPulling ? <IconLoader2 size={12} className="animate-spin" /> : <IconCloudDownload size={12} />}
+            {git.isPulling ? (
+              <IconLoader2 size={12} className="animate-spin" />
+            ) : (
+              <IconCloudDownload size={12} />
+            )}
             Pull
           </Button>
         )}
@@ -106,7 +114,11 @@ export function GitSidebar() {
             onClick={() => git.push()}
             disabled={git.isPushing}
           >
-            {git.isPushing ? <IconLoader2 size={12} className="animate-spin" /> : <IconCloudUpload size={12} />}
+            {git.isPushing ? (
+              <IconLoader2 size={12} className="animate-spin" />
+            ) : (
+              <IconCloudUpload size={12} />
+            )}
             Push
           </Button>
         )}
@@ -118,7 +130,9 @@ export function GitSidebar() {
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-1 py-1">
           {allChanges.length === 0 && (
-            <p className="px-2 py-4 text-xs text-muted-foreground text-center">No changes</p>
+            <p className="px-2 py-4 text-xs text-muted-foreground text-center">
+              No changes
+            </p>
           )}
           {allChanges.map((f) => {
             const st = fileStatus(f);
@@ -131,7 +145,10 @@ export function GitSidebar() {
                 onClick={() => openFileTab(f.path)}
               >
                 <span
-                  className={cn("shrink-0 w-3 text-center text-[10px] font-bold", statusColor(st.label))}
+                  className={cn(
+                    "shrink-0 w-3 text-center text-[10px] font-bold",
+                    statusColor(st.label),
+                  )}
                 >
                   {st.label}
                 </span>
@@ -139,7 +156,10 @@ export function GitSidebar() {
                   {relPath(f.path, projectPath)}
                 </span>
                 {f._staged && (
-                  <IconCheck size={10} className="ml-auto shrink-0 text-green-500" />
+                  <IconCheck
+                    size={10}
+                    className="ml-auto shrink-0 text-green-500"
+                  />
                 )}
               </Button>
             );
@@ -167,10 +187,16 @@ export function GitSidebar() {
         <Button
           size="xs"
           className="w-full"
-          disabled={!commitMsg.trim() || git.isCommitting || git.staged.length === 0}
+          disabled={
+            !commitMsg.trim() || git.isCommitting || git.staged.length === 0
+          }
           onClick={handleCommit}
         >
-          {git.isCommitting ? <IconLoader2 size={12} className="animate-spin" /> : <IconCheck size={12} />}
+          {git.isCommitting ? (
+            <IconLoader2 size={12} className="animate-spin" />
+          ) : (
+            <IconCheck size={12} />
+          )}
           Commit{git.staged.length > 0 ? ` (${git.staged.length})` : ""}
         </Button>
       </div>
@@ -181,10 +207,17 @@ export function GitSidebar() {
       <ScrollArea className="h-[140px] shrink-0">
         <div className="px-1 py-1">
           {git.log.map((entry) => (
-            <div key={entry.hash} className="flex items-center gap-1.5 px-2 py-0.5 text-[10px]">
-              <span className="text-muted-foreground font-mono shrink-0">{entry.shortHash}</span>
+            <div
+              key={entry.hash}
+              className="flex items-center gap-1.5 px-2 py-0.5 text-[10px]"
+            >
+              <span className="text-muted-foreground font-mono shrink-0">
+                {entry.shortHash}
+              </span>
               <span className="truncate">{entry.subject}</span>
-              <span className="ml-auto shrink-0 text-muted-foreground">{timeAgo(entry.timestamp)}</span>
+              <span className="ml-auto shrink-0 text-muted-foreground">
+                {timeAgo(entry.timestamp)}
+              </span>
             </div>
           ))}
         </div>

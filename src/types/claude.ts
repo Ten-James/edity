@@ -17,7 +17,10 @@ export interface ContentBlockThinking {
   thinking: string;
 }
 
-export type ContentBlock = ContentBlockText | ContentBlockToolUse | ContentBlockThinking;
+export type ContentBlock =
+  | ContentBlockText
+  | ContentBlockToolUse
+  | ContentBlockThinking;
 
 export type ContentDelta =
   | { type: "text_delta"; text: string }
@@ -34,7 +37,11 @@ export type StreamEventPayload =
 
 // --- Messages from main process to renderer ---
 
-import type { PermissionMode as _PermissionMode, ClaudeSessionInfo as _ClaudeSessionInfo, ClaudeSessionMessage as _ClaudeSessionMessage } from "@shared/types/ipc";
+import type {
+  PermissionMode as _PermissionMode,
+  ClaudeSessionInfo as _ClaudeSessionInfo,
+  ClaudeSessionMessage as _ClaudeSessionMessage,
+} from "@shared/types/ipc";
 export type PermissionMode = _PermissionMode;
 export type ClaudeSessionInfo = _ClaudeSessionInfo;
 export type ClaudeSessionMessage = _ClaudeSessionMessage;
@@ -152,4 +159,3 @@ export interface ClaudeConversation {
   tools: string[];
   slashCommands: string[];
 }
-

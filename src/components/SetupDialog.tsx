@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  IconPlus,
-  IconTrash,
-  IconGripVertical,
-} from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconGripVertical } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -84,7 +80,8 @@ export function SetupDialog({
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center text-xs font-bold"
               style={{
-                backgroundColor: PROJECT_COLORS[color]?.hex ?? PROJECT_COLORS.blue.hex,
+                backgroundColor:
+                  PROJECT_COLORS[color]?.hex ?? PROJECT_COLORS.blue.hex,
                 color: PROJECT_COLORS[color]?.textHex ?? "#fff",
               }}
             >
@@ -113,7 +110,8 @@ export function SetupDialog({
                   onClick={() => setColor(key)}
                   className={cn(
                     "h-7 w-7 rounded-full transition-all",
-                    color === key && "ring-2 ring-offset-2 ring-offset-background ring-foreground",
+                    color === key &&
+                      "ring-2 ring-offset-2 ring-offset-background ring-foreground",
                   )}
                   style={{ backgroundColor: PROJECT_COLORS[key].hex }}
                 />
@@ -123,7 +121,9 @@ export function SetupDialog({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-muted-foreground">Run Commands</label>
+              <label className="text-xs text-muted-foreground">
+                Run Commands
+              </label>
               <Button
                 type="button"
                 variant="ghost"
@@ -147,7 +147,10 @@ export function SetupDialog({
                   className="flex flex-col gap-1.5 border border-border p-2"
                 >
                   <div className="flex items-center gap-1">
-                    <IconGripVertical size={12} className="text-muted-foreground shrink-0" />
+                    <IconGripVertical
+                      size={12}
+                      className="text-muted-foreground shrink-0"
+                    />
                     {i === 0 && (
                       <span className="text-[10px] font-medium text-primary px-1 bg-primary/10 shrink-0">
                         Default
@@ -155,7 +158,9 @@ export function SetupDialog({
                     )}
                     <Input
                       value={cmd.name}
-                      onChange={(e) => updateCommand(i, { name: e.target.value })}
+                      onChange={(e) =>
+                        updateCommand(i, { name: e.target.value })
+                      }
                       placeholder="Name (e.g. dev)"
                       className="h-6 text-xs flex-1"
                     />
@@ -171,7 +176,9 @@ export function SetupDialog({
                   </div>
                   <Input
                     value={cmd.command}
-                    onChange={(e) => updateCommand(i, { command: e.target.value })}
+                    onChange={(e) =>
+                      updateCommand(i, { command: e.target.value })
+                    }
                     placeholder="Command (e.g. npm run dev)"
                     className="h-7 text-xs"
                   />
@@ -188,7 +195,9 @@ export function SetupDialog({
                     <Button
                       type="button"
                       size="sm"
-                      variant={cmd.mode === "background" ? "default" : "outline"}
+                      variant={
+                        cmd.mode === "background" ? "default" : "outline"
+                      }
                       className="flex-1 h-6 text-[11px]"
                       onClick={() => updateCommand(i, { mode: "background" })}
                     >

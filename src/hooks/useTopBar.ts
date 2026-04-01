@@ -8,9 +8,14 @@ export function useTopBar() {
   useEffect(() => {
     invoke<string>("get_homedir").then(setHomedir);
     let unlisten: (() => void) | undefined;
-    listen<boolean>("fullscreen-changed", (e) => setIsFullscreen(e.payload))
-      .then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
+    listen<boolean>("fullscreen-changed", (e) =>
+      setIsFullscreen(e.payload),
+    ).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   function formatProjectPath(path: string): string {

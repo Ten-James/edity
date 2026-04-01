@@ -62,7 +62,10 @@ function useShikiTokens(
       const highlighter: Highlighter = await getHighlighter();
       if (cancelled) return;
       try {
-        const result = highlighter.codeToTokens(code, { lang: lang as Parameters<Highlighter["codeToTokens"]>[1]["lang"], theme: shikiTheme });
+        const result = highlighter.codeToTokens(code, {
+          lang: lang as Parameters<Highlighter["codeToTokens"]>[1]["lang"],
+          theme: shikiTheme,
+        });
         const map = new Map<number, TokenSpan[]>();
 
         let shikiLineIdx = 0;
@@ -178,18 +181,18 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
                           : " "}
                   </span>
                   <span className="whitespace-pre">
-                    {line.type === "header" ? (
-                      line.content
-                    ) : (
-                      tokens.map((token, ti) => (
-                        <span
-                          key={ti}
-                          style={token.color ? { color: token.color } : undefined}
-                        >
-                          {token.content}
-                        </span>
-                      ))
-                    )}
+                    {line.type === "header"
+                      ? line.content
+                      : tokens.map((token, ti) => (
+                          <span
+                            key={ti}
+                            style={
+                              token.color ? { color: token.color } : undefined
+                            }
+                          >
+                            {token.content}
+                          </span>
+                        ))}
                   </span>
                 </div>
               );

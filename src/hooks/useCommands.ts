@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { subscribe } from "@/stores/eventBus";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { COMMANDS } from "@/lib/commands";
-import { eventToKeyCombo, matchKeybinding, resolveKeybindings } from "@/lib/keybindings";
+import {
+  eventToKeyCombo,
+  matchKeybinding,
+  resolveKeybindings,
+} from "@/lib/keybindings";
 
 function isEditorFocused(): boolean {
   const el = document.activeElement;
@@ -62,7 +66,8 @@ export function useCommands() {
     }
 
     window.addEventListener("keydown", handler, { capture: true });
-    return () => window.removeEventListener("keydown", handler, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
   return { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen };

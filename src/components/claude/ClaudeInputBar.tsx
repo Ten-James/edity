@@ -4,10 +4,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const BUILTIN_COMMANDS = [
-  "bug", "clear", "compact", "config", "context", "cost", "diff",
-  "doctor", "fast", "help", "init", "login", "logout", "memory",
-  "model", "permissions", "pr-comments", "review", "search",
-  "status", "terminal-setup", "vim",
+  "bug",
+  "clear",
+  "compact",
+  "config",
+  "context",
+  "cost",
+  "diff",
+  "doctor",
+  "fast",
+  "help",
+  "init",
+  "login",
+  "logout",
+  "memory",
+  "model",
+  "permissions",
+  "pr-comments",
+  "review",
+  "search",
+  "status",
+  "terminal-setup",
+  "vim",
 ];
 
 interface ClaudeInputBarProps {
@@ -30,7 +48,8 @@ export function ClaudeInputBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandsRef = useRef<HTMLDivElement>(null);
 
-  const allCommands = slashCommands.length > 0 ? slashCommands : BUILTIN_COMMANDS;
+  const allCommands =
+    slashCommands.length > 0 ? slashCommands : BUILTIN_COMMANDS;
   const filteredCommands = allCommands.filter((cmd) =>
     cmd.toLowerCase().includes(commandFilter.toLowerCase()),
   );
@@ -45,14 +64,11 @@ export function ClaudeInputBar({
     }
   }, [value]);
 
-  const insertCommand = useCallback(
-    (cmd: string) => {
-      setValue(`/${cmd} `);
-      setShowCommands(false);
-      textareaRef.current?.focus();
-    },
-    [],
-  );
+  const insertCommand = useCallback((cmd: string) => {
+    setValue(`/${cmd} `);
+    setShowCommands(false);
+    textareaRef.current?.focus();
+  }, []);
 
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();

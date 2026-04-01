@@ -12,7 +12,8 @@ import { dispatch } from "@/stores/eventBus";
 import "./App.css";
 
 function AppShell() {
-  const { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen } = useCommands();
+  const { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen } =
+    useCommands();
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -30,17 +31,20 @@ function AppShell() {
 function StoreInitializer() {
   useEffect(() => {
     useSettingsStore.getState()._loadFromDisk();
-    useProjectStore.getState()._init().then(() => {
-      const { projects } = useProjectStore.getState();
-      const { settings } = useSettingsStore.getState();
-      const defaultProject = settings.defaultProjectId
-        ? projects.find((p) => p.id === settings.defaultProjectId)
-        : null;
-      const initial = defaultProject ?? projects[0] ?? null;
-      if (initial) {
-        dispatch({ type: "project-switch", projectId: initial.id });
-      }
-    });
+    useProjectStore
+      .getState()
+      ._init()
+      .then(() => {
+        const { projects } = useProjectStore.getState();
+        const { settings } = useSettingsStore.getState();
+        const defaultProject = settings.defaultProjectId
+          ? projects.find((p) => p.id === settings.defaultProjectId)
+          : null;
+        const initial = defaultProject ?? projects[0] ?? null;
+        if (initial) {
+          dispatch({ type: "project-switch", projectId: initial.id });
+        }
+      });
   }, []);
   return null;
 }

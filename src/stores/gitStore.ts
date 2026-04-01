@@ -28,11 +28,18 @@ export const useGitStore = create<GitState>((set, get) => ({
 
     const [branchResult, diffResult] = await Promise.allSettled([
       invoke<{
-        ok: boolean; current?: string; upstream?: string | null;
-        ahead?: number; behind?: number; detached?: boolean;
+        ok: boolean;
+        current?: string;
+        upstream?: string | null;
+        ahead?: number;
+        behind?: number;
+        detached?: boolean;
       }>("git_branch_info", { cwd: proj.path }),
       invoke<{
-        ok: boolean; additions?: number; deletions?: number; changedFiles?: number;
+        ok: boolean;
+        additions?: number;
+        deletions?: number;
+        changedFiles?: number;
       }>("git_diff_stats", { cwd: proj.path }),
     ]);
 

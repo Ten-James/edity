@@ -8,8 +8,18 @@ interface TerminalViewProps {
   initialCommand?: string;
 }
 
-export function TerminalView({ tabId, isActive, cwd, initialCommand }: TerminalViewProps) {
-  const { containerRef } = useTerminal({ tabId, isActive, cwd, initialCommand });
+export function TerminalView({
+  tabId,
+  isActive,
+  cwd,
+  initialCommand,
+}: TerminalViewProps) {
+  const { containerRef } = useTerminal({
+    tabId,
+    isActive,
+    cwd,
+    initialCommand,
+  });
 
   return (
     <div

@@ -155,7 +155,10 @@ export function FileTreeNode({
         ) : (
           <>
             <span className="w-3.5 shrink-0" />
-            {(() => { const FileIcon = getFileIcon(entry.name); return <FileIcon size={13} className="shrink-0" />; })()}
+            {(() => {
+              const FileIcon = getFileIcon(entry.name);
+              return <FileIcon size={13} className="shrink-0" />;
+            })()}
           </>
         )}
         <span className="truncate flex-1 text-left">{entry.name}</span>

@@ -47,7 +47,9 @@ export function ClaudeHeader({
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
         {contextWindow != null && contextWindow > 0 && totalTokens != null && (
-          <span>{formatTokens(totalTokens)}/{formatTokens(contextWindow)}</span>
+          <span>
+            {formatTokens(totalTokens)}/{formatTokens(contextWindow)}
+          </span>
         )}
         {conversation.totalCost > 0 && (
           <span>${conversation.totalCost.toFixed(4)}</span>
