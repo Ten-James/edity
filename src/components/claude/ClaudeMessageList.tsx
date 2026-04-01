@@ -1,6 +1,6 @@
 import type { ClaudeUIMessage } from "@/types/claude";
 import { ClaudeMessageBubble } from "./ClaudeMessageBubble";
-import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
+import { TASK_TOOL_NAMES } from "./claude-tool-config";
 
 interface ClaudeMessageListProps {
   messages: ClaudeUIMessage[];

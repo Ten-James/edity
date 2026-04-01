@@ -33,6 +33,14 @@ export interface SqliteDataProvider extends DataProvider {
   query(sql: string, params?: unknown[]): SqliteQueryResult;
 }
 
+// ─── Type helpers ─────────────────────────────────────────────
+
+const REDIS_KEY_TYPES = new Set<string>(["string", "list", "set", "zset", "hash", "stream"]);
+
+function toRedisKeyType(raw: string): RedisKeyType {
+  return REDIS_KEY_TYPES.has(raw) ? raw as RedisKeyType : "unknown";
+}
+
 // ─── Identifier validation ─────────────────────────────────────
 
 const SAFE_IDENTIFIER = /^[a-zA-Z0-9_]+$/;
@@ -110,17 +118,21 @@ export class RedisProvider implements RedisDataProvider {
       pipeline.ttl(key);
     }
     const results = await pipeline.exec();
-    const keys: RedisKeyInfo[] = rawKeys.map((key, i) => ({
-      key,
-      type: (results?.[i * 2]?.[1] as RedisKeyType) ?? "unknown",
-      ttl: (results?.[i * 2 + 1]?.[1] as number) ?? -1,
-    }));
+    const keys: RedisKeyInfo[] = rawKeys.map((key, i) => {
+      const typeResult = results?.[i * 2]?.[1];
+      const ttlResult = results?.[i * 2 + 1]?.[1];
+      return {
+        key,
+        type: typeof typeResult === "string" ? toRedisKeyType(typeResult) : "unknown",
+        ttl: typeof ttlResult === "number" ? ttlResult : -1,
+      };
+    });
     return { cursor: nextCursor, keys };
   }
 
   async getKey(key: string): Promise<RedisKeyValue> {
     const client = this.requireClient();
-    const type = (await client.type(key)) as RedisKeyType;
+    const type = toRedisKeyType(await client.type(key));
     const ttl = await client.ttl(key);
     let value: string | string[] | Record<string, string>;
     let size = 0;
@@ -232,24 +244,27 @@ export class SqliteProvider implements SqliteDataProvider {
       .prepare(
         `SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' ORDER BY name`,
       )
-      .all() as Array<{ name: string; type: "table" | "view" }>;
+      .all();
 
     return tables.map((t) => {
+      const row = t as Record<string, unknown>;
+      const name = String(row.name);
+      const type = row.type === "view" ? "view" as const : "table" as const;
       let rowCount = 0;
       try {
-        // Table name comes from sqlite_master, safe to use
-        const row = db.prepare(`SELECT COUNT(*) as c FROM "${t.name}"`).get() as { c: number };
-        rowCount = row.c;
+        const countRow = db.prepare(`SELECT COUNT(*) as c FROM "${name}"`).get() as Record<string, unknown> | undefined;
+        rowCount = typeof countRow?.c === "number" ? countRow.c : 0;
       } catch {
         // view or error
       }
-      return { name: t.name, type: t.type, rowCount };
+      return { name, type, rowCount };
     });
   }
 
   getColumns(table: string): SqliteColumnInfo[] {
     this.validateTableName(table);
     const db = this.requireDb();
+    // PRAGMA table_info returns rows matching SqliteColumnInfo shape
     return db.prepare(`PRAGMA table_info("${table}")`).all() as SqliteColumnInfo[];
   }
 
@@ -261,10 +276,16 @@ export class SqliteProvider implements SqliteDataProvider {
     if (isSelect) {
       const stmt = db.prepare(sql);
       const rows = params ? stmt.all(...params) : stmt.all();
-      const columns = rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+      const firstRow = rows[0];
+      const columns = firstRow !== null && typeof firstRow === "object"
+        ? Object.keys(firstRow)
+        : [];
       return {
         columns,
-        rows: rows.map((r) => columns.map((c) => (r as Record<string, unknown>)[c])),
+        rows: rows.map((r) => {
+          const record = r as Record<string, unknown>;
+          return columns.map((c) => record[c]);
+        }),
         rowCount: rows.length,
       };
     } else {

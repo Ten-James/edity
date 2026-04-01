@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
+import { extractTasks } from "@/lib/claude-utils";
 import { Button } from "@/components/ui/button";
 import {
   IconChecklist,
@@ -14,46 +15,9 @@ interface ClaudeTaskPopoverProps {
   taskTools: ClaudeToolUse[];
 }
 
-interface TaskInfo {
-  id: string;
-  subject: string;
-  status: "pending" | "in_progress" | "completed" | "deleted";
-}
+type TaskStatus = "pending" | "in_progress" | "completed" | "deleted";
 
-function extractTasks(tools: ClaudeToolUse[]): TaskInfo[] {
-  const tasks = new Map<string, TaskInfo>();
-
-  for (const tool of tools) {
-    if (tool.name === "TaskCreate" && tool.input.subject) {
-      const id = tool.id;
-      tasks.set(id, {
-        id,
-        subject: String(tool.input.subject),
-        status: "pending",
-      });
-    }
-  }
-
-  // Apply updates - match by taskId in input to task # in creation order
-  const taskList = [...tasks.values()];
-  const byIndex = new Map<string, TaskInfo>();
-  taskList.forEach((t, i) => byIndex.set(String(i + 1), t));
-
-  for (const tool of tools) {
-    if (tool.name === "TaskUpdate" && tool.input.taskId) {
-      const target = byIndex.get(String(tool.input.taskId));
-      if (target) {
-        if (tool.input.status)
-          target.status = tool.input.status as TaskInfo["status"];
-        if (tool.input.subject) target.subject = String(tool.input.subject);
-      }
-    }
-  }
-
-  return taskList.filter((t) => t.status !== "deleted");
-}
-
-function TaskStatusIcon({ status }: { status: TaskInfo["status"] }) {
+function TaskStatusIcon({ status }: { status: TaskStatus }) {
   switch (status) {
     case "completed":
       return <IconCheck size={12} className="text-green-500" />;

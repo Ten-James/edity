@@ -9,7 +9,6 @@ import type {
   ClaudeResultMessage,
   ClaudeStreamEvent,
   ContentBlock,
-  ContentBlockToolUse,
   StreamEventPayload,
   PermissionMode,
 } from "@/types/claude";
@@ -64,44 +63,65 @@ export type Action =
   | { type: "LOAD_HISTORY"; sessionId: string; messages: ClaudeUIMessage[] }
   | { type: "RESET" };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractContentFromSessionMessage(message: unknown): {
+  textContent: string;
+  thinkingContent: string;
+  toolUses: ClaudeToolUse[];
+} {
+  let textContent = "";
+  let thinkingContent = "";
+  const toolUses: ClaudeToolUse[] = [];
+
+  if (!isRecord(message)) return { textContent, thinkingContent, toolUses };
+  const content = message.content;
+
+  if (typeof content === "string") {
+    textContent = content;
+  } else if (Array.isArray(content)) {
+    for (const block of content) {
+      if (!isRecord(block)) continue;
+      if (block.type === "text" && typeof block.text === "string") {
+        textContent += block.text;
+      } else if (block.type === "thinking" && typeof block.thinking === "string") {
+        thinkingContent += block.thinking;
+      } else if (
+        block.type === "tool_use" &&
+        typeof block.id === "string" &&
+        typeof block.name === "string"
+      ) {
+        const input = isRecord(block.input) ? block.input : {};
+        toolUses.push({
+          id: block.id,
+          name: block.name,
+          input,
+          inputJson: JSON.stringify(input),
+          status: "complete",
+        });
+      }
+    }
+  }
+
+  return { textContent, thinkingContent, toolUses };
+}
+
 export function convertSessionMessages(
   messages: ClaudeSessionMessage[],
 ): ClaudeUIMessage[] {
   return messages
-    .filter((m) => m.type === "user" || m.type === "assistant")
+    .filter((m): m is ClaudeSessionMessage & { type: "user" | "assistant" } =>
+      m.type === "user" || m.type === "assistant",
+    )
     .map((m) => {
-      const msg = m.message as
-        | { content?: string | ContentBlock[] }
-        | undefined;
-      const content = msg?.content;
-
-      let textContent = "";
-      let thinkingContent = "";
-      const toolUses: ClaudeToolUse[] = [];
-
-      if (typeof content === "string") {
-        textContent = content;
-      } else if (Array.isArray(content)) {
-        for (const block of content) {
-          if (block.type === "text" && block.text) {
-            textContent += block.text;
-          } else if (block.type === "thinking" && block.thinking) {
-            thinkingContent += block.thinking;
-          } else if (block.type === "tool_use" && block.id && block.name) {
-            toolUses.push({
-              id: block.id,
-              name: block.name,
-              input: block.input ?? {},
-              inputJson: JSON.stringify(block.input ?? {}),
-              status: "complete",
-            });
-          }
-        }
-      }
+      const { textContent, thinkingContent, toolUses } =
+        extractContentFromSessionMessage(m.message);
 
       return {
         id: m.uuid,
-        role: m.type as "user" | "assistant",
+        role: m.type,
         textContent,
         thinkingContent,
         toolUses,
@@ -160,12 +180,11 @@ function applyToolUseEvent(
     event.type === "content_block_start" &&
     event.content_block.type === "tool_use"
   ) {
-    const block = event.content_block as ContentBlockToolUse;
     return [
       ...toolUses,
       {
-        id: block.id,
-        name: block.name,
+        id: event.content_block.id,
+        name: event.content_block.name,
         input: {},
         inputJson: "",
         status: "running",
@@ -578,7 +597,7 @@ function handleAskUserQuestion(
         typeof q.header === "string" ? q.header : `Question ${i + 1}`,
       question: typeof q.question === "string" ? q.question : "",
       options: Array.isArray(q.options)
-        ? (q.options as Array<Record<string, unknown>>).map((o) => ({
+        ? q.options.filter(isRecord).map((o) => ({
             label: String(o.label ?? ""),
             description:
               typeof o.description === "string" ? o.description : undefined,

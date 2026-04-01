@@ -7,6 +7,15 @@ interface GitResult {
   error?: string;
 }
 
+/** Error shape thrown by execFileSync -- includes stderr from the child process. */
+interface ExecFileSyncError extends Error {
+  stderr?: string;
+}
+
+function isExecError(err: unknown): err is ExecFileSyncError {
+  return err instanceof Error;
+}
+
 export function execGit(args: string[], cwd: string, timeout = 15000): GitResult {
   try {
     const result = execFileSync("git", args, {
@@ -18,8 +27,10 @@ export function execGit(args: string[], cwd: string, timeout = 15000): GitResult
     });
     return { ok: true, output: result.trimEnd() };
   } catch (err: unknown) {
-    const e = err as { stderr?: string; message: string };
-    return { ok: false, error: e.stderr?.trim() || e.message };
+    if (isExecError(err)) {
+      return { ok: false, error: err.stderr?.trim() || err.message };
+    }
+    return { ok: false, error: String(err) };
   }
 }
 

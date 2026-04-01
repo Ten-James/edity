@@ -15,7 +15,7 @@ export function registerTerminalHandlers(): void {
       cols: 80,
       rows: 24,
       cwd: cwd || os.homedir(),
-      env: process.env as Record<string, string>,
+      env: process.env,
     });
 
     tabClaudeState.set(tabId, {

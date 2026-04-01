@@ -1,6 +1,8 @@
+import { useState } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
-import { Button } from "@/components/ui/button";
+import { extractJsonField } from "@/lib/claude-utils";
 import { CodeBlock } from "@/components/ui/code-block";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ClaudeToolCall } from "./ClaudeToolCall";
@@ -8,6 +10,49 @@ import { ClaudeToolCall } from "./ClaudeToolCall";
 interface ToolInputProps {
   input: Record<string, unknown>;
   inputJson: string;
+}
+
+// --- Diff helpers ---
+
+interface DiffLine {
+  type: "context" | "removed" | "added";
+  content: string;
+}
+
+function computeInlineDiff(oldLines: string[], newLines: string[]): DiffLine[] {
+  const m = oldLines.length;
+  const n = newLines.length;
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array<number>(n + 1).fill(0),
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  const result: DiffLine[] = [];
+  let i = m,
+    j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.push({ type: "context", content: oldLines[i - 1] });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.push({ type: "added", content: newLines[j - 1] });
+      j--;
+    } else {
+      result.push({ type: "removed", content: oldLines[i - 1] });
+      i--;
+    }
+  }
+
+  return result.reverse();
 }
 
 // --- Edit: inline diff ---
@@ -67,17 +112,14 @@ export function BashCommand({ input, inputJson }: ToolInputProps) {
 
 // --- Agent: sub-content + sub-tool calls ---
 
-import { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-
-const COLLAPSED_COUNT = 5;
+const COLLAPSED_SUB_TOOL_COUNT = 5;
 
 export function AgentBody({ toolUse }: { toolUse: ClaudeToolUse }) {
   const [showAll, setShowAll] = useState(false);
   const subTools = toolUse.subToolUses ?? [];
-  const hasMore = subTools.length > COLLAPSED_COUNT;
-  const visibleTools = showAll ? subTools : subTools.slice(-COLLAPSED_COUNT);
-  const hiddenCount = subTools.length - COLLAPSED_COUNT;
+  const hasMore = subTools.length > COLLAPSED_SUB_TOOL_COUNT;
+  const visibleTools = showAll ? subTools : subTools.slice(-COLLAPSED_SUB_TOOL_COUNT);
+  const hiddenCount = subTools.length - COLLAPSED_SUB_TOOL_COUNT;
 
   return (
     <ScrollArea className="max-h-64">
@@ -135,63 +177,6 @@ export function McpBody({ input }: { input: Record<string, unknown> }) {
   );
 }
 
-// --- AskUserQuestion: interactive question UI ---
-
-interface QuestionOption {
-  label: string;
-  description?: string;
-}
-
-interface Question {
-  question: string;
-  header?: string;
-  options?: QuestionOption[];
-  multiSelect?: boolean;
-}
-
-export function AskUserQuestionBody({
-  input,
-  isRunning,
-  onAnswer,
-}: {
-  input: Record<string, unknown>;
-  isRunning: boolean;
-  onAnswer?: (answer: string) => void;
-}) {
-  const questions = (input.questions ?? []) as Question[];
-  if (questions.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-3">
-      {questions.map((q, i) => (
-        <div key={i} className="flex flex-col gap-1.5">
-          {q.header && (
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-              {q.header}
-            </span>
-          )}
-          <p className="text-xs">{q.question}</p>
-          {q.options && isRunning && onAnswer && (
-            <div className="flex flex-wrap gap-1">
-              {q.options.map((opt) => (
-                <Button
-                  key={opt.label}
-                  variant="outline"
-                  size="xs"
-                  onClick={() => onAnswer(opt.label)}
-                  title={opt.description}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // --- Fallback: formatted JSON ---
 
 export function FormattedJson({ input, inputJson }: ToolInputProps) {
@@ -201,59 +186,4 @@ export function FormattedJson({ input, inputJson }: ToolInputProps) {
       : inputJson || "{}";
 
   return <CodeBlock>{json}</CodeBlock>;
-}
-
-// --- Diff helpers ---
-
-interface DiffLine {
-  type: "context" | "removed" | "added";
-  content: string;
-}
-
-function computeInlineDiff(oldLines: string[], newLines: string[]): DiffLine[] {
-  const m = oldLines.length;
-  const n = newLines.length;
-
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array<number>(n + 1).fill(0),
-  );
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        oldLines[i - 1] === newLines[j - 1]
-          ? dp[i - 1][j - 1] + 1
-          : Math.max(dp[i - 1][j], dp[i][j - 1]);
-    }
-  }
-
-  const result: DiffLine[] = [];
-  let i = m,
-    j = n;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      result.push({ type: "context", content: oldLines[i - 1] });
-      i--;
-      j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.push({ type: "added", content: newLines[j - 1] });
-      j--;
-    } else {
-      result.push({ type: "removed", content: oldLines[i - 1] });
-      i--;
-    }
-  }
-
-  return result.reverse();
-}
-
-function extractJsonField(json: string, field: string): string | null {
-  if (!json) return null;
-  const regex = new RegExp(`"${field}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
-  const match = json.match(regex);
-  if (!match) return null;
-  try {
-    return JSON.parse(`"${match[1]}"`);
-  } catch {
-    return match[1];
-  }
 }

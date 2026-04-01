@@ -1,5 +1,7 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { useClaudeSession } from "@/hooks/useClaudeSession";
+import { useElapsedTime } from "@/hooks/useElapsedTime";
+import { TASK_TOOL_NAMES } from "./claude-tool-config";
 import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
 import { ClaudePermissionPrompt } from "./ClaudePermissionPrompt";
@@ -7,7 +9,6 @@ import { ClaudeQuestionPrompt } from "./ClaudeQuestionPrompt";
 import { ClaudeInputBar } from "./ClaudeInputBar";
 import { ClaudeSettingsBar } from "./ClaudeSettingsBar";
 import { ClaudeTaskPopover } from "./ClaudeTaskPopover";
-import { TASK_TOOL_NAMES } from "./ClaudeToolCall";
 import { cn } from "@/lib/utils";
 import { IconRobot, IconLoader2 } from "@tabler/icons-react";
 
@@ -38,32 +39,7 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
     conversation.status === "waiting_permission";
   const isWaitingPermission = conversation.status === "waiting_permission";
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Elapsed time tracking
-  const [streamStart, setStreamStart] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState("");
-
-  useEffect(() => {
-    if (isBusy && !streamStart) {
-      setStreamStart(Date.now());
-    } else if (!isBusy && streamStart) {
-      setStreamStart(null);
-    }
-  }, [isBusy, streamStart]);
-
-  useEffect(() => {
-    if (!streamStart) {
-      setElapsed("");
-      return;
-    }
-    const tick = () => {
-      const s = Math.floor((Date.now() - streamStart) / 1000);
-      setElapsed(s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [streamStart]);
+  const elapsed = useElapsedTime(isBusy);
 
   useEffect(() => {
     if (conversation.status === "streaming" && scrollRef.current) {

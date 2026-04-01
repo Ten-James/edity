@@ -47,7 +47,7 @@ export function registerProjectHandlers(): void {
     const projects = loadProjects();
     const ordered = ids
       .map((id) => projects.find((p) => p.id === id))
-      .filter(Boolean) as Project[];
+      .filter((p): p is Project => p !== undefined);
     saveProjects(ordered);
   });
 
@@ -55,21 +55,26 @@ export function registerProjectHandlers(): void {
   ipcMain.handle("read_edity_config", (_event, { projectPath }: { projectPath: string }) => {
     try {
       const filePath = path.join(projectPath, ".edity");
-      const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      const raw: Record<string, unknown> = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
       // Auto-migrate legacy runCommand/runMode to runCommands[]
       if (raw.runCommand && !raw.runCommands) {
         raw.runCommands = [{
           name: raw.runCommand,
           command: raw.runCommand,
-          mode: raw.runMode ?? "terminal",
+          mode: typeof raw.runMode === "string" ? raw.runMode : "terminal",
         }];
         delete raw.runCommand;
         delete raw.runMode;
         fs.writeFileSync(filePath, JSON.stringify(raw, null, 2));
       }
 
-      return raw as EdityConfig;
+      const config: EdityConfig = {
+        acronym: typeof raw.acronym === "string" ? raw.acronym : undefined,
+        color: typeof raw.color === "string" ? raw.color : undefined,
+        runCommands: Array.isArray(raw.runCommands) ? raw.runCommands : undefined,
+      };
+      return config;
     } catch {
       return null;
     }

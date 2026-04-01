@@ -1,14 +1,12 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { invoke } from "@/lib/ipc";
 import type {
-  ClaudeAssistantMessage,
-  ClaudePermissionRequest,
-  ClaudeResultMessage,
   ClaudeSessionInfo,
   ClaudeSessionMessage,
-  ClaudeStreamEvent,
   ContentBlock,
+  ModelUsageEntry,
   PermissionMode,
+  StreamEventPayload,
 } from "@/types/claude";
 import {
   claudeSessionReducer,
@@ -17,77 +15,208 @@ import {
 } from "./claudeSessionReducer";
 import type { Action } from "./claudeSessionReducer";
 
-/**
- * Parse raw IPC data into a typed dispatch call.
- *
- * The IPC bridge delivers `unknown` payloads — this is the single
- * boundary where we narrow the shape and dispatch typed actions.
- */
+// --- IPC data narrowing helpers ---
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getString(obj: Record<string, unknown>, key: string): string | undefined {
+  const val = obj[key];
+  return typeof val === "string" ? val : undefined;
+}
+
+function getStringOrNull(obj: Record<string, unknown>, key: string): string | null {
+  return getString(obj, key) ?? null;
+}
+
+function getStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+function isContentBlock(value: unknown): value is ContentBlock {
+  if (!isRecord(value)) return false;
+  const { type } = value;
+  if (type === "text") return typeof value.text === "string";
+  if (type === "thinking") return typeof value.thinking === "string";
+  if (type === "tool_use") return typeof value.id === "string" && typeof value.name === "string";
+  return false;
+}
+
+function getContentBlocks(msg: unknown): ContentBlock[] {
+  if (!isRecord(msg)) return [];
+  const content = msg.content;
+  if (!Array.isArray(content)) return [];
+  return content.filter(isContentBlock);
+}
+
+function getToolResultBlocks(
+  msg: unknown,
+): Array<{ type: string; tool_use_id: string; content: string; is_error: boolean }> {
+  if (!isRecord(msg)) return [];
+  const content = msg.content;
+  if (!Array.isArray(content)) return [];
+
+  const results: Array<{ type: string; tool_use_id: string; content: string; is_error: boolean }> = [];
+  for (const block of content) {
+    if (!isRecord(block)) continue;
+    if (block.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+    results.push({
+      type: "tool_result",
+      tool_use_id: block.tool_use_id,
+      content: typeof block.content === "string" ? block.content : "",
+      is_error: block.is_error === true,
+    });
+  }
+  return results;
+}
+
+// --- IPC message dispatch ---
+
 function dispatchIPCMessage(data: unknown, dispatch: React.Dispatch<Action>) {
-  const raw = data as Record<string, unknown>;
-  const msgType = raw.type as string;
+  if (!isRecord(data)) return;
+
+  const msgType = getString(data, "type");
+  if (!msgType) return;
 
   switch (msgType) {
     case "system":
-      dispatchSystemMessage(raw, dispatch);
+      dispatchSystemMessage(data, dispatch);
       break;
 
     case "stream_event":
-      dispatch({
-        type: "STREAM_EVENT",
-        message: data as ClaudeStreamEvent,
-      });
+      dispatchStreamEvent(data, dispatch);
       break;
 
     case "assistant":
-      dispatchAssistantMessage(raw, data, dispatch);
+      dispatchAssistantMessage(data, dispatch);
       break;
 
     case "user":
-      dispatchUserMessage(raw, dispatch);
+      dispatchUserMessage(data, dispatch);
       break;
 
     case "result":
-      dispatch({
-        type: "RESULT",
-        message: data as ClaudeResultMessage,
-      });
+      dispatchResultMessage(data, dispatch);
       break;
 
     case "ask_user_question":
-      dispatch({
-        type: "ASK_USER_QUESTION",
-        toolUseID: raw.toolUseID as string,
-        input: raw.input as Record<string, unknown>,
-      });
+      dispatchAskUserQuestion(data, dispatch);
       break;
 
     case "permission_request":
-      dispatch({
-        type: "PERMISSION_REQUEST",
-        request: data as ClaudePermissionRequest,
-      });
+      dispatchPermissionRequest(data, dispatch);
       break;
 
     case "error":
       dispatch({
         type: "ERROR",
-        message: (raw.message as string) ?? "Unknown error",
+        message: getString(data, "message") ?? "Unknown error",
       });
       break;
   }
+}
+
+function dispatchStreamEvent(
+  raw: Record<string, unknown>,
+  dispatch: React.Dispatch<Action>,
+) {
+  const event = raw.event;
+  if (!isRecord(event)) return;
+
+  const eventType = getString(event, "type");
+  if (!eventType) return;
+
+  // StreamEventPayload is a complex discriminated union from the Claude SDK.
+  // The reducer handles each variant with runtime checks. Full validation here
+  // would duplicate that logic. We trust the SDK shape at this IPC boundary.
+  const streamEvent: StreamEventPayload = event as StreamEventPayload;
+
+  dispatch({
+    type: "STREAM_EVENT",
+    message: {
+      type: "stream_event",
+      event: streamEvent,
+      parent_tool_use_id: getStringOrNull(raw, "parent_tool_use_id"),
+      uuid: getString(raw, "uuid") ?? "",
+      session_id: getString(raw, "session_id") ?? "",
+    },
+  });
+}
+
+function dispatchResultMessage(
+  raw: Record<string, unknown>,
+  dispatch: React.Dispatch<Action>,
+) {
+  // ModelUsageEntry fields are all optional numbers — the reducer handles
+  // missing values with ?? 0. We trust the SDK shape for this nested record.
+  const modelUsage = isRecord(raw.modelUsage)
+    ? (raw.modelUsage as Record<string, ModelUsageEntry>)
+    : undefined;
+  const errors = Array.isArray(raw.errors) ? raw.errors.map(String) : undefined;
+
+  dispatch({
+    type: "RESULT",
+    message: {
+      type: "result",
+      subtype: getString(raw, "subtype") ?? "success",
+      result: getString(raw, "result"),
+      total_cost_usd: typeof raw.total_cost_usd === "number" ? raw.total_cost_usd : undefined,
+      duration_ms: typeof raw.duration_ms === "number" ? raw.duration_ms : undefined,
+      num_turns: typeof raw.num_turns === "number" ? raw.num_turns : undefined,
+      session_id: getString(raw, "session_id") ?? "",
+      modelUsage,
+      errors,
+    },
+  });
+}
+
+function dispatchAskUserQuestion(
+  raw: Record<string, unknown>,
+  dispatch: React.Dispatch<Action>,
+) {
+  const toolUseID = getString(raw, "toolUseID");
+  if (!toolUseID) return;
+
+  dispatch({
+    type: "ASK_USER_QUESTION",
+    toolUseID,
+    input: isRecord(raw.input) ? raw.input : {},
+  });
+}
+
+function dispatchPermissionRequest(
+  raw: Record<string, unknown>,
+  dispatch: React.Dispatch<Action>,
+) {
+  const toolUseID = getString(raw, "toolUseID");
+  const toolName = getString(raw, "toolName");
+  if (!toolUseID || !toolName) return;
+
+  dispatch({
+    type: "PERMISSION_REQUEST",
+    request: {
+      type: "permission_request",
+      toolName,
+      input: isRecord(raw.input) ? raw.input : {},
+      toolUseID,
+      title: getString(raw, "title"),
+      displayName: getString(raw, "displayName"),
+      description: getString(raw, "description"),
+    },
+  });
 }
 
 function dispatchSystemMessage(
   raw: Record<string, unknown>,
   dispatch: React.Dispatch<Action>,
 ) {
-  if (
-    raw.subtype === "task_progress" ||
-    raw.subtype === "task_started"
-  ) {
-    const toolUseId = raw.tool_use_id as string | undefined;
-    const desc = raw.description as string | undefined;
+  const subtype = getString(raw, "subtype");
+
+  if (subtype === "task_progress" || subtype === "task_started") {
+    const toolUseId = getString(raw, "tool_use_id");
+    const desc = getString(raw, "description");
     if (toolUseId && desc) {
       dispatch({
         type: "SUBAGENT_PROGRESS",
@@ -98,16 +227,16 @@ function dispatchSystemMessage(
     return;
   }
 
-  if (raw.subtype === "task_notification") {
-    const toolUseId = raw.tool_use_id as string | undefined;
+  if (subtype === "task_notification") {
+    const toolUseId = getString(raw, "tool_use_id");
     if (toolUseId) {
       dispatch({ type: "SUBAGENT_COMPLETED", toolUseId });
     }
     return;
   }
 
-  if (raw.subtype === "status") {
-    const status = raw.status as string | undefined;
+  if (subtype === "status") {
+    const status = getString(raw, "status");
     dispatch({
       type: "SESSION_STATE",
       sessionState: status === "compacting" ? "compacting" : "running",
@@ -115,38 +244,50 @@ function dispatchSystemMessage(
     return;
   }
 
-  if (raw.subtype !== "init") return;
+  if (subtype !== "init") return;
 
-  // slash_commands may be string[] or {name, description}[] — normalize
-  const rawCmds = raw.slash_commands as unknown[];
+  const rawCmds = raw.slash_commands;
   const slashCommands = Array.isArray(rawCmds)
     ? rawCmds.map((c) =>
         typeof c === "string"
           ? c
-          : (c as { name: string }).name,
-      )
+          : isRecord(c) && typeof c.name === "string"
+            ? c.name
+            : "",
+      ).filter(Boolean)
     : [];
 
   dispatch({
     type: "SYSTEM_INIT",
-    sessionId: raw.session_id as string,
-    model: raw.model as string | undefined,
-    permissionMode: raw.permissionMode as PermissionMode | undefined,
-    tools: raw.tools as string[] | undefined,
+    sessionId: getString(raw, "session_id") ?? "",
+    model: getString(raw, "model"),
+    permissionMode: getPermissionMode(raw.permissionMode),
+    tools: getStringArray(raw.tools),
     slashCommands,
   });
 }
 
+function getPermissionMode(value: unknown): PermissionMode | undefined {
+  if (
+    value === "default" ||
+    value === "acceptEdits" ||
+    value === "bypassPermissions" ||
+    value === "plan" ||
+    value === "dontAsk"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 function dispatchAssistantMessage(
   raw: Record<string, unknown>,
-  data: unknown,
   dispatch: React.Dispatch<Action>,
 ) {
-  const parentId = raw.parent_tool_use_id as string | null;
+  const parentId = getStringOrNull(raw, "parent_tool_use_id");
+  const content = getContentBlocks(raw.message);
 
   if (parentId) {
-    const msg = raw.message as { content?: ContentBlock[] } | undefined;
-    const content = msg?.content ?? [];
     let text = "";
 
     for (const block of content) {
@@ -175,7 +316,13 @@ function dispatchAssistantMessage(
   } else {
     dispatch({
       type: "ASSISTANT_MESSAGE",
-      message: data as ClaudeAssistantMessage,
+      message: {
+        type: "assistant",
+        message: { content },
+        uuid: getString(raw, "uuid") ?? "",
+        parent_tool_use_id: null,
+        session_id: getString(raw, "session_id") ?? "",
+      },
     });
   }
 }
@@ -184,38 +331,37 @@ function dispatchUserMessage(
   raw: Record<string, unknown>,
   dispatch: React.Dispatch<Action>,
 ) {
-  const parentId = raw.parent_tool_use_id as string | null;
-  const msg = raw.message as
-    | { content?: Array<Record<string, unknown>> }
-    | undefined;
-  const content = msg?.content ?? [];
+  const parentId = getStringOrNull(raw, "parent_tool_use_id");
+  const blocks = getToolResultBlocks(raw.message);
 
-  for (const block of content) {
-    if (block.type !== "tool_result" || !block.tool_use_id) continue;
-
+  for (const block of blocks) {
     if (parentId) {
       dispatch({
         type: "SUBAGENT_TOOL_RESULT",
         parentToolUseId: parentId,
-        toolUseId: String(block.tool_use_id),
-        content: String(block.content ?? ""),
-        isError: block.is_error === true,
+        toolUseId: block.tool_use_id,
+        content: block.content,
+        isError: block.is_error,
       });
     } else {
       dispatch({
         type: "TOOL_RESULT",
-        toolUseId: String(block.tool_use_id),
-        content: String(block.content ?? ""),
-        isError: block.is_error === true,
+        toolUseId: block.tool_use_id,
+        content: block.content,
+        isError: block.is_error,
       });
     }
   }
 }
 
+// --- Error handling ---
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
 }
+
+// --- Hook ---
 
 export function useClaudeSession(projectPath: string) {
   const [conversation, dispatch] = useReducer(

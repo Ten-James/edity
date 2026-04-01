@@ -16,10 +16,17 @@ import {
 
 const EDITY_HOOK_MARKER = "claude-hook.sh";
 
-interface HookEntry {
-  hooks?: Array<{ type?: string; command?: string }>;
-  [key: string]: unknown;
+interface HookAction {
+  type?: string;
+  command?: string;
 }
+
+interface HookEntry {
+  matcher?: string;
+  hooks?: HookAction[];
+}
+
+type HookSettings = Record<string, HookEntry[]>;
 
 function isEdityHookEntry(entry: HookEntry): boolean {
   return !!entry.hooks?.some((h) => h.command?.includes(EDITY_HOOK_MARKER));
@@ -40,13 +47,13 @@ export function ensureClaudeHooks(): void {
     const claudeDir = path.join(os.homedir(), ".claude");
     fs.mkdirSync(claudeDir, { recursive: true });
 
-    let settings: Record<string, unknown> = {};
+    let settings: { hooks?: HookSettings; [key: string]: unknown } = {};
     try {
       settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS_PATH, "utf-8"));
     } catch { /* new file */ }
 
     if (!settings.hooks) settings.hooks = {};
-    const hooks = settings.hooks as Record<string, HookEntry[]>;
+    const hooks = settings.hooks;
 
     const edityHooks: Record<string, HookEntry> = {
       UserPromptSubmit: {
@@ -74,7 +81,7 @@ export function ensureClaudeHooks(): void {
       fs.writeFileSync(CLAUDE_SETTINGS_PATH, JSON.stringify(settings, null, 2));
     }
   } catch (err: unknown) {
-    console.error("Failed to inject Claude hooks:", (err as Error).message);
+    console.error("Failed to inject Claude hooks:", err instanceof Error ? err.message : String(err));
   }
 }
 

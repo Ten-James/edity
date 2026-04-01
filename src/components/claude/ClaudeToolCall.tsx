@@ -13,22 +13,26 @@ import {
   FormattedJson,
 } from "./ClaudeToolBodies";
 
-// Re-export for consumers
-export { TASK_TOOL_NAMES, INLINE_TOOLS } from "./claude-tool-config";
-
 const FILE_TOOLS = new Set(["Read", "Write", "Edit"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStringField(obj: unknown, key: string): string | undefined {
+  if (!isRecord(obj)) return undefined;
+  const val = obj[key];
+  return typeof val === "string" ? val : undefined;
+}
 
 function getEffectiveStatus(toolUse: ClaudeToolUse): ClaudeToolUse["status"] {
   if (toolUse.name === "Agent" && toolUse.status === "complete") {
-    const hasRunning = toolUse.subToolUses?.some((t) => t.status === "running" || t.status === "pending");
+    const hasRunning = toolUse.subToolUses?.some(
+      (t) => t.status === "running" || t.status === "pending",
+    );
     if (hasRunning) return "running";
   }
   return toolUse.status;
-}
-
-interface ClaudeToolCallProps {
-  toolUse: ClaudeToolUse;
-  autoExpand?: boolean;
 }
 
 function getToolBody(toolUse: ClaudeToolUse) {
@@ -56,6 +60,11 @@ function getToolBody(toolUse: ClaudeToolUse) {
   }
 }
 
+interface ClaudeToolCallProps {
+  toolUse: ClaudeToolUse;
+  autoExpand?: boolean;
+}
+
 export function ClaudeToolCall({
   toolUse,
   autoExpand = false,
@@ -69,6 +78,7 @@ export function ClaudeToolCall({
   useEffect(() => {
     if (isActiveAgent) setOpen(true);
   }, [isActiveAgent]);
+
   const rawSummary =
     getToolSummary(toolUse.name, toolUse.input, toolUse.inputJson) ??
     toolUse.name;
@@ -77,10 +87,11 @@ export function ClaudeToolCall({
     : rawSummary;
   const isInline = INLINE_TOOLS.has(toolUse.name);
 
-  // AskUserQuestion renders as inline question text
   if (toolUse.name === "AskUserQuestion") {
-    const questions = (toolUse.input.questions ?? []) as Array<{ question: string }>;
-    const questionText = questions[0]?.question ?? summary;
+    const rawQuestions = Array.isArray(toolUse.input.questions)
+      ? toolUse.input.questions
+      : [];
+    const questionText = getStringField(rawQuestions[0], "question") ?? summary;
     return (
       <div className="flex items-start gap-1.5 py-0.5 text-xs">
         <span className="shrink-0 text-muted-foreground mt-0.5">

@@ -1,14 +1,23 @@
 import { ipcMain, BrowserWindow, app } from "electron";
 import * as path from "path";
 import { pathToFileURL } from "url";
+import type {
+  PermissionResult,
+  SDKMessage,
+  SDKSessionInfo as SDKSessionInfoType,
+  SessionMessage,
+  Query,
+  Options as SDKOptions,
+  PermissionMode as SDKPermissionMode,
+} from "@anthropic-ai/claude-agent-sdk/sdk";
 import type { ClaudeSessionInfo, ClaudeSessionMessage } from "../../../shared/types/ipc";
 import { createLogger } from "../lib/logger";
 
 const log = createLogger("claude-sdk");
 
 interface PermissionCallback {
-  resolve: (value: unknown) => void;
-  input?: unknown;
+  resolve: (value: PermissionResult) => void;
+  input?: Record<string, unknown>;
   toolName?: string;
 }
 
@@ -17,16 +26,28 @@ interface ClaudeSession {
   permissionCallbacks: Map<string, PermissionCallback>;
   mainWindow: BrowserWindow;
   sessionId: string;
-  batchBuffer: unknown[];
+  batchBuffer: SDKMessage[];
   batchTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const claudeSessions = new Map<string, ClaudeSession>();
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sdkModule: any = null;
+/** Messages synthesized by the IPC layer (not from the SDK stream). */
+type SyntheticMessage =
+  | { type: "error"; message: string }
+  | { type: "result"; subtype: "success" }
+  | { type: "permission_request"; toolName: string; input: unknown; toolUseID: string; title?: string; displayName?: string; description?: string }
+  | { type: "ask_user_question"; toolName: string; input: unknown; toolUseID: string };
 
-/** Resolve SDK paths — handles both dev (node_modules) and packaged (asar.unpacked). */
+interface ClaudeSDK {
+  query(params: { prompt: string; options?: SDKOptions }): Query;
+  listSessions(options?: { dir?: string }): Promise<SDKSessionInfoType[]>;
+  getSessionMessages(sessionId: string, options?: { dir?: string }): Promise<SessionMessage[]>;
+}
+
+let sdkModule: ClaudeSDK | null = null;
+
+/** Resolve SDK paths -- handles both dev (node_modules) and packaged (asar.unpacked). */
 function getSdkPath(file: string): string {
   const appPath = app.getAppPath();
   const rel = path.join("node_modules", "@anthropic-ai", "claude-agent-sdk", file);
@@ -36,12 +57,11 @@ function getSdkPath(file: string): string {
   return path.join(appPath, rel);
 }
 
-// Use Function constructor to preserve real import() — TypeScript CJS compilation converts import() to require()
-// which cannot load ESM modules. This bypasses that transformation.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<any>;
+// Use Function constructor to preserve real import() -- TypeScript CJS compilation converts
+// import() to require() which cannot load ESM modules. This bypasses that transformation.
+const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<ClaudeSDK>;
 
-async function loadSDK() {
+async function loadSDK(): Promise<ClaudeSDK> {
   if (!sdkModule) {
     try {
       const sdkUrl = pathToFileURL(getSdkPath("sdk.mjs")).href;
@@ -59,17 +79,14 @@ function flushBatch(session: ClaudeSession): void {
   const messages = session.batchBuffer.splice(0);
   if (session.mainWindow && !session.mainWindow.isDestroyed()) {
     for (const msg of messages) {
-      log.debug("→", msg);
+      log.debug("->", msg);
       session.mainWindow.webContents.send(`claude-msg-${session.sessionId}`, msg);
     }
   }
 }
 
-function sendToRenderer(session: ClaudeSession, message: unknown): void {
-  const msg = message as { type?: string; parent_tool_use_id?: string; subtype?: string };
-
-  // Batch stream_events for performance, don't log (too verbose)
-  if (msg.type === "stream_event") {
+function sendToRenderer(session: ClaudeSession, message: SDKMessage | SyntheticMessage): void {
+  if ("type" in message && message.type === "stream_event") {
     session.batchBuffer.push(message);
     if (!session.batchTimer) {
       session.batchTimer = setTimeout(() => {
@@ -80,32 +97,38 @@ function sendToRenderer(session: ClaudeSession, message: unknown): void {
     return;
   }
 
-  // Flush pending stream_events before sending other message types
   flushBatch(session);
   if (session.batchTimer) {
     clearTimeout(session.batchTimer);
     session.batchTimer = null;
   }
 
-  log.debug("→", message);
+  log.debug("->", message);
   if (session.mainWindow && !session.mainWindow.isDestroyed()) {
     session.mainWindow.webContents.send(`claude-msg-${session.sessionId}`, message);
   }
 }
 
 function isInterrupted(err: unknown): boolean {
-  if ((err as Error).name === "AbortError") return true;
-  const msg = String((err as Error).message ?? "");
-  return msg.includes("aborted") || msg.includes("interrupted") || msg.includes("all fibers interrupted");
+  if (err instanceof Error) {
+    if (err.name === "AbortError") return true;
+    const msg = err.message;
+    return msg.includes("aborted") || msg.includes("interrupted") || msg.includes("all fibers interrupted");
+  }
+  return String(err).includes("aborted");
 }
 
-async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterable<unknown>): Promise<void> {
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterable<SDKMessage>): Promise<void> {
   let hadResult = false;
   let hadError = false;
   try {
     for await (const message of queryIterator) {
-      const msg = message as { type?: string };
-      if (msg.type === "result") hadResult = true;
+      if (message.type === "result") hadResult = true;
       sendToRenderer(session, message);
     }
   } catch (err: unknown) {
@@ -114,7 +137,7 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
     log.error("Session loop error:", err);
     sendToRenderer(session, {
       type: "error",
-      message: (err as Error).message || "Unknown error",
+      message: getErrorMessage(err) || "Unknown error",
     });
   } finally {
     flushBatch(session);
@@ -133,6 +156,15 @@ async function runSessionLoop(session: ClaudeSession, queryIterator: AsyncIterab
       claudeSessions.delete(session.sessionId);
     }
   }
+}
+
+const PERMISSION_MODES = new Set<SDKPermissionMode>(["default", "acceptEdits", "bypassPermissions", "plan", "dontAsk"]);
+
+function toPermissionMode(value: string | undefined): SDKPermissionMode {
+  if (value && PERMISSION_MODES.has(value as SDKPermissionMode)) {
+    return value as SDKPermissionMode;
+  }
+  return "default";
 }
 
 interface StartSessionArgs {
@@ -163,29 +195,26 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
   try {
     const sdk = await loadSDK();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const queryOptions: any = {
+    const queryOptions: SDKOptions = {
       abortController,
       cwd: projectPath,
       pathToClaudeCodeExecutable: getSdkPath("cli.js"),
-      permissionMode: permissionMode || "default",
+      permissionMode: toPermissionMode(permissionMode),
       betas: ["context-1m-2025-08-07"],
       includePartialMessages: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      canUseTool: (toolName: string, input: unknown, options: any) => {
-        return new Promise((resolve) => {
-          const toolUseID = options?.toolUseID || crypto.randomUUID();
+      model,
+      resume,
+      canUseTool: (toolName, input, options) => {
+        return new Promise<PermissionResult>((resolve) => {
+          const toolUseID = options.toolUseID;
           session.permissionCallbacks.set(toolUseID, { resolve, input, toolName });
 
-          // Handle abort signal from SDK
-          if (options?.signal) {
-            options.signal.addEventListener("abort", () => {
-              if (session.permissionCallbacks.has(toolUseID)) {
-                session.permissionCallbacks.delete(toolUseID);
-                resolve({ behavior: "deny", message: "Aborted" });
-              }
-            }, { once: true });
-          }
+          options.signal.addEventListener("abort", () => {
+            if (session.permissionCallbacks.has(toolUseID)) {
+              session.permissionCallbacks.delete(toolUseID);
+              resolve({ behavior: "deny", message: "Aborted" });
+            }
+          }, { once: true });
 
           if (toolName === "AskUserQuestion") {
             sendToRenderer(session, {
@@ -200,17 +229,14 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
               toolName,
               input,
               toolUseID,
-              title: options?.title,
-              displayName: options?.displayName,
-              description: options?.description,
+              title: options.title,
+              displayName: options.displayName,
+              description: options.description,
             });
           }
         });
       },
     };
-
-    if (model) queryOptions.model = model;
-    if (resume) queryOptions.resume = resume;
 
     const queryIterator = sdk.query({ prompt, options: queryOptions });
     runSessionLoop(session, queryIterator);
@@ -218,7 +244,7 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
     log.error("Failed to start session:", err);
     sendToRenderer(session, {
       type: "error",
-      message: `Failed to start Claude session: ${(err as Error).message}`,
+      message: `Failed to start Claude session: ${getErrorMessage(err)}`,
     });
     claudeSessions.delete(sessionId);
   }
@@ -229,10 +255,8 @@ async function startSession(mainWindow: BrowserWindow, args: StartSessionArgs): 
 async function listSessions(args: { projectPath: string }): Promise<ClaudeSessionInfo[]> {
   const sdk = await loadSDK();
   try {
-    if (typeof sdk.listSessions !== "function") return [];
     const sessions = await sdk.listSessions({ dir: args.projectPath });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (sessions || []).map((s: any) => ({
+    return (sessions || []).map((s) => ({
       sessionId: s.sessionId,
       summary: s.summary || s.firstPrompt || "Untitled",
       lastModified: s.lastModified || 0,
@@ -240,7 +264,7 @@ async function listSessions(args: { projectPath: string }): Promise<ClaudeSessio
       gitBranch: s.gitBranch,
     }));
   } catch (err) {
-    console.error("[claude-sdk] Failed to list sessions:", err);
+    log.error("Failed to list sessions:", err);
     return [];
   }
 }
@@ -248,17 +272,15 @@ async function listSessions(args: { projectPath: string }): Promise<ClaudeSessio
 async function getSessionMessages(args: { sessionId: string; projectPath: string }): Promise<ClaudeSessionMessage[]> {
   const sdk = await loadSDK();
   try {
-    if (typeof sdk.getSessionMessages !== "function") return [];
     const messages = await sdk.getSessionMessages(args.sessionId, { dir: args.projectPath });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (messages || []).map((m: any) => ({
+    return (messages || []).map((m) => ({
       type: m.type,
       uuid: m.uuid,
       session_id: m.session_id,
       message: m.message,
     }));
   } catch (err) {
-    console.error("[claude-sdk] Failed to get session messages:", err);
+    log.error("Failed to get session messages:", err);
     return [];
   }
 }
@@ -308,11 +330,10 @@ export function registerClaudeSdkHandlers(getMainWindow: () => BrowserWindow | n
     const callback = session.permissionCallbacks.get(args.toolUseID);
     if (!callback) return { ok: false, error: "Question callback not found" };
     session.permissionCallbacks.delete(args.toolUseID);
-    const originalInput = callback.input as Record<string, unknown> | undefined;
     callback.resolve({
       behavior: "allow",
       updatedInput: {
-        questions: originalInput?.questions ?? [],
+        questions: callback.input?.questions ?? [],
         answers: args.answers,
       },
     });
