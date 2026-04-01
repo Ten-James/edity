@@ -1,7 +1,6 @@
 import {
   useEffect,
   useState,
-  useCallback,
   type ComponentPropsWithoutRef,
 } from "react";
 import Markdown from "react-markdown";
@@ -80,21 +79,18 @@ function ShikiCodeBlock({
 }
 
 export function MarkdownPreview({ content, filePath }: MarkdownPreviewProps) {
-  const resolveImageSrc = useCallback(
-    (src: string | undefined) => {
-      if (!src) return src;
-      if (
-        src.startsWith("http://") ||
-        src.startsWith("https://") ||
-        src.startsWith("data:")
-      ) {
-        return src;
-      }
-      const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-      return `edity-file://${encodeURI(dir + "/" + src)}`;
-    },
-    [filePath],
-  );
+  const resolveImageSrc = (src: string | undefined) => {
+    if (!src) return src;
+    if (
+      src.startsWith("http://") ||
+      src.startsWith("https://") ||
+      src.startsWith("data:")
+    ) {
+      return src;
+    }
+    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+    return `edity-file://${encodeURI(dir + "/" + src)}`;
+  };
 
   return (
     <ScrollArea className="flex-1">

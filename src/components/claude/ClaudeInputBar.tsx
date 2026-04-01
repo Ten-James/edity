@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -64,13 +64,13 @@ export function ClaudeInputBar({
     }
   }, [value]);
 
-  const insertCommand = useCallback((cmd: string) => {
+  const insertCommand = (cmd: string) => {
     setValue(`/${cmd} `);
     setShowCommands(false);
     textareaRef.current?.focus();
-  }, []);
+  };
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
@@ -78,7 +78,7 @@ export function ClaudeInputBar({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [value, disabled, onSend]);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showCommands && filteredCommands.length > 0) {

@@ -74,6 +74,14 @@ export interface ClaudeAssistantMessage {
   session_id: string;
 }
 
+export interface ModelUsageEntry {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  contextWindow?: number;
+}
+
 export interface ClaudeResultMessage {
   type: "result";
   subtype: "success" | "error_during_execution" | "error_max_turns" | string;
@@ -82,6 +90,8 @@ export interface ClaudeResultMessage {
   duration_ms?: number;
   num_turns?: number;
   session_id: string;
+  modelUsage?: Record<string, ModelUsageEntry>;
+  errors?: string[];
 }
 
 export interface ClaudePermissionRequest {

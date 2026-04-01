@@ -30,7 +30,7 @@ export function getToolSummary(
         ? String(input.description)
         : input.prompt
           ? String(input.prompt).slice(0, 80)
-          : null;
+          : extractFieldFromJson(inputJson, "description");
     case "AskUserQuestion":
       return input.question ? String(input.question).slice(0, 80) : null;
     case "Skill":

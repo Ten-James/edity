@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { dispatch } from "@/stores/eventBus";
 import type { GlobalSettings, ColorTheme } from "@shared/types/settings";
@@ -22,13 +22,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const settings = useSettingsStore((s) => s.settings);
   const activeTheme = useSettingsStore((s) => s.activeTheme);
 
-  const toggleMode = useCallback(() => {
+  const toggleMode = () => {
     dispatch({ type: "settings-toggle-mode" });
-  }, []);
+  };
 
-  const updateSettings = useCallback(async (patch: Partial<GlobalSettings>) => {
+  const updateSettings = async (patch: Partial<GlobalSettings>) => {
     dispatch({ type: "settings-update", patch });
-  }, []);
+  };
 
   return (
     <ThemeContext.Provider

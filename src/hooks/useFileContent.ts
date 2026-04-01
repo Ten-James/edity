@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { invoke, listen } from "@/lib/ipc";
 
 export type FileContent =
@@ -14,9 +14,8 @@ export function useFileContent(tabId: string, filePath: string) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFetchedRef = useRef(false);
 
-  const fetchContent = useCallback(async () => {
+  const fetchContent = async () => {
     try {
-      // Only show loading spinner on initial fetch, not on re-fetches
       if (!hasFetchedRef.current) {
         setLoading(true);
       }
@@ -34,7 +33,7 @@ export function useFileContent(tabId: string, filePath: string) {
       hasFetchedRef.current = true;
       setLoading(false);
     }
-  }, [filePath]);
+  };
 
   useEffect(() => {
     fetchContent();

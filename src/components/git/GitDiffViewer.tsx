@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
@@ -35,13 +35,12 @@ function useShikiTokens(
     null,
   );
 
-  const code = useMemo(() => {
-    if (!lines) return null;
-    return lines
-      .filter((l) => l.type !== "header")
-      .map((l) => l.content)
-      .join("\n");
-  }, [lines]);
+  const code = lines
+    ? lines
+        .filter((l) => l.type !== "header")
+        .map((l) => l.content)
+        .join("\n")
+    : null;
 
   useEffect(() => {
     if (!code || !filePath) {
@@ -100,15 +99,8 @@ function useShikiTokens(
 export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
   const { activeTheme } = useTheme();
 
-  const parsed = useMemo(() => {
-    if (!diff || !filePath) return null;
-    return parseDiff(diff, filePath);
-  }, [diff, filePath]);
-
-  const allLines = useMemo(() => {
-    if (!parsed) return null;
-    return parsed.hunks.flatMap((h) => h.lines);
-  }, [parsed]);
+  const parsed = diff && filePath ? parseDiff(diff, filePath) : null;
+  const allLines = parsed ? parsed.hunks.flatMap((h) => h.lines) : null;
 
   const tokenMap = useShikiTokens(allLines, filePath, activeTheme.shikiTheme);
 

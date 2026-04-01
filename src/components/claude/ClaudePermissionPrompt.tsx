@@ -1,5 +1,5 @@
 import type { ClaudePermissionRequest } from "@/types/claude";
-import { getToolSummary, getFilePath } from "./claude-utils";
+import { getToolSummary, getFilePath } from "@/lib/claude-utils";
 import { Button } from "@/components/ui/button";
 import { CodeBlock } from "@/components/ui/code-block";
 import { IconShieldCheck, IconShieldX } from "@tabler/icons-react";

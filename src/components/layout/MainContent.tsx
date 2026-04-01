@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { FileTree } from "./FileTree";
 import { GitSidebar } from "./GitSidebar";
@@ -14,19 +13,15 @@ export function MainContent() {
   const { allTabs, projects, activeProject, projectPanes, sidebarPanel } =
     useAppContext();
 
-  // Group allTabs by paneId for fast lookup
-  const tabsByPane = useMemo(() => {
-    const map = new Map<string, AllTab[]>();
-    for (const tab of allTabs) {
-      let arr = map.get(tab.paneId);
-      if (!arr) {
-        arr = [];
-        map.set(tab.paneId, arr);
-      }
-      arr.push(tab);
+  const tabsByPane = new Map<string, AllTab[]>();
+  for (const tab of allTabs) {
+    let arr = tabsByPane.get(tab.paneId);
+    if (!arr) {
+      arr = [];
+      tabsByPane.set(tab.paneId, arr);
     }
-    return map;
-  }, [allTabs]);
+    arr.push(tab);
+  }
 
   return (
     <div className="flex flex-1 overflow-hidden">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -98,7 +98,7 @@ export function GitLogPanel({
     onLoadLog();
   }, [onLoadLog]);
 
-  const graphNodes = useMemo(() => computeGraph(log), [log]);
+  const graphNodes = computeGraph(log);
 
   return (
     <ScrollArea className="h-full">

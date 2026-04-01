@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -44,9 +44,9 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
-  const getWebview = useCallback((): WebviewElement | null => {
+  const getWebview = (): WebviewElement | null => {
     return webviewRef.current as unknown as WebviewElement | null;
-  }, []);
+  };
 
   useEffect(() => {
     const webview = getWebview();
@@ -88,35 +88,32 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
       webview.removeEventListener("page-title-updated", handleTitleUpdate);
       webview.removeEventListener("context-menu", handleContextMenu);
     };
-  }, [tabId, updateTabTitle, updateBrowserUrl, getWebview]);
+  }, [tabId, updateTabTitle, updateBrowserUrl]);
 
-  const navigate = useCallback(
-    (url: string) => {
-      let normalized = url.trim();
-      if (
-        !normalized.startsWith("http://") &&
-        !normalized.startsWith("https://")
-      ) {
-        normalized = `https://${normalized}`;
-      }
-      setUrlInput(normalized);
-      getWebview()?.loadURL(normalized);
-    },
-    [getWebview],
-  );
+  const navigate = (url: string) => {
+    let normalized = url.trim();
+    if (
+      !normalized.startsWith("http://") &&
+      !normalized.startsWith("https://")
+    ) {
+      normalized = `https://${normalized}`;
+    }
+    setUrlInput(normalized);
+    getWebview()?.loadURL(normalized);
+  };
 
-  const goBack = useCallback(() => getWebview()?.goBack(), [getWebview]);
-  const goForward = useCallback(() => getWebview()?.goForward(), [getWebview]);
-  const reload = useCallback(() => getWebview()?.reload(), [getWebview]);
+  const goBack = () => getWebview()?.goBack();
+  const goForward = () => getWebview()?.goForward();
+  const reload = () => getWebview()?.reload();
 
-  const openDevTools = useCallback(() => {
+  const openDevTools = () => {
     getWebview()?.openDevTools();
-  }, [getWebview]);
+  };
 
-  const copyUrl = useCallback(() => {
+  const copyUrl = () => {
     const webview = getWebview();
     if (webview) navigator.clipboard.writeText(webview.getURL());
-  }, [getWebview]);
+  };
 
   return (
     <div

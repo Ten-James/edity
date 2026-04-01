@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   IconGitBranch,
   IconCloudDownload,
@@ -48,16 +48,16 @@ export function GitSidebar() {
     ...git.untracked.map((f) => ({ ...f, _staged: false })),
   ];
 
-  const handleCommit = useCallback(async () => {
+  const handleCommit = async () => {
     if (!commitMsg.trim()) return;
     await git.commit(commitMsg.trim());
     setCommitMsg("");
-  }, [commitMsg, git]);
+  };
 
-  const handleOpenFullView = useCallback(() => {
+  const handleOpenFullView = () => {
     createGitTab();
     toggleSidebarPanel("git");
-  }, [createGitTab, toggleSidebarPanel]);
+  };
 
   if (!activeProject) return null;
 

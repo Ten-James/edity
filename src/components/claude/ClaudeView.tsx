@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useClaudeSession } from "@/hooks/useClaudeSession";
 import { ClaudeHeader } from "./ClaudeHeader";
 import { ClaudeMessageList } from "./ClaudeMessageList";
@@ -71,12 +71,8 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
     }
   }, [conversation.messages, conversation.status]);
 
-  const taskTools = useMemo(
-    () =>
-      conversation.messages.flatMap((m) =>
-        m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name)),
-      ),
-    [conversation.messages],
+  const taskTools = conversation.messages.flatMap((m) =>
+    m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name)),
   );
 
   const handleSend = async (text: string) => {

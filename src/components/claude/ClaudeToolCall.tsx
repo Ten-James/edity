@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
-import { getToolSummary, getFilePath } from "./claude-utils";
+import { getToolSummary, getFilePath } from "@/lib/claude-utils";
 import { getToolIcon, getStatusIcon, INLINE_TOOLS } from "./claude-tool-config";
 import {
   EditDiff,

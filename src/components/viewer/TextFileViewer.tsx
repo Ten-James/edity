@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAppContext } from "@/contexts/AppContext";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
@@ -72,7 +72,7 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
     };
   }, [content, filePath, activeTheme]);
 
-  const getRelativePath = useCallback(() => {
+  const getRelativePath = () => {
     if (activeProject) {
       const projectPath = activeProject.path;
       if (filePath.startsWith(projectPath)) {
@@ -80,23 +80,20 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
       }
     }
     return filePath;
-  }, [filePath, activeProject]);
+  };
 
-  const handleLineClick = useCallback(
-    (lineNum: number, e: React.MouseEvent) => {
-      if (e.shiftKey && lastClickedLine.current !== null) {
-        const start = Math.min(lastClickedLine.current, lineNum);
-        const end = Math.max(lastClickedLine.current, lineNum);
-        setSelection({ start, end });
-      } else {
-        setSelection({ start: lineNum, end: lineNum });
-        lastClickedLine.current = lineNum;
-      }
-    },
-    [],
-  );
+  const handleLineClick = (lineNum: number, e: React.MouseEvent) => {
+    if (e.shiftKey && lastClickedLine.current !== null) {
+      const start = Math.min(lastClickedLine.current, lineNum);
+      const end = Math.max(lastClickedLine.current, lineNum);
+      setSelection({ start, end });
+    } else {
+      setSelection({ start: lineNum, end: lineNum });
+      lastClickedLine.current = lineNum;
+    }
+  };
 
-  const copyReference = useCallback(async () => {
+  const copyReference = async () => {
     if (!selection) return;
     const relativePath = getRelativePath();
     const ref =
@@ -106,15 +103,12 @@ export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
     await navigator.clipboard.writeText(ref);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [selection, getRelativePath]);
+  };
 
-  const isLineSelected = useCallback(
-    (lineNum: number) => {
-      if (!selection) return false;
-      return lineNum >= selection.start && lineNum <= selection.end;
-    },
-    [selection],
-  );
+  const isLineSelected = (lineNum: number) => {
+    if (!selection) return false;
+    return lineNum >= selection.start && lineNum <= selection.end;
+  };
 
   if (lines.length === 0) {
     return (

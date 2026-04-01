@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@/lib/ipc";
 import type {
   GitFileStatus,
@@ -52,18 +52,17 @@ export function useGitState(projectPath: string) {
   const cwdRef = useRef(projectPath);
   cwdRef.current = projectPath;
 
-  const clearSelection = useCallback(() => {
+  const clearSelection = () => {
     setState((s) => ({ ...s, selectedFile: null, selectedDiff: null }));
-  }, []);
+  };
 
-  const refreshStatus = useCallback(async () => {
+  const refreshStatus = async () => {
     const cwd = cwdRef.current;
     try {
       const statusResult = await invoke<
         GitResult & { files?: GitFileStatus[] }
       >("git_status", { cwd });
 
-      // Guard against stale response if project changed
       if (cwd !== cwdRef.current) return;
 
       if (!statusResult.ok) {
@@ -101,134 +100,108 @@ export function useGitState(projectPath: string) {
         error: "Failed to get git status",
       }));
     }
-  }, []);
+  };
 
-  // Auto-refresh on mount and interval
   useEffect(() => {
     setState(initialState);
     refreshStatus();
     const interval = setInterval(refreshStatus, 5000);
     return () => clearInterval(interval);
-  }, [projectPath, refreshStatus]);
+  }, [projectPath]);
 
-  const selectFile = useCallback(
-    async (path: string, staged: boolean) => {
-      const cwd = cwdRef.current;
-      setState((s) => ({ ...s, selectedFile: { path, staged } }));
+  const selectFile = async (path: string, staged: boolean) => {
+    const cwd = cwdRef.current;
+    setState((s) => ({ ...s, selectedFile: { path, staged } }));
 
-      // Check if file is untracked/new — show full content instead of empty diff
-      const isUntracked = state.untracked.some((f) => f.path === path);
-      const isNewStaged =
-        staged &&
-        state.staged.some((f) => f.path === path && f.indexStatus === "A");
+    const isUntracked = state.untracked.some((f) => f.path === path);
+    const isNewStaged =
+      staged &&
+      state.staged.some((f) => f.path === path && f.indexStatus === "A");
 
-      if (isUntracked || isNewStaged) {
-        try {
-          const fullPath = `${cwd}/${path}`;
-          const fileResult = await invoke<{ type: string; content?: string }>(
-            "read_file_content",
-            { path: fullPath },
-          );
-          if (fileResult.type === "Text" && fileResult.content) {
-            // Construct a synthetic diff showing the entire file as additions
-            const lines = fileResult.content.split("\n");
-            const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n`;
-            const body = lines.map((l) => `+${l}`).join("\n");
-            setState((s) => ({ ...s, selectedDiff: header + body }));
-          } else {
-            setState((s) => ({ ...s, selectedDiff: null }));
-          }
-        } catch {
+    if (isUntracked || isNewStaged) {
+      try {
+        const fullPath = `${cwd}/${path}`;
+        const fileResult = await invoke<{ type: string; content?: string }>(
+          "read_file_content",
+          { path: fullPath },
+        );
+        if (fileResult.type === "Text" && fileResult.content) {
+          const lines = fileResult.content.split("\n");
+          const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n`;
+          const body = lines.map((l) => `+${l}`).join("\n");
+          setState((s) => ({ ...s, selectedDiff: header + body }));
+        } else {
           setState((s) => ({ ...s, selectedDiff: null }));
         }
-        return;
-      }
-
-      try {
-        const result = await invoke<GitResult & { diff?: string }>(
-          "git_file_diff",
-          { cwd, filePath: path, staged },
-        );
-        setState((s) => ({
-          ...s,
-          selectedDiff: result.ok ? ((result.diff as string) ?? "") : null,
-        }));
       } catch {
         setState((s) => ({ ...s, selectedDiff: null }));
       }
-    },
-    [state.untracked, state.staged],
-  );
+      return;
+    }
 
-  const gitFileAction = useCallback(
-    async (command: string, paths: string[]) => {
-      try {
-        const result = await invoke<GitResult>(command, {
-          cwd: cwdRef.current,
-          paths,
-        });
-        await refreshStatus();
-        clearSelection();
-        return result;
-      } catch {
-        await refreshStatus();
-        clearSelection();
-        return { ok: false, error: "Operation failed" };
-      }
-    },
-    [refreshStatus, clearSelection],
-  );
+    try {
+      const result = await invoke<GitResult & { diff?: string }>(
+        "git_file_diff",
+        { cwd, filePath: path, staged },
+      );
+      setState((s) => ({
+        ...s,
+        selectedDiff: result.ok ? ((result.diff as string) ?? "") : null,
+      }));
+    } catch {
+      setState((s) => ({ ...s, selectedDiff: null }));
+    }
+  };
 
-  const stage = useCallback(
-    (paths: string[]) => gitFileAction("git_stage", paths),
-    [gitFileAction],
-  );
-
-  const unstage = useCallback(
-    (paths: string[]) => gitFileAction("git_unstage", paths),
-    [gitFileAction],
-  );
-
-  const discard = useCallback(
-    (paths: string[]) => gitFileAction("git_discard", paths),
-    [gitFileAction],
-  );
-
-  const commit = useCallback(
-    async (message: string) => {
-      setState((s) => ({ ...s, isCommitting: true }));
-      try {
-        const result = await invoke<GitResult & { hash?: string }>(
-          "git_commit",
-          { cwd: cwdRef.current, message },
-        );
-        await refreshStatus();
-        setState((s) => ({ ...s, isCommitting: false }));
-        clearSelection();
-        return result;
-      } catch {
-        setState((s) => ({ ...s, isCommitting: false }));
-        return { ok: false, error: "Commit failed" };
-      }
-    },
-    [refreshStatus, clearSelection],
-  );
-
-  const push = useCallback(
-    async (setUpstream?: boolean) => {
-      setState((s) => ({ ...s, isPushing: true }));
-      const result = await invoke<GitResult>("git_push", {
+  const gitFileAction = async (command: string, paths: string[]) => {
+    try {
+      const result = await invoke<GitResult>(command, {
         cwd: cwdRef.current,
-        setUpstream,
+        paths,
       });
       await refreshStatus();
-      setState((s) => ({ ...s, isPushing: false }));
+      clearSelection();
       return result;
-    },
-    [refreshStatus],
-  );
+    } catch {
+      await refreshStatus();
+      clearSelection();
+      return { ok: false, error: "Operation failed" };
+    }
+  };
 
-  const pull = useCallback(async () => {
+  const stage = (paths: string[]) => gitFileAction("git_stage", paths);
+  const unstage = (paths: string[]) => gitFileAction("git_unstage", paths);
+  const discard = (paths: string[]) => gitFileAction("git_discard", paths);
+
+  const commit = async (message: string) => {
+    setState((s) => ({ ...s, isCommitting: true }));
+    try {
+      const result = await invoke<GitResult & { hash?: string }>(
+        "git_commit",
+        { cwd: cwdRef.current, message },
+      );
+      await refreshStatus();
+      setState((s) => ({ ...s, isCommitting: false }));
+      clearSelection();
+      return result;
+    } catch {
+      setState((s) => ({ ...s, isCommitting: false }));
+      return { ok: false, error: "Commit failed" };
+    }
+  };
+
+  const push = async (setUpstream?: boolean) => {
+    setState((s) => ({ ...s, isPushing: true }));
+    const result = await invoke<GitResult>("git_push", {
+      cwd: cwdRef.current,
+      setUpstream,
+    });
+    await refreshStatus();
+    setState((s) => ({ ...s, isPushing: false }));
+    return result;
+  };
+
+  const pull = async () => {
     setState((s) => ({ ...s, isPulling: true }));
     const result = await invoke<GitResult>("git_pull", {
       cwd: cwdRef.current,
@@ -236,14 +209,14 @@ export function useGitState(projectPath: string) {
     await refreshStatus();
     setState((s) => ({ ...s, isPulling: false }));
     return result;
-  }, [refreshStatus]);
+  };
 
-  const fetch = useCallback(async () => {
+  const fetch = async () => {
     await invoke("git_fetch", { cwd: cwdRef.current });
     await refreshStatus();
-  }, [refreshStatus]);
+  };
 
-  const loadBranches = useCallback(async () => {
+  const loadBranches = async () => {
     const result = await invoke<GitResult & { branches?: GitBranch[] }>(
       "git_branches",
       { cwd: cwdRef.current },
@@ -251,55 +224,46 @@ export function useGitState(projectPath: string) {
     if (result.ok) {
       setState((s) => ({ ...s, branches: result.branches ?? [] }));
     }
-  }, []);
+  };
 
-  const switchBranch = useCallback(
-    async (branch: string) => {
-      const result = await invoke<GitResult>("git_switch_branch", {
-        cwd: cwdRef.current,
-        branch,
-      });
-      if (result.ok) {
-        await refreshStatus();
-        await loadBranches();
-      }
-      return result;
-    },
-    [refreshStatus, loadBranches],
-  );
+  const switchBranch = async (branch: string) => {
+    const result = await invoke<GitResult>("git_switch_branch", {
+      cwd: cwdRef.current,
+      branch,
+    });
+    if (result.ok) {
+      await refreshStatus();
+      await loadBranches();
+    }
+    return result;
+  };
 
-  const createBranch = useCallback(
-    async (branch: string, checkout: boolean) => {
-      const result = await invoke<GitResult>("git_create_branch", {
-        cwd: cwdRef.current,
-        branch,
-        checkout,
-      });
-      if (result.ok) {
-        await refreshStatus();
-        await loadBranches();
-      }
-      return result;
-    },
-    [refreshStatus, loadBranches],
-  );
+  const createBranch = async (branch: string, checkout: boolean) => {
+    const result = await invoke<GitResult>("git_create_branch", {
+      cwd: cwdRef.current,
+      branch,
+      checkout,
+    });
+    if (result.ok) {
+      await refreshStatus();
+      await loadBranches();
+    }
+    return result;
+  };
 
-  const deleteBranch = useCallback(
-    async (branch: string, force?: boolean) => {
-      const result = await invoke<GitResult>("git_delete_branch", {
-        cwd: cwdRef.current,
-        branch,
-        force,
-      });
-      if (result.ok) {
-        await loadBranches();
-      }
-      return result;
-    },
-    [loadBranches],
-  );
+  const deleteBranch = async (branch: string, force?: boolean) => {
+    const result = await invoke<GitResult>("git_delete_branch", {
+      cwd: cwdRef.current,
+      branch,
+      force,
+    });
+    if (result.ok) {
+      await loadBranches();
+    }
+    return result;
+  };
 
-  const loadLog = useCallback(async (count = 50, skip = 0) => {
+  const loadLog = async (count = 50, skip = 0) => {
     const result = await invoke<GitResult & { entries?: GitLogEntry[] }>(
       "git_log",
       { cwd: cwdRef.current, count, skip },
@@ -313,9 +277,9 @@ export function useGitState(projectPath: string) {
             : [...s.log, ...(result.entries ?? [])],
       }));
     }
-  }, []);
+  };
 
-  const selectCommit = useCallback(async (hash: string) => {
+  const selectCommit = async (hash: string) => {
     try {
       const result = await invoke<GitResult & GitCommitDetail>(
         "git_show_commit",
@@ -340,11 +304,11 @@ export function useGitState(projectPath: string) {
     } catch {
       setState((s) => ({ ...s, selectedCommit: null }));
     }
-  }, []);
+  };
 
-  const clearSelectedCommit = useCallback(() => {
+  const clearSelectedCommit = () => {
     setState((s) => ({ ...s, selectedCommit: null }));
-  }, []);
+  };
 
   return {
     ...state,

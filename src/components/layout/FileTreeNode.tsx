@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconChevronRight,
   IconChevronDown,
@@ -66,7 +66,7 @@ export function FileTreeNode({
 
   const { openFileTab } = useAppContext();
 
-  const toggle = useCallback(async () => {
+  const toggle = async () => {
     if (!entry.is_dir) {
       openFileTab(entry.path);
       return;
@@ -79,7 +79,7 @@ export function FileTreeNode({
       setChildren(entries);
     }
     setExpanded((v) => !v);
-  }, [entry, expanded, openFileTab, showIgnored]);
+  };
 
   useEffect(() => {
     if (expanded && entry.is_dir && refreshSignal > 0) {
@@ -104,25 +104,19 @@ export function FileTreeNode({
 
   const isSelected = selectedPaths.has(entry.path);
 
-  const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      onSelect(entry.path, e);
-      toggle();
-    },
-    [entry.path, onSelect, toggle],
-  );
+  const handleClick = (e: React.MouseEvent) => {
+    onSelect(entry.path, e);
+    toggle();
+  };
 
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!isSelected) {
-        onSelect(entry.path, e);
-      }
-      onContextMenu({ entry, x: e.clientX, y: e.clientY });
-    },
-    [entry, isSelected, onSelect, onContextMenu],
-  );
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isSelected) {
+      onSelect(entry.path, e);
+    }
+    onContextMenu({ entry, x: e.clientX, y: e.clientY });
+  };
 
   return (
     <>

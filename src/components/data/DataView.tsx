@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useDataState } from "@/hooks/useDataState";
 import { ConnectionList } from "./ConnectionList";
 import { ConnectionForm } from "./ConnectionForm";
@@ -32,35 +32,29 @@ export function DataView({
     ? data.connectionStatuses.get(data.activeConnectionId)
     : undefined;
 
-  const handleAdd = useCallback(() => {
+  const handleAdd = () => {
     setEditingConnection(null);
     setFormOpen(true);
-  }, []);
+  };
 
-  const handleEdit = useCallback((config: ConnectionConfig) => {
+  const handleEdit = (config: ConnectionConfig) => {
     setEditingConnection(config);
     setFormOpen(true);
-  }, []);
+  };
 
-  const handleSelect = useCallback(
-    (id: string) => {
-      const status = data.connectionStatuses.get(id);
-      if (status === "connected") {
-        data.setActiveConnection(id);
-      }
-    },
-    [data.connectionStatuses, data.setActiveConnection],
-  );
+  const handleSelect = (id: string) => {
+    const status = data.connectionStatuses.get(id);
+    if (status === "connected") {
+      data.setActiveConnection(id);
+    }
+  };
 
-  const handleConnect = useCallback(
-    async (id: string) => {
-      const result = await data.connect(id);
-      if (result.ok) {
-        data.setActiveConnection(id);
-      }
-    },
-    [data.connect, data.setActiveConnection],
-  );
+  const handleConnect = async (id: string) => {
+    const result = await data.connect(id);
+    if (result.ok) {
+      data.setActiveConnection(id);
+    }
+  };
 
   return (
     <div
