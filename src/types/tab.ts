@@ -32,13 +32,18 @@ export interface DataTab extends BaseTab {
   connectionId?: string;
 }
 
+export interface EventLogTab extends BaseTab {
+  type: "event-log";
+}
+
 export type Tab =
   | TerminalTab
   | FileTab
   | BrowserTab
   | GitTab
   | ClaudeTab
-  | DataTab;
+  | DataTab
+  | EventLogTab;
 
 export type SplitDirection = "horizontal" | "vertical";
 

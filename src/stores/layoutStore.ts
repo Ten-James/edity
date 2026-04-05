@@ -10,6 +10,7 @@ import type {
   GitTab,
   ClaudeTab,
   DataTab,
+  EventLogTab,
   AllTab,
   Pane,
   ProjectPaneState,
@@ -393,6 +394,24 @@ subscribe((event) => {
             title: "Data",
             type: "data",
             connectionId: event.connectionId,
+          }),
+        ),
+      }));
+      break;
+    }
+
+    case "tab-create-event-log": {
+      const projectId = getActiveProjectId();
+      if (!projectId) break;
+      useLayoutStore.setState((s) => ({
+        projectPanes: openOrCreateSingletonTab(
+          s.projectPanes,
+          projectId,
+          (t) => t.type === "event-log",
+          (): EventLogTab => ({
+            id: crypto.randomUUID(),
+            title: "Event Log",
+            type: "event-log",
           }),
         ),
       }));

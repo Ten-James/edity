@@ -71,6 +71,11 @@ export interface TabCreateDataEvent {
   connectionId?: string;
 }
 
+/** Open (or focus) the singleton Event Log tab. */
+export interface TabCreateEventLogEvent {
+  type: "tab-create-event-log";
+}
+
 /** Close a tab by ID. */
 export interface TabCloseEvent {
   type: "tab-close";
@@ -238,6 +243,7 @@ export type EdityEvent =
   | TabCreateGitEvent
   | TabCreateClaudeEvent
   | TabCreateDataEvent
+  | TabCreateEventLogEvent
   | TabCloseEvent
   | TabCloseByFilePathEvent
   | TabSetActiveEvent

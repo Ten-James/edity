@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { invoke, listen } from "@/lib/ipc";
 
 export type FileContent =
@@ -13,8 +13,9 @@ export function useFileContent(tabId: string, filePath: string) {
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFetchedRef = useRef(false);
+  const bustRef = useRef(0);
 
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       if (!hasFetchedRef.current) {
         setLoading(true);
@@ -24,7 +25,8 @@ export function useFileContent(tabId: string, filePath: string) {
         path: filePath,
       });
       if (result.type === "Image") {
-        result.url = `${result.url}?t=${Date.now()}`;
+        bustRef.current += 1;
+        result.url = `${result.url}?v=${bustRef.current}`;
       }
       setContent(result);
     } catch (e) {
@@ -33,9 +35,11 @@ export function useFileContent(tabId: string, filePath: string) {
       hasFetchedRef.current = true;
       setLoading(false);
     }
-  };
+  }, [filePath]);
 
   useEffect(() => {
+    hasFetchedRef.current = false;
+    bustRef.current = 0;
     fetchContent();
   }, [fetchContent]);
 

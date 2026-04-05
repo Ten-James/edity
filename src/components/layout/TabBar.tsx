@@ -5,6 +5,7 @@ import {
   IconGitBranch,
   IconRobot,
   IconDatabase,
+  IconActivityHeartbeat,
   IconX,
   IconPlus,
   IconLayoutColumns,
@@ -68,6 +69,8 @@ export function TabBar({ paneId }: TabBarProps) {
         return <IconRobot size={14} />;
       case "data":
         return <IconDatabase size={14} />;
+      case "event-log":
+        return <IconActivityHeartbeat size={14} />;
     }
   }
 

@@ -5,6 +5,7 @@ import { BrowserView } from "@/components/BrowserView";
 import { GitView } from "@/components/git/GitView";
 import { ClaudeView } from "@/components/claude/ClaudeView";
 import { DataView } from "@/components/data/DataView";
+import { EventLogView } from "@/components/EventLogView";
 import { TabBar } from "./TabBar";
 import type { AllTab } from "@/types/tab";
 
@@ -90,6 +91,13 @@ export function PaneContainer({
                   isActive={isActive}
                   projectId={tab.projectId}
                   connectionId={tab.connectionId}
+                />
+              );
+            case "event-log":
+              return (
+                <EventLogView
+                  key={tab.id}
+                  isActive={isActive}
                 />
               );
             default:

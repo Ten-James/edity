@@ -25,7 +25,12 @@ import {
   IconSettings,
   IconSearch,
   IconGitMerge,
+  IconBug,
+  IconActivityHeartbeat,
 } from "@tabler/icons-react";
+import { invoke } from "@/lib/ipc";
+import { toast } from "sonner";
+import { getConsoleLog } from "@/lib/console-capture";
 
 export interface Command {
   id: string;
@@ -282,5 +287,34 @@ export const COMMANDS: Command[] = [
       );
     },
     execute: () => dispatch({ type: "run-stop" }),
+  },
+
+  {
+    id: "tab.open-event-log",
+    label: "Open Event Log",
+    category: "Tab",
+    icon: IconActivityHeartbeat,
+    execute: () => dispatch({ type: "tab-create-event-log" }),
+  },
+
+  // Debug
+  {
+    id: "debug.create-bug-report",
+    label: "Create Bug Report",
+    category: "Debug",
+    icon: IconBug,
+    alwaysActive: true,
+    execute: async () => {
+      const dom = document.documentElement.outerHTML;
+      const consoleLog = getConsoleLog();
+      const result = await invoke<
+        { ok: true; filePath: string } | { ok: false; error: string }
+      >("create_bug_report", { dom, consoleLog });
+      if (result.ok) {
+        toast.success("Bug report saved");
+      } else {
+        toast.error(`Failed to create bug report: ${result.error}`);
+      }
+    },
   },
 ];

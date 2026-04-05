@@ -9,6 +9,7 @@ import { useCommands } from "@/hooks/useCommands";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { dispatch } from "@/stores/eventBus";
+import "@/stores/mcpStore"; // side-effect: registers MCP IPC listeners
 import "./App.css";
 
 function AppShell() {

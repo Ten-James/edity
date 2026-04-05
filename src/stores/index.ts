@@ -6,3 +6,4 @@ export { useLayoutStore, useCurrentPaneState, useAllTabs } from "./layoutStore";
 export { useGitStore } from "./gitStore";
 export { useRunStore } from "./runStore";
 export { useClaudeStore } from "./claudeStore";
+export { useMcpStore } from "./mcpStore";

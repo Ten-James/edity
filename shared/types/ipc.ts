@@ -208,6 +208,14 @@ export interface IpcHandlerMap {
   get_settings: { args: undefined; ret: GlobalSettings };
   save_settings: { args: { settings: GlobalSettings }; ret: void };
 
+  // MCP
+  mcp_start: { args: { port?: number }; ret: { ok: true; port: number } | ErrorResult };
+  mcp_stop: { args: undefined; ret: Result };
+  mcp_status: { args: undefined; ret: { running: boolean } };
+
+  // Bug Report
+  create_bug_report: { args: { dom: string; consoleLog: string }; ret: { ok: true; filePath: string } | ErrorResult };
+
   // Dialog
   "show-open-dialog": { args: { properties?: string[]; title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }; ret: { canceled: boolean; filePaths: string[] } };
 }
@@ -218,6 +226,7 @@ export interface IpcEventMap {
   "claude-notification": { tabId: string };
   "directory-changed": void;
   "fullscreen-changed": boolean;
+  "mcp-dispatch": Record<string, unknown>;
   [key: `pty-output-${string}`]: string;
   [key: `file-changed-${string}`]: void;
   [key: `project-run-exit-${string}`]: void;

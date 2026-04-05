@@ -6,7 +6,9 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 const CONFIG_DIR = path.join(os.homedir(), ".config", "edity");
 const LOG_PATH = path.join(CONFIG_DIR, "edity-dev.log");
 const MODULE_PAD = 16;
+const MAX_LOG_BUFFER = 10000;
 
+const logBuffer: string[] = [];
 let stream: fs.WriteStream | null = null;
 const origConsole = {
   log: console.log.bind(console),
@@ -33,6 +35,8 @@ function formatLine(level: string, mod: string, args: unknown[]): string {
 
 function writeLine(level: string, mod: string, args: unknown[]): void {
   const line = formatLine(level, mod, args);
+  if (logBuffer.length >= MAX_LOG_BUFFER) logBuffer.shift();
+  logBuffer.push(line);
   if (stream) stream.write(line + "\n");
 }
 
@@ -46,9 +50,18 @@ export interface Logger {
 export function createLogger(mod: string): Logger {
   if (!isDev) {
     return {
-      info: (...args: unknown[]) => origConsole.log(`[${mod}]`, ...args),
-      warn: (...args: unknown[]) => origConsole.warn(`[${mod}]`, ...args),
-      error: (...args: unknown[]) => origConsole.error(`[${mod}]`, ...args),
+      info(...args: unknown[]) {
+        origConsole.log(`[${mod}]`, ...args);
+        writeLine("INFO", mod, args);
+      },
+      warn(...args: unknown[]) {
+        origConsole.warn(`[${mod}]`, ...args);
+        writeLine("WARN", mod, args);
+      },
+      error(...args: unknown[]) {
+        origConsole.error(`[${mod}]`, ...args);
+        writeLine("ERROR", mod, args);
+      },
       debug: () => {},
     };
   }
@@ -90,6 +103,10 @@ export function setupDevLogger(): void {
     origConsole.error(...args);
     writeLine("ERROR", "console", args);
   };
+}
+
+export function getLogBuffer(): string {
+  return logBuffer.join("\n");
 }
 
 export function flushAndClose(): void {

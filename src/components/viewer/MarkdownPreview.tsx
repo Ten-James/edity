@@ -1,13 +1,14 @@
 import {
   useEffect,
+  useRef,
   useState,
   type ComponentPropsWithoutRef,
 } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MarkdownPreviewProps {
   content: string;
@@ -23,6 +24,7 @@ function ShikiCodeBlock({
 }) {
   const { activeTheme } = useTheme();
   const [html, setHtml] = useState<string | null>(null);
+  const prevHtmlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +55,10 @@ function ShikiCodeBlock({
         lang: actualLang,
         theme: shikiTheme,
       });
-      if (!cancelled) setHtml(result);
+      if (!cancelled) {
+        prevHtmlRef.current = result;
+        setHtml(result);
+      }
     }
 
     highlight();
@@ -62,7 +67,9 @@ function ShikiCodeBlock({
     };
   }, [children, language, activeTheme]);
 
-  if (!html) {
+  const displayHtml = html ?? prevHtmlRef.current;
+
+  if (!displayHtml) {
     return (
       <pre className="bg-muted p-4 rounded-md overflow-x-auto text-xs">
         <code>{children}</code>
@@ -73,7 +80,7 @@ function ShikiCodeBlock({
   return (
     <div
       className="rounded-md overflow-x-auto text-xs [&_pre]:p-4 [&_pre]:m-0 [&_pre]:rounded-md"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: displayHtml }}
     />
   );
 }
@@ -93,7 +100,7 @@ export function MarkdownPreview({ content, filePath }: MarkdownPreviewProps) {
   };
 
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-auto">
       <div className="max-w-4xl mx-auto px-8 py-6">
         <div
           className={[
@@ -141,6 +148,7 @@ export function MarkdownPreview({ content, filePath }: MarkdownPreviewProps) {
         >
           <Markdown
             remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={{
               code(props: ComponentPropsWithoutRef<"code">) {
                 const { children, className, ...rest } = props;
@@ -188,6 +196,6 @@ export function MarkdownPreview({ content, filePath }: MarkdownPreviewProps) {
           </Markdown>
         </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 }

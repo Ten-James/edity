@@ -42,10 +42,16 @@ export function ClaudeView({ isActive, projectPath }: ClaudeViewProps) {
   const elapsed = useElapsedTime(isBusy);
 
   useEffect(() => {
-    if (conversation.status === "streaming" && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [conversation.messages, conversation.status]);
+    if (conversation.status !== "streaming") return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let rafId = requestAnimationFrame(function scroll() {
+      el.scrollTop = el.scrollHeight;
+      rafId = requestAnimationFrame(scroll);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [conversation.status]);
 
   const taskTools = conversation.messages.flatMap((m) =>
     m.toolUses.filter((t) => TASK_TOOL_NAMES.has(t.name)),

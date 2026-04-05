@@ -1,3 +1,4 @@
+import "./lib/console-capture";
 import ReactDOM from "react-dom/client";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { TooltipProvider } from "./components/ui/tooltip";

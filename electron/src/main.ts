@@ -23,6 +23,9 @@ import { ensureClaudeHooks, registerClaudeDetectionHandlers } from "./ipc/claude
 import { registerClaudeSdkHandlers, cleanupAllSessions } from "./ipc/claude-sdk";
 import { registerSettingsHandlers } from "./ipc/settings";
 import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
+import { registerBugReportHandlers } from "./ipc/bug-report";
+import { registerMcpHandlers } from "./ipc/mcp";
+import { stopEventLogServer } from "./mcp/event-log-server";
 import { setupDevLogger, flushAndClose } from "./lib/logger";
 
 setupDevLogger();
@@ -73,6 +76,8 @@ registerClaudeDetectionHandlers();
 registerClaudeSdkHandlers(() => mainWindow);
 registerSettingsHandlers();
 registerDataHandlers();
+registerBugReportHandlers();
+registerMcpHandlers();
 
 // --- App Lifecycle ---
 
@@ -134,6 +139,7 @@ app.on("window-all-closed", () => {
   tabClaudeState.clear();
   cleanupAllSessions();
   cleanupDataConnections();
+  stopEventLogServer().catch(() => {});
   flushAndClose();
 
   app.quit();
