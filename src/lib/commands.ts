@@ -2,6 +2,7 @@ import { dispatch } from "@/stores/eventBus";
 import { useProjectStore } from "@/stores/projectStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useRunStore } from "@/stores/runStore";
+import { findLeafByPaneId, firstLeaf, countLeaves } from "@/lib/paneTree";
 import {
   IconTerminal2,
   IconX,
@@ -50,9 +51,9 @@ function getActiveTabId(): string | null {
   if (!activeProject) return null;
   const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
   if (!state) return null;
-  const pane =
-    state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
-  return pane?.activeTabId ?? null;
+  const leaf =
+    findLeafByPaneId(state.root, state.focusedPaneId) ?? firstLeaf(state.root);
+  return leaf?.pane.activeTabId ?? null;
 }
 
 function getFocusedPaneTabs() {
@@ -60,16 +61,16 @@ function getFocusedPaneTabs() {
   if (!activeProject) return [];
   const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
   if (!state) return [];
-  const pane =
-    state.panes.find((p) => p.id === state.focusedPaneId) ?? state.panes[0];
-  return pane?.tabs ?? [];
+  const leaf =
+    findLeafByPaneId(state.root, state.focusedPaneId) ?? firstLeaf(state.root);
+  return leaf?.pane.tabs ?? [];
 }
 
 function getPaneCount(): number {
   const activeProject = useProjectStore.getState().activeProject;
   if (!activeProject) return 0;
   const state = useLayoutStore.getState().projectPanes.get(activeProject.id);
-  return state?.panes.length ?? 0;
+  return state ? countLeaves(state.root) : 0;
 }
 
 function cycleProject(direction: 1 | -1) {

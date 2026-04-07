@@ -30,6 +30,9 @@ import {
 } from "@/components/ui/context-menu";
 import { useLayoutStore, useCurrentPaneState } from "@/stores/layoutStore";
 import { dispatch } from "@/stores/eventBus";
+import { setDraggingTabId } from "@/stores/dragStore";
+import { flattenPanes } from "@/lib/paneTree";
+import { TAB_DRAG_MIME } from "./PaneDropZones";
 import { cn } from "@/lib/utils";
 import type { Tab } from "@/types/tab";
 
@@ -40,7 +43,7 @@ interface TabBarProps {
 export function TabBar({ paneId }: TabBarProps) {
   const paneState = useCurrentPaneState();
   const dirtyTabs = useLayoutStore((s) => s.dirtyTabs);
-  const panes = paneState?.panes ?? [];
+  const panes = paneState ? flattenPanes(paneState.root) : [];
 
   const pane = panes.find((p) => p.id === paneId);
   const paneTabs = pane?.tabs ?? [];
@@ -77,6 +80,13 @@ export function TabBar({ paneId }: TabBarProps) {
           <ContextMenu key={tab.id}>
             <ContextMenuTrigger asChild>
               <div
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(TAB_DRAG_MIME, tab.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggingTabId(tab.id);
+                }}
+                onDragEnd={() => setDraggingTabId(null)}
                 onClick={() => dispatch({ type: "tab-set-active", tabId: tab.id })}
                 onDoubleClick={() => {
                   if (tab.type === "file" && tab.isTemporary) {
@@ -117,28 +127,24 @@ export function TabBar({ paneId }: TabBarProps) {
             </ContextMenuTrigger>
 
             <ContextMenuContent>
-              {panes.length < 2 && (
-                <>
-                  <ContextMenuItem
-                    onClick={() =>
-                      dispatch({ type: "layout-split", direction: "horizontal", tabId: tab.id })
-                    }
-                  >
-                    <IconLayoutColumns size={14} />
-                    Split Right
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() =>
-                      dispatch({ type: "layout-split", direction: "vertical", tabId: tab.id })
-                    }
-                  >
-                    <IconLayoutRows size={14} />
-                    Split Down
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                </>
-              )}
-              {panes.length === 2 && otherPaneId && (
+              <ContextMenuItem
+                onClick={() =>
+                  dispatch({ type: "layout-split", direction: "horizontal", tabId: tab.id })
+                }
+              >
+                <IconLayoutColumns size={14} />
+                Split Right
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() =>
+                  dispatch({ type: "layout-split", direction: "vertical", tabId: tab.id })
+                }
+              >
+                <IconLayoutRows size={14} />
+                Split Down
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              {otherPaneId && (
                 <>
                   <ContextMenuItem
                     onClick={() =>

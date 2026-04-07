@@ -10,6 +10,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import type { LayoutNode, ProjectPaneState } from "@/types/tab";
 
 export function MainContent() {
   const projects = useProjectStore((s) => s.projects);
@@ -30,47 +31,18 @@ export function MainContent() {
         const state = projectPanes.get(project.id);
         if (!state) return null;
         const isActive = project.id === activeProject?.id;
-        const { panes } = state;
-        if (panes.length === 0) return null;
-
-        // Always render the same ResizablePanelGroup tree regardless of pane
-        // count, with stable keys. Combined with the TabHost portal layer,
-        // this guarantees that splitting or unsplitting never remounts pane
-        // content.
-        const defaultSize = 100 / panes.length;
-
         return (
           <div
             key={project.id}
             className="flex-1 flex overflow-hidden"
             style={{ display: isActive ? "flex" : "none" }}
           >
-            <ResizablePanelGroup
-              id={`pane-group-${project.id}`}
-              orientation={state.splitDirection}
-              className="flex-1"
-            >
-              {panes.map((pane, idx) => (
-                <Fragment key={pane.id}>
-                  {idx > 0 && <ResizableHandle withHandle />}
-                  <ResizablePanel
-                    id={pane.id}
-                    defaultSize={defaultSize}
-                    minSize={20}
-                    className="flex flex-col"
-                  >
-                    <PaneContainer
-                      key={pane.id}
-                      paneId={pane.id}
-                      isFocused={
-                        panes.length === 1 || pane.id === state.focusedPaneId
-                      }
-                      showTabBar={isActive}
-                    />
-                  </ResizablePanel>
-                </Fragment>
-              ))}
-            </ResizablePanelGroup>
+            <NodeRenderer
+              node={state.root}
+              state={state}
+              isActive={isActive}
+              projectId={project.id}
+            />
           </div>
         );
       })}
@@ -78,4 +50,71 @@ export function MainContent() {
       {sidebarPanel === "git" && <GitSidebar />}
     </div>
   );
+}
+
+interface NodeRendererProps {
+  node: LayoutNode;
+  state: ProjectPaneState;
+  isActive: boolean;
+  projectId: string;
+}
+
+/**
+ * Recursively renders a layout tree as nested ResizablePanelGroups.
+ *
+ * - A `leaf` becomes a single PaneContainer.
+ * - A `split` becomes a ResizablePanelGroup whose two ResizablePanel
+ *   children recurse on the split's children.
+ *
+ * The PanelGroup `id` is the split node id, and each ResizablePanel `id` is
+ * derived from the child subtree's identity (leaf pane id or nested split
+ * id). This gives react-resizable-panels stable identifiers across renders
+ * so it doesn't lose its layout when an unrelated branch updates.
+ */
+function NodeRenderer({
+  node,
+  state,
+  isActive,
+  projectId,
+}: NodeRendererProps) {
+  if (node.type === "leaf") {
+    return (
+      <PaneContainer
+        paneId={node.pane.id}
+        isFocused={node.pane.id === state.focusedPaneId}
+        showTabBar={isActive}
+      />
+    );
+  }
+
+  return (
+    <ResizablePanelGroup
+      id={`panel-group-${node.id}`}
+      orientation={node.orientation}
+      className="flex-1"
+    >
+      {node.children.map((child, idx) => (
+        <Fragment key={childKey(child)}>
+          {idx > 0 && <ResizableHandle withHandle />}
+          <ResizablePanel
+            id={`panel-${childKey(child)}`}
+            defaultSize="50%"
+            minSize="10%"
+            className="flex flex-col"
+          >
+            <NodeRenderer
+              node={child}
+              state={state}
+              isActive={isActive}
+              projectId={projectId}
+            />
+          </ResizablePanel>
+        </Fragment>
+      ))}
+    </ResizablePanelGroup>
+  );
+}
+
+function childKey(node: LayoutNode): string {
+  return node.type === "leaf" ? node.pane.id : node.id;
 }

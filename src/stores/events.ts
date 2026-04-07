@@ -154,6 +154,18 @@ export interface LayoutMoveTabEvent {
   targetPaneId: string;
 }
 
+/**
+ * Drag-and-drop a tab onto a pane drop zone. `center` moves the tab into
+ * the target pane (same as layout-move-tab); the four edge zones split the
+ * target pane in half and place the dragged tab in the new sub-pane.
+ */
+export interface LayoutDropTabEvent {
+  type: "layout-drop-tab";
+  tabId: string;
+  targetPaneId: string;
+  zone: import("@/types/tab").DropZone;
+}
+
 /** Set the focused pane. */
 export interface LayoutFocusPaneEvent {
   type: "layout-focus-pane";
@@ -276,6 +288,7 @@ export type EdityEvent =
   | LayoutSplitEvent
   | LayoutUnsplitEvent
   | LayoutMoveTabEvent
+  | LayoutDropTabEvent
   | LayoutFocusPaneEvent
   | LayoutFocusOtherPaneEvent
   | LayoutToggleSidebarEvent

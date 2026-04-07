@@ -2,6 +2,17 @@ import { create } from "zustand";
 import { subscribe } from "./eventBus";
 import { invoke } from "@/lib/ipc";
 import { useProjectStore } from "./projectStore";
+import {
+  findLeafByPaneId,
+  findLeafByTabId,
+  firstLeaf,
+  getLeaves,
+  makeLeaf,
+  makePane,
+  removeLeaf,
+  splitLeafByZone,
+  updatePane,
+} from "@/lib/paneTree";
 import type {
   Tab,
   TerminalTab,
@@ -17,7 +28,7 @@ import type {
   ProjectPaneState,
 } from "@/types/tab";
 
-// ─── Pure helpers (lifted from useTabManager.ts) ────────────────
+// ─── Pure helpers ──────────────────────────────────────────────
 
 let globalTabCounter = 0;
 
@@ -39,29 +50,12 @@ function makeTerminalTab(opts?: {
   };
 }
 
-function makePane(tabs?: Tab[]): Pane {
-  const paneTabs = tabs ?? [];
-  return {
-    id: crypto.randomUUID(),
-    tabs: paneTabs,
-    activeTabId: paneTabs[0]?.id ?? null,
-  };
-}
-
 function makeDefaultState(): ProjectPaneState {
   const pane = makePane();
   return {
-    panes: [pane],
+    root: makeLeaf(pane),
     focusedPaneId: pane.id,
-    splitDirection: "horizontal",
   };
-}
-
-function findPaneForTab(
-  state: ProjectPaneState,
-  tabId: string,
-): Pane | undefined {
-  return state.panes.find((p) => p.tabs.some((t) => t.id === tabId));
 }
 
 function updatePaneInState(
@@ -69,30 +63,43 @@ function updatePaneInState(
   paneId: string,
   updater: (pane: Pane) => Pane,
 ): ProjectPaneState {
-  return {
-    ...state,
-    panes: state.panes.map((p) => (p.id === paneId ? updater(p) : p)),
-  };
+  return { ...state, root: updatePane(state.root, paneId, updater) };
 }
 
 function removeTabFromState(
   state: ProjectPaneState,
   tabId: string,
 ): ProjectPaneState {
-  const pane = findPaneForTab(state, tabId);
-  if (!pane) return state;
+  const leaf = findLeafByTabId(state.root, tabId);
+  if (!leaf) return state;
+  const pane = leaf.pane;
   const remaining = pane.tabs.filter((t) => t.id !== tabId);
+
   if (remaining.length === 0) {
-    if (state.panes.length > 1) {
-      const otherPanes = state.panes.filter((p) => p.id !== pane.id);
-      return { ...state, panes: otherPanes, focusedPaneId: otherPanes[0].id };
+    // Pane goes empty: collapse it out of the tree if it has siblings,
+    // otherwise leave the empty pane in place (single-leaf root case).
+    const removed = removeLeaf(state.root, pane.id);
+    if (removed === null) {
+      // Last pane standing — keep the leaf, just clear its tabs.
+      return updatePaneInState(state, pane.id, () => ({
+        ...pane,
+        tabs: [],
+        activeTabId: null,
+      }));
     }
-    return updatePaneInState(state, pane.id, () => ({
-      ...pane,
-      tabs: [],
-      activeTabId: null,
-    }));
+    // Focused pane disappeared — refocus to any remaining leaf.
+    const fallbackLeaf = firstLeaf(removed);
+    return {
+      ...state,
+      root: removed,
+      focusedPaneId:
+        state.focusedPaneId === pane.id
+          ? (fallbackLeaf?.pane.id ?? state.focusedPaneId)
+          : state.focusedPaneId,
+    };
   }
+
+  // Pane survives with at least one tab: pick the next active.
   let newActive = pane.activeTabId;
   if (pane.activeTabId === tabId) {
     const closedIdx = pane.tabs.findIndex((t) => t.id === tabId);
@@ -112,16 +119,16 @@ function updateTabAcrossProjects(
   updater: (tab: Tab) => Tab | null,
 ): Map<string, ProjectPaneState> {
   for (const [projectId, state] of prev) {
-    const pane = findPaneForTab(state, tabId);
-    if (!pane) continue;
-    const tab = pane.tabs.find((t) => t.id === tabId);
+    const leaf = findLeafByTabId(state.root, tabId);
+    if (!leaf) continue;
+    const tab = leaf.pane.tabs.find((t) => t.id === tabId);
     if (!tab) continue;
     const updated = updater(tab);
     if (!updated) return prev;
     const next = new Map(prev);
     next.set(
       projectId,
-      updatePaneInState(state, pane.id, (p) => ({
+      updatePaneInState(state, leaf.pane.id, (p) => ({
         ...p,
         tabs: p.tabs.map((t) => (t.id === tabId ? updated : t)),
       })),
@@ -138,16 +145,16 @@ function openOrCreateSingletonTab(
   factory: () => Tab,
 ): Map<string, ProjectPaneState> {
   const state = prev.get(projectId) ?? makeDefaultState();
-  for (const pane of state.panes) {
-    const existing = pane.tabs.find(predicate);
+  for (const leaf of getLeaves(state.root)) {
+    const existing = leaf.pane.tabs.find(predicate);
     if (existing) {
       const next = new Map(prev);
       next.set(projectId, {
-        ...updatePaneInState(state, pane.id, (p) => ({
+        ...updatePaneInState(state, leaf.pane.id, (p) => ({
           ...p,
           activeTabId: existing.id,
         })),
-        focusedPaneId: pane.id,
+        focusedPaneId: leaf.pane.id,
       });
       return next;
     }
@@ -171,6 +178,51 @@ function addTabToFocusedPane(
     })),
   );
   return next;
+}
+
+/** Move a tab from its current leaf to the target leaf and return the
+ *  full LayoutState with the updated map. Used by both layout-move-tab
+ *  and the center-zone of layout-drop-tab. */
+function moveTabBetweenLeaves(
+  s: LayoutState,
+  projectId: string,
+  state: ProjectPaneState,
+  event: { tabId: string; targetPaneId: string },
+): Partial<LayoutState> {
+  const sourceLeaf = findLeafByTabId(state.root, event.tabId);
+  if (!sourceLeaf) return {};
+  const sourcePane = sourceLeaf.pane;
+  const tab = sourcePane.tabs.find((t) => t.id === event.tabId)!;
+  const remainingSource = sourcePane.tabs.filter((t) => t.id !== event.tabId);
+  const newSourceActive =
+    sourcePane.activeTabId === event.tabId
+      ? (remainingSource[0]?.id ?? null)
+      : sourcePane.activeTabId;
+
+  let nextRoot = updatePane(state.root, event.targetPaneId, (p) => ({
+    ...p,
+    tabs: [...p.tabs, tab],
+    activeTabId: tab.id,
+  }));
+
+  if (remainingSource.length === 0) {
+    const removed = removeLeaf(nextRoot, sourcePane.id);
+    nextRoot = removed ?? nextRoot;
+  } else {
+    nextRoot = updatePane(nextRoot, sourcePane.id, (p) => ({
+      ...p,
+      tabs: remainingSource,
+      activeTabId: newSourceActive,
+    }));
+  }
+
+  const next = new Map(s.projectPanes);
+  next.set(projectId, {
+    ...state,
+    root: nextRoot,
+    focusedPaneId: event.targetPaneId,
+  });
+  return { projectPanes: next };
 }
 
 // ─── Store ──────────────────────────────────────────────────────
@@ -205,13 +257,13 @@ export function useAllTabs(): AllTab[] {
   for (const [projectId, state] of projectPanes) {
     const project = projectMap.get(projectId);
     if (!project) continue;
-    for (const pane of state.panes) {
-      for (const tab of pane.tabs) {
+    for (const leaf of getLeaves(state.root)) {
+      for (const tab of leaf.pane.tabs) {
         result.push({
           ...tab,
           projectId,
           projectPath: project.path,
-          paneId: pane.id,
+          paneId: leaf.pane.id,
         } as AllTab);
       }
     }
@@ -281,21 +333,21 @@ subscribe((event) => {
 
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId) ?? makeDefaultState();
-        const targetPaneId = state.focusedPaneId;
+        const focusedLeaf = findLeafByPaneId(state.root, state.focusedPaneId);
         const targetPane =
-          state.panes.find((p) => p.id === targetPaneId) ?? state.panes[0];
+          focusedLeaf?.pane ?? firstLeaf(state.root)?.pane;
         if (!targetPane) return s;
 
         // Check if file already open in any pane
-        for (const p of state.panes) {
-          const existing = p.tabs.find(
+        for (const leaf of getLeaves(state.root)) {
+          const existing = leaf.pane.tabs.find(
             (t) => t.type === "file" && t.filePath === filePath,
           );
           if (existing) {
             const next = new Map(s.projectPanes);
             next.set(
               projectId,
-              updatePaneInState(state, p.id, (pn) => ({
+              updatePaneInState(state, leaf.pane.id, (pn) => ({
                 ...pn,
                 activeTabId: existing.id,
               })),
@@ -456,9 +508,9 @@ subscribe((event) => {
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
-        const pane = findPaneForTab(state, event.tabId);
-        if (!pane) return s;
-        const closingTab = pane.tabs.find((t) => t.id === event.tabId);
+        const leaf = findLeafByTabId(state.root, event.tabId);
+        if (!leaf) return s;
+        const closingTab = leaf.pane.tabs.find((t) => t.id === event.tabId);
         if (closingTab?.type === "file") {
           invoke("unwatch_file", { tabId: event.tabId }).catch(() => {});
         }
@@ -481,8 +533,8 @@ subscribe((event) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
         const matchingIds: string[] = [];
-        for (const pane of state.panes) {
-          for (const tab of pane.tabs) {
+        for (const leaf of getLeaves(state.root)) {
+          for (const tab of leaf.pane.tabs) {
             if (
               tab.type === "file" &&
               (tab.filePath === event.filePath ||
@@ -513,12 +565,12 @@ subscribe((event) => {
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
-        const pane = findPaneForTab(state, event.tabId);
-        if (!pane || pane.activeTabId === event.tabId) return s;
+        const leaf = findLeafByTabId(state.root, event.tabId);
+        if (!leaf || leaf.pane.activeTabId === event.tabId) return s;
         const next = new Map(s.projectPanes);
         next.set(
           projectId,
-          updatePaneInState(state, pane.id, (p) => ({
+          updatePaneInState(state, leaf.pane.id, (p) => ({
             ...p,
             activeTabId: event.tabId,
           })),
@@ -536,9 +588,9 @@ subscribe((event) => {
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
-        const pane =
-          state.panes.find((p) => p.id === state.focusedPaneId) ??
-          state.panes[0];
+        const focusedLeaf = findLeafByPaneId(state.root, state.focusedPaneId);
+        const fallbackLeaf = firstLeaf(state.root);
+        const pane = focusedLeaf?.pane ?? fallbackLeaf?.pane;
         if (!pane || pane.tabs.length < 2 || !pane.activeTabId) return s;
         const idx = pane.tabs.findIndex((t) => t.id === pane.activeTabId);
         const nextTab =
@@ -612,15 +664,16 @@ subscribe((event) => {
       if (!projectId) break;
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
-        if (!state || state.panes.length >= 2) return s;
+        if (!state) return s;
 
-        const sourcePane = state.panes.find(
-          (p) => p.id === state.focusedPaneId,
-        );
-        if (!sourcePane) return s;
+        const sourceLeaf = findLeafByPaneId(state.root, state.focusedPaneId);
+        if (!sourceLeaf) return s;
+        const sourcePane = sourceLeaf.pane;
 
+        // If a specific tab was passed, move it into the new pane;
+        // otherwise create an empty new pane next to the source.
         let newPaneTabs: Tab[] | undefined;
-        let updatedSourcePane = sourcePane;
+        let nextRoot = state.root;
 
         if (event.tabId) {
           const tab = sourcePane.tabs.find((t) => t.id === event.tabId);
@@ -635,20 +688,25 @@ subscribe((event) => {
               remaining.length > 0 && sourcePane.activeTabId !== event.tabId
                 ? sourcePane.activeTabId
                 : newTabs[0].id;
-            updatedSourcePane = {
-              ...sourcePane,
+            nextRoot = updatePane(nextRoot, sourcePane.id, (p) => ({
+              ...p,
               tabs: newTabs,
               activeTabId: newActive,
-            };
+            }));
           }
         }
 
         const newPane = makePane(newPaneTabs);
+        // direction "horizontal" means a column-style layout (top/bottom);
+        // map it to the equivalent split zone.
+        const zone = event.direction === "horizontal" ? "right" : "bottom";
+        nextRoot = splitLeafByZone(nextRoot, sourcePane.id, zone, newPane);
+
         const next = new Map(s.projectPanes);
         next.set(projectId, {
-          panes: [updatedSourcePane, newPane],
+          ...state,
+          root: nextRoot,
           focusedPaneId: newPane.id,
-          splitDirection: event.direction,
         });
         return { projectPanes: next };
       });
@@ -660,24 +718,21 @@ subscribe((event) => {
       if (!projectId) break;
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
-        if (!state || state.panes.length <= 1) return s;
+        if (!state || state.root.type === "leaf") return s;
 
-        // Reuse the focused pane (preserving its id) and merge other panes'
-        // tabs into it. Creating a fresh merged pane would change pane.id and
-        // force React to remount PaneContainer, disposing terminals.
-        const focusedPane =
-          state.panes.find((p) => p.id === state.focusedPaneId) ??
-          state.panes[0];
+        // Merge every pane's tabs into the focused pane (preserving its id)
+        // and replace the entire layout root with that single leaf. Reusing
+        // the focused pane id keeps PaneContainer mounted so terminals etc.
+        // survive the unsplit.
+        const focusedLeaf =
+          findLeafByPaneId(state.root, state.focusedPaneId) ??
+          firstLeaf(state.root)!;
+        const focusedPane = focusedLeaf.pane;
 
-        const mergedTabs: Tab[] = [];
-        for (const pane of state.panes) {
-          if (pane.id === focusedPane.id) {
-            mergedTabs.push(...pane.tabs);
-          }
-        }
-        for (const pane of state.panes) {
-          if (pane.id !== focusedPane.id) {
-            mergedTabs.push(...pane.tabs);
+        const mergedTabs: Tab[] = [...focusedPane.tabs];
+        for (const leaf of getLeaves(state.root)) {
+          if (leaf.pane.id !== focusedPane.id) {
+            mergedTabs.push(...leaf.pane.tabs);
           }
         }
 
@@ -689,9 +744,8 @@ subscribe((event) => {
 
         const next = new Map(s.projectPanes);
         next.set(projectId, {
-          panes: [merged],
+          root: makeLeaf(merged),
           focusedPaneId: merged.id,
-          splitDirection: state.splitDirection,
         });
         return { projectPanes: next };
       });
@@ -705,12 +759,12 @@ subscribe((event) => {
         const state = s.projectPanes.get(projectId);
         if (!state) return s;
 
-        const sourcePane = findPaneForTab(state, event.tabId);
-        if (!sourcePane || sourcePane.id === event.targetPaneId) return s;
+        const sourceLeaf = findLeafByTabId(state.root, event.tabId);
+        if (!sourceLeaf || sourceLeaf.pane.id === event.targetPaneId) return s;
+        const targetLeaf = findLeafByPaneId(state.root, event.targetPaneId);
+        if (!targetLeaf) return s;
 
-        const targetPane = state.panes.find((p) => p.id === event.targetPaneId);
-        if (!targetPane) return s;
-
+        const sourcePane = sourceLeaf.pane;
         const tab = sourcePane.tabs.find((t) => t.id === event.tabId)!;
         const remainingSource = sourcePane.tabs.filter(
           (t) => t.id !== event.tabId,
@@ -721,33 +775,113 @@ subscribe((event) => {
           newSourceActive = remainingSource[0]?.id ?? null;
         }
 
-        const next = new Map(s.projectPanes);
+        // First add the tab to the target pane.
+        let nextRoot = updatePane(state.root, event.targetPaneId, (p) => ({
+          ...p,
+          tabs: [...p.tabs, tab],
+          activeTabId: tab.id,
+        }));
 
         if (remainingSource.length === 0) {
-          next.set(projectId, {
-            ...state,
-            panes: state.panes
-              .filter((p) => p.id !== sourcePane.id)
-              .map((p) =>
-                p.id === event.targetPaneId
-                  ? { ...p, tabs: [...p.tabs, tab], activeTabId: tab.id }
-                  : p,
-              ),
-            focusedPaneId: event.targetPaneId,
-          });
+          // Source pane goes empty → collapse it out of the tree.
+          const removed = removeLeaf(nextRoot, sourcePane.id);
+          nextRoot = removed ?? nextRoot;
         } else {
-          let updated = updatePaneInState(state, sourcePane.id, () => ({
-            ...sourcePane,
+          nextRoot = updatePane(nextRoot, sourcePane.id, (p) => ({
+            ...p,
             tabs: remainingSource,
             activeTabId: newSourceActive,
           }));
-          updated = updatePaneInState(updated, event.targetPaneId, (p) => ({
-            ...p,
-            tabs: [...p.tabs, tab],
-            activeTabId: tab.id,
-          }));
-          next.set(projectId, updated);
         }
+
+        const next = new Map(s.projectPanes);
+        next.set(projectId, {
+          ...state,
+          root: nextRoot,
+          focusedPaneId: event.targetPaneId,
+        });
+        return { projectPanes: next };
+      });
+      break;
+    }
+
+    case "layout-drop-tab": {
+      const projectId = getActiveProjectId();
+      if (!projectId) break;
+      useLayoutStore.setState((s) => {
+        const state = s.projectPanes.get(projectId);
+        if (!state) return s;
+
+        const sourceLeaf = findLeafByTabId(state.root, event.tabId);
+        const targetLeaf = findLeafByPaneId(state.root, event.targetPaneId);
+        if (!sourceLeaf || !targetLeaf) return s;
+
+        // Center drop: identical to layout-move-tab but inline so we don't
+        // dispatch from inside a reducer. No-op when dropping on the same
+        // pane (the user just released the drag, no movement intended).
+        if (event.zone === "center") {
+          if (sourceLeaf.pane.id === targetLeaf.pane.id) return s;
+          return moveTabBetweenLeaves(s, projectId, state, event);
+        }
+
+        // Edge drop: split the target pane and place the dragged tab in the
+        // newly created sub-pane. Source pane gets the tab removed.
+        const sourcePane = sourceLeaf.pane;
+        const tab = sourcePane.tabs.find((t) => t.id === event.tabId)!;
+        const remainingSource = sourcePane.tabs.filter(
+          (t) => t.id !== event.tabId,
+        );
+        const newSourceActive =
+          sourcePane.activeTabId === event.tabId
+            ? (remainingSource[0]?.id ?? null)
+            : sourcePane.activeTabId;
+
+        const newPane = makePane([tab]);
+        let nextRoot = state.root;
+
+        // Remove (or empty) the source pane first so the split lands on a
+        // tree that no longer references the moved tab.
+        if (sourcePane.id !== event.targetPaneId) {
+          if (remainingSource.length === 0) {
+            const removed = removeLeaf(nextRoot, sourcePane.id);
+            nextRoot = removed ?? nextRoot;
+          } else {
+            nextRoot = updatePane(nextRoot, sourcePane.id, (p) => ({
+              ...p,
+              tabs: remainingSource,
+              activeTabId: newSourceActive,
+            }));
+          }
+        } else {
+          // Dropping on the same pane (edge): leave the original tab in
+          // place inside the source — the dragged tab is duplicated into
+          // the new sub-pane. Restore by also removing it from the source
+          // since we want a true "move".
+          if (remainingSource.length === 0) {
+            // Edge-split a pane that only contained the dragged tab is a
+            // no-op; nothing to split into.
+            return s;
+          }
+          nextRoot = updatePane(nextRoot, sourcePane.id, (p) => ({
+            ...p,
+            tabs: remainingSource,
+            activeTabId: newSourceActive,
+          }));
+        }
+
+        nextRoot = splitLeafByZone(
+          nextRoot,
+          event.targetPaneId,
+          event.zone,
+          newPane,
+        );
+
+        const next = new Map(s.projectPanes);
+        next.set(projectId, {
+          ...state,
+          root: nextRoot,
+          focusedPaneId: newPane.id,
+        });
         return { projectPanes: next };
       });
       break;
@@ -771,11 +905,15 @@ subscribe((event) => {
       if (!projectId) break;
       useLayoutStore.setState((s) => {
         const state = s.projectPanes.get(projectId);
-        if (!state || state.panes.length < 2) return s;
-        const other = state.panes.find((p) => p.id !== state.focusedPaneId);
-        if (!other) return s;
+        if (!state) return s;
+        const leaves = [...getLeaves(state.root)];
+        if (leaves.length < 2) return s;
+        const currentIdx = leaves.findIndex(
+          (l) => l.pane.id === state.focusedPaneId,
+        );
+        const nextLeaf = leaves[(currentIdx + 1) % leaves.length];
         const next = new Map(s.projectPanes);
-        next.set(projectId, { ...state, focusedPaneId: other.id });
+        next.set(projectId, { ...state, focusedPaneId: nextLeaf.pane.id });
         return { projectPanes: next };
       });
       break;

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAllTabs, useLayoutStore } from "@/stores/layoutStore";
+import { findLeafByPaneId } from "@/lib/paneTree";
 import { usePaneSlot } from "@/hooks/usePaneSlot";
 import {
   disposeTabHostDiv,
@@ -36,8 +37,10 @@ export function TabHost() {
     <>
       {allTabs.map((tab) => {
         const projectState = projectPanes.get(tab.projectId);
-        const pane = projectState?.panes.find((p) => p.id === tab.paneId);
-        const isActive = pane?.activeTabId === tab.id;
+        const leaf = projectState
+          ? findLeafByPaneId(projectState.root, tab.paneId)
+          : null;
+        const isActive = leaf?.pane.activeTabId === tab.id;
         return (
           <TabHostEntry
             key={tab.id}

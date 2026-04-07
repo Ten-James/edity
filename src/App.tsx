@@ -22,7 +22,7 @@ function AppShell() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 w-screen overflow-hidden">
         <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
         <MainContent />
       </div>

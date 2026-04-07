@@ -60,11 +60,33 @@ export interface Pane {
   activeTabId: string | null;
 }
 
-export interface ProjectPaneState {
-  panes: Pane[];
-  focusedPaneId: string;
-  splitDirection: SplitDirection;
+/**
+ * Recursive layout tree. A `leaf` is a single Pane with tabs; a `split`
+ * arranges its two children either horizontally or vertically and can be
+ * nested arbitrarily, so any pane can be split in half by drag-and-drop
+ * regardless of how deeply nested it already is.
+ */
+export type LayoutNode = LeafNode | SplitNode;
+
+export interface LeafNode {
+  type: "leaf";
+  pane: Pane;
 }
+
+export interface SplitNode {
+  type: "split";
+  id: string;
+  orientation: SplitDirection;
+  children: [LayoutNode, LayoutNode];
+}
+
+export interface ProjectPaneState {
+  root: LayoutNode;
+  focusedPaneId: string;
+}
+
+/** Drop zone within a pane — center moves the tab in, edges split. */
+export type DropZone = "center" | "top" | "right" | "bottom" | "left";
 
 export type AllTab = Tab & {
   projectId: string;

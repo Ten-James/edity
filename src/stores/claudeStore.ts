@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { subscribe } from "./eventBus";
 import { invoke, listen } from "@/lib/ipc";
 import { useLayoutStore } from "./layoutStore";
+import { flattenPanes } from "@/lib/paneTree";
 
 type ClaudeStatus = "working" | "idle" | "notification" | "active" | null;
 
@@ -44,7 +45,7 @@ export const useClaudeStore = create<ClaudeState>((set, get) => ({
 
         const tabToProject = new Map<string, string>();
         for (const [projectId, state] of projectPanes) {
-          for (const pane of state.panes) {
+          for (const pane of flattenPanes(state.root)) {
             for (const tab of pane.tabs) {
               tabToProject.set(tab.id, projectId);
             }
