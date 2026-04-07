@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Component, type ReactNode } from "react";
+import { useState, useEffect, Component, type ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
@@ -35,30 +35,17 @@ function useShikiTokens(
     null,
   );
 
-  // Keep lines in a ref so the effect always reads the latest value
-  // without lines being a dependency (which would cause infinite re-renders
-  // because flatMap creates a new array reference on each render).
-  const linesRef = useRef(lines);
-  linesRef.current = lines;
-
   const code = lines
     ? lines
         .filter((l) => l.type !== "header")
         .map((l) => l.content)
         .join("\n")
     : null;
+  const lang = filePath ? detectLang(filePath) : null;
+  const canHighlight = !!(code && filePath && lines && lang && lang !== "text");
 
   useEffect(() => {
-    if (!code || !filePath) {
-      setTokenMap(null);
-      return;
-    }
-
-    const lang = detectLang(filePath);
-    if (lang === "text") {
-      setTokenMap(null);
-      return;
-    }
+    if (!canHighlight) return;
 
     let cancelled = false;
 
@@ -72,21 +59,18 @@ function useShikiTokens(
           theme: shikiTheme,
         });
         const map = new Map<number, TokenSpan[]>();
-        const currentLines = linesRef.current;
 
         let shikiLineIdx = 0;
-        if (currentLines) {
-          for (let i = 0; i < currentLines.length; i++) {
-            if (currentLines[i].type === "header") continue;
-            const shikiLine = result.tokens[shikiLineIdx];
-            if (shikiLine) {
-              map.set(
-                i,
-                shikiLine.map((t) => ({ content: t.content, color: t.color })),
-              );
-            }
-            shikiLineIdx++;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].type === "header") continue;
+          const shikiLine = result.tokens[shikiLineIdx];
+          if (shikiLine) {
+            map.set(
+              i,
+              shikiLine.map((t) => ({ content: t.content, color: t.color })),
+            );
           }
+          shikiLineIdx++;
         }
 
         if (!cancelled) setTokenMap(map);
@@ -98,9 +82,9 @@ function useShikiTokens(
     return () => {
       cancelled = true;
     };
-  }, [code, filePath, shikiTheme]);
+  }, [canHighlight, code, lang, shikiTheme, lines]);
 
-  return tokenMap;
+  return canHighlight ? tokenMap : null;
 }
 
 interface ErrorBoundaryProps {

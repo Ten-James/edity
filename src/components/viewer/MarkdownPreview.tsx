@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   useState,
   type ComponentPropsWithoutRef,
 } from "react";
@@ -24,7 +23,6 @@ function ShikiCodeBlock({
 }) {
   const { activeTheme } = useTheme();
   const [html, setHtml] = useState<string | null>(null);
-  const prevHtmlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +54,6 @@ function ShikiCodeBlock({
         theme: shikiTheme,
       });
       if (!cancelled) {
-        prevHtmlRef.current = result;
         setHtml(result);
       }
     }
@@ -67,9 +64,7 @@ function ShikiCodeBlock({
     };
   }, [children, language, activeTheme]);
 
-  const displayHtml = html ?? prevHtmlRef.current;
-
-  if (!displayHtml) {
+  if (!html) {
     return (
       <pre className="bg-muted p-4 rounded-md overflow-x-auto text-xs">
         <code>{children}</code>
@@ -80,7 +75,7 @@ function ShikiCodeBlock({
   return (
     <div
       className="rounded-md overflow-x-auto text-xs [&_pre]:p-4 [&_pre]:m-0 [&_pre]:rounded-md"
-      dangerouslySetInnerHTML={{ __html: displayHtml }}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
 }

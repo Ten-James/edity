@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IconPlus, IconTrash, IconGripVertical } from "@tabler/icons-react";
 import {
   Dialog,
@@ -31,13 +31,16 @@ export function SetupDialog({
   const [color, setColor] = useState<string>("blue");
   const [runCommands, setRunCommands] = useState<RunCommand[]>([]);
 
-  useEffect(() => {
+  // Reset form to initial config each time the dialog opens.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setAcronym(initialConfig?.acronym ?? "");
       setColor(initialConfig?.color ?? "blue");
       setRunCommands(initialConfig?.runCommands ?? []);
     }
-  }, [open, initialConfig]);
+  }
 
   const handleSave = async () => {
     const config: EdityConfig = {};

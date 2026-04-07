@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,10 @@ export function ClaudeInputBar({
     cmd.toLowerCase().includes(commandFilter.toLowerCase()),
   );
 
-  useEffect(() => {
+  // Update command-palette state in response to value changes.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (value.startsWith("/") && !value.includes(" ")) {
       setShowCommands(true);
       setCommandFilter(value.slice(1));
@@ -62,7 +65,7 @@ export function ClaudeInputBar({
     } else {
       setShowCommands(false);
     }
-  }, [value]);
+  }
 
   const insertCommand = (cmd: string) => {
     setValue(`/${cmd} `);

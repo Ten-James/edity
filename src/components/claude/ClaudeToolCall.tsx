@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
 import { Button } from "@/components/ui/button";
 import { useProjectStore } from "@/stores/projectStore";
@@ -75,12 +75,12 @@ export function ClaudeToolCall({
   const isQuestion = toolUse.name === "AskUserQuestion";
   const isActiveAgent = toolUse.name === "Agent" && getEffectiveStatus(toolUse) === "running";
   const [open, setOpen] = useState(autoExpand || isQuestion || isActiveAgent);
-  const wasActiveRef = useRef(isActiveAgent);
+  const [prevIsActiveAgent, setPrevIsActiveAgent] = useState(isActiveAgent);
 
-  if (isActiveAgent && !wasActiveRef.current) {
-    setOpen(true);
+  if (isActiveAgent !== prevIsActiveAgent) {
+    setPrevIsActiveAgent(isActiveAgent);
+    if (isActiveAgent) setOpen(true);
   }
-  wasActiveRef.current = isActiveAgent;
 
   const rawSummary =
     getToolSummary(toolUse.name, toolUse.input, toolUse.inputJson) ??

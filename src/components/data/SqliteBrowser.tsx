@@ -34,14 +34,19 @@ export function SqliteBrowser({
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    // Load table list on mount; the parent's onLoadTables identity is unstable.
     onLoadTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+  // Update query template when the selected table changes.
+  const [prevSelectedTable, setPrevSelectedTable] = useState(selectedTable);
+  if (selectedTable !== prevSelectedTable) {
+    setPrevSelectedTable(selectedTable);
     if (selectedTable) {
       setQuery(`SELECT * FROM "${selectedTable}" LIMIT 100`);
     }
-  }, [selectedTable]);
+  }
 
   function handleRun() {
     if (query.trim()) onExecuteQuery(query);

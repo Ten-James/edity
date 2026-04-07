@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -64,8 +64,10 @@ export function ConnectionForm({
     initial?.type === "sqlite" ? initial.filePath : "",
   );
 
-  // Reset form state when dialog opens or initial changes
-  useEffect(() => {
+  // Reset form state each time the dialog opens.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setType(initial?.type ?? "redis");
       setName(initial?.name ?? "");
@@ -77,7 +79,7 @@ export function ConnectionForm({
       setTestResult(null);
       setTesting(false);
     }
-  }, [open, initial]);
+  }
 
   function buildConfig(): ConnectionConfig {
     const id = initial?.id ?? crypto.randomUUID();

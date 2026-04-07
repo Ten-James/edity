@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { COMMANDS } from "@/lib/commands";
 import {
   formatKeybinding,
@@ -19,11 +19,11 @@ export function KeybindingsSettings({
   onChange,
 }: KeybindingsSettingsProps) {
   const [recordingId, setRecordingId] = useState<string | null>(null);
-  const recordingRef = useRef<string | null>(null);
-  recordingRef.current = recordingId;
 
   useEffect(() => {
     if (!recordingId) return;
+    // Capture in a const so TypeScript keeps the non-null narrowing inside the handler.
+    const id = recordingId;
 
     function handler(e: KeyboardEvent) {
       e.preventDefault();
@@ -35,29 +35,23 @@ export function KeybindingsSettings({
       }
 
       if (e.key === "Backspace" || e.key === "Delete") {
-        const id = recordingRef.current;
-        if (id) {
-          onChange({ ...keybindings, [id]: "" });
-          setRecordingId(null);
-        }
+        onChange({ ...keybindings, [id]: "" });
+        setRecordingId(null);
         return;
       }
 
       const str = eventToKeybindingString(e);
       if (!str) return;
 
-      const id = recordingRef.current;
-      if (id) {
-        const cmd = COMMANDS.find((c) => c.id === id);
-        if (cmd?.defaultKeybinding === str) {
-          const next = { ...keybindings };
-          delete next[id];
-          onChange(next);
-        } else {
-          onChange({ ...keybindings, [id]: str });
-        }
-        setRecordingId(null);
+      const cmd = COMMANDS.find((c) => c.id === id);
+      if (cmd?.defaultKeybinding === str) {
+        const next = { ...keybindings };
+        delete next[id];
+        onChange(next);
+      } else {
+        onChange({ ...keybindings, [id]: str });
       }
+      setRecordingId(null);
     }
 
     window.addEventListener("keydown", handler, { capture: true });

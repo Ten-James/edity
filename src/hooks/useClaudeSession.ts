@@ -393,7 +393,11 @@ export function useClaudeSession(projectPath: string) {
   };
 
   useEffect(() => {
-    refreshSessions();
+    // Inline the refresh so projectPath is the only dep — refreshSessions
+    // is recreated each render but its body only needs projectPath.
+    invoke<ClaudeSessionInfo[]>("claude_list_sessions", { projectPath })
+      .then(setSessions)
+      .catch(() => {});
     return teardownListener;
   }, [projectPath]);
 

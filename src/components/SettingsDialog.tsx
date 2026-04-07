@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -97,7 +97,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [monoFontLigatures, setMonoFontLigatures] = useState(
     settings.monoFontLigatures,
   );
-  useEffect(() => {
+  // Reset form to current settings each time the dialog opens.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setLightTheme(settings.lightTheme);
       setDarkTheme(settings.darkTheme);
@@ -108,7 +111,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setMonoFontFamily(settings.monoFontFamily);
       setMonoFontLigatures(settings.monoFontLigatures);
     }
-  }, [open, settings]);
+  }
 
   const handleSave = async () => {
     await updateSettings({

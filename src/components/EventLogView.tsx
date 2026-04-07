@@ -21,7 +21,7 @@ export function EventLogView({ isActive }: EventLogViewProps) {
 
   useEffect(() => {
     refreshStatus();
-  }, []);
+  }, [refreshStatus]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "instant" });

@@ -90,7 +90,10 @@ export function RedisBrowser({
   const [search, setSearch] = useState(pattern);
 
   useEffect(() => {
+    // Initial scan on mount with the pattern provided by the parent.
+    // Subsequent scans are user-driven via the search box.
     onScan(pattern, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSearch() {

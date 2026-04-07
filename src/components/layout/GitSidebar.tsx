@@ -35,8 +35,10 @@ export function GitSidebar() {
   const [commitMsg, setCommitMsg] = useState("");
 
   useEffect(() => {
+    // Initial log load on mount; git.loadLog identity changes every render.
     git.loadLog(15);
-  }, [git.loadLog]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const allChanges: (GitFileStatus & { _staged: boolean })[] = [
     ...git.staged.map((f) => ({ ...f, _staged: true })),

@@ -137,8 +137,17 @@ export function useGitState(projectPath: string) {
     });
   };
 
-  useEffect(() => {
+  // Reset git state when the project path changes (before the polling effect).
+  const [prevProjectPath, setPrevProjectPath] = useState(projectPath);
+  if (prevProjectPath !== projectPath) {
+    setPrevProjectPath(projectPath);
     setState(initialState);
+  }
+
+  useEffect(() => {
+    // refreshStatus is async; all its setState calls happen after `await invoke(...)`,
+    // so they are not synchronous-in-effect. The lint can't see through the await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshStatus();
     const interval = setInterval(refreshStatus, 5000);
     return () => clearInterval(interval);

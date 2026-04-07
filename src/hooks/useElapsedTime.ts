@@ -14,11 +14,7 @@ export function useElapsedTime(isRunning: boolean): string {
   const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
-    if (!isRunning) {
-      startRef.current = null;
-      setElapsed("");
-      return;
-    }
+    if (!isRunning) return;
 
     startRef.current = Date.now();
     const tick = () =>
@@ -28,5 +24,6 @@ export function useElapsedTime(isRunning: boolean): string {
     return () => clearInterval(id);
   }, [isRunning]);
 
-  return elapsed;
+  // Derive the displayed value so callers see "" the moment isRunning flips off.
+  return isRunning ? elapsed : "";
 }

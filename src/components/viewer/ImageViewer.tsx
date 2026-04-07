@@ -27,7 +27,6 @@ export function ImageViewer({ url, size }: ImageViewerProps) {
   const translateStartRef = useRef({ x: 0, y: 0 });
   const translateRef = useRef({ x: 0, y: 0 });
   const scaleRef = useRef(1);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -36,30 +35,28 @@ export function ImageViewer({ url, size }: ImageViewerProps) {
     translateRef.current = translate;
   }, [translate]);
 
-  useEffect(() => {
+  // Reset zoom/pan/dimensions when the image url changes.
+  const [prevUrl, setPrevUrl] = useState(url);
+  if (url !== prevUrl) {
+    setPrevUrl(url);
     setScale(1);
     setTranslate({ x: 0, y: 0 });
     setDimensions(null);
-    initializedRef.current = false;
-  }, [url]);
+  }
 
-  const centerImage = () => {
-    if (!dimensions || !containerRef.current) {
+  const centerImage = (
+    dims: { width: number; height: number } | null = dimensions,
+  ) => {
+    if (!dims || !containerRef.current) {
       setTranslate({ x: 0, y: 0 });
       return;
     }
     const rect = containerRef.current.getBoundingClientRect();
     setTranslate({
-      x: (rect.width - dimensions.width) / 2,
-      y: (rect.height - dimensions.height) / 2,
+      x: (rect.width - dims.width) / 2,
+      y: (rect.height - dims.height) / 2,
     });
   };
-
-  useEffect(() => {
-    if (!dimensions || !containerRef.current || initializedRef.current) return;
-    initializedRef.current = true;
-    centerImage();
-  }, [dimensions]);
 
   const resetZoom = () => {
     setScale(1);
@@ -78,22 +75,19 @@ export function ImageViewer({ url, size }: ImageViewerProps) {
     });
   };
 
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    const container = containerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const cursorX = e.clientX - rect.left;
-    const cursorY = e.clientY - rect.top;
-    const delta = -e.deltaY * ZOOM_SENSITIVITY;
-
-    zoomAt(cursorX, cursorY, scaleRef.current * (1 + delta));
-  };
-
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+      const delta = -e.deltaY * ZOOM_SENSITIVITY;
+      zoomAt(cursorX, cursorY, scaleRef.current * (1 + delta));
+    };
+
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
   }, []);
@@ -158,10 +152,12 @@ export function ImageViewer({ url, size }: ImageViewerProps) {
             draggable={false}
             onLoad={(e) => {
               const img = e.currentTarget;
-              setDimensions({
+              const dims = {
                 width: img.naturalWidth,
                 height: img.naturalHeight,
-              });
+              };
+              setDimensions(dims);
+              centerImage(dims);
             }}
           />
         </div>

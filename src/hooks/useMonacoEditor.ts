@@ -158,7 +158,6 @@ export function useMonacoEditor({
     >);
 
     editor.addCommand(
-      // eslint-disable-next-line no-bitwise
       monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
       () => handleSave(),
     );

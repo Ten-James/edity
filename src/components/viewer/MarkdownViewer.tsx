@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { MonacoEditor } from "./MonacoEditor";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,9 @@ export function MarkdownViewer({
   const [mode, setMode] = useState<"preview" | "edit">("preview");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     setMode((m) => (m === "preview" ? "edit" : "preview"));
-  };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

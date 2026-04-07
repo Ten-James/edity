@@ -89,7 +89,6 @@ export function FontPicker({
 }: FontPickerProps) {
   const [open, setOpen] = useState(false);
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterMono, setFilterMono] = useState(monoOnly);
   const loadStartedRef = useRef(false);
@@ -103,15 +102,15 @@ export function FontPicker({
     [],
   );
 
+  // Loading state is derived: we're loading if the picker is open, supports
+  // local fonts, and we haven't yet received the font list.
+  const loading = open && supportsLocalFonts && systemFonts === null;
+
   useEffect(() => {
     if (!open || loadStartedRef.current || !supportsLocalFonts) return;
     loadStartedRef.current = true;
-    setLoading(true);
-    const query = (window as unknown as WindowWithFonts).queryLocalFonts;
-    if (!query) {
-      setLoading(false);
-      return;
-    }
+    // supportsLocalFonts guarantees queryLocalFonts is defined.
+    const query = (window as unknown as WindowWithFonts).queryLocalFonts!;
     query()
       .then((data) => {
         const families = Array.from(new Set(data.map((f) => f.family))).sort(
@@ -121,16 +120,15 @@ export function FontPicker({
       })
       .catch(() => {
         setSystemFonts([]);
-      })
-      .finally(() => {
-        setLoading(false);
       });
   }, [open, supportsLocalFonts]);
 
-  // Reset search when closing.
-  useEffect(() => {
+  // Reset search when the popover closes.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) setSearch("");
-  }, [open]);
+  }
 
   const rows = useMemo<FontRow[]>(() => {
     const q = search.trim().toLowerCase();

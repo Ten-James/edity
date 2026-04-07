@@ -85,15 +85,21 @@ export function useFileTree() {
     });
   }
 
-  // Watch project directory
-  useEffect(() => {
-    refreshTree();
-
+  // Clear file tree state when the active project becomes null.
+  const [prevActiveProject, setPrevActiveProject] = useState(activeProject);
+  if (prevActiveProject !== activeProject) {
+    setPrevActiveProject(activeProject);
     if (!activeProject) {
       setEntries([]);
       setGitStatusMap(new Map());
-      return;
     }
+  }
+
+  // Watch project directory
+  useEffect(() => {
+    if (!activeProject) return;
+
+    refreshTree();
 
     let unlisten: (() => void) | null = null;
     invoke("watch_project_dir", { projectPath: activeProject.path }).catch(
@@ -111,6 +117,8 @@ export function useFileTree() {
       if (unlisten) unlisten();
       invoke("unwatch_project_dir").catch(() => {});
     };
+    // refreshTree is recreated each render but only depends on activeProject/showIgnored.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject, showIgnored]);
 
   // Selection

@@ -20,7 +20,7 @@ export function RemoteAccessView({ isActive }: RemoteAccessViewProps) {
 
   useEffect(() => {
     refreshStatus();
-  }, []);
+  }, [refreshStatus]);
 
   const handleToggle = async () => {
     try {

@@ -123,6 +123,9 @@ export function useTerminal({
       term.dispose();
       invoke("close_pty", { tabId });
     };
+    // One-time init per terminal instance — theme and font are synced via separate
+    // effects below; cwd / initialCommand are only used at spawn time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   // Sync theme
