@@ -6,7 +6,7 @@ import { timeAgo } from "@/lib/git-utils";
 import { computeGraph, getColorHex } from "@/lib/git-graph";
 import type { GitLogEntry } from "@/types/git";
 
-const ROW_HEIGHT = 28;
+const ROW_HEIGHT = 48;
 const COL_WIDTH = 16;
 const DOT_RADIUS = 3.5;
 
@@ -108,28 +108,36 @@ export function GitLogPanel({
             key={entry.hash}
             onClick={() => onSelectCommit(entry.hash)}
             className={cn(
-              "flex items-center text-xs cursor-pointer hover:bg-accent",
+              "flex items-center text-xs cursor-pointer hover:bg-accent border-b border-border/30",
               selectedHash === entry.hash && "bg-accent",
             )}
             style={{ height: ROW_HEIGHT }}
           >
             <GraphSvg nodes={graphNodes} rowIndex={i} />
-            <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
-              <span className="font-mono text-[10px] text-muted-foreground shrink-0">
-                {entry.shortHash}
-              </span>
-              {entry.refs && (
-                <span className="text-[10px] text-blue-400 shrink-0 max-w-[120px] truncate">
-                  {entry.refs}
+            <div className="flex items-start gap-3 flex-1 min-w-0 pr-3 py-1">
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate text-xs font-medium">
+                    {entry.subject}
+                  </span>
+                  {entry.refs && (
+                    <span className="text-[10px] text-blue-400 shrink-0 max-w-[140px] truncate">
+                      {entry.refs}
+                    </span>
+                  )}
+                </div>
+                <span className="font-mono text-[10px] text-muted-foreground/70">
+                  {entry.shortHash}
                 </span>
-              )}
-              <span className="truncate flex-1">{entry.subject}</span>
-              <span className="text-[10px] text-muted-foreground shrink-0">
-                {entry.author}
-              </span>
-              <span className="text-[10px] text-muted-foreground shrink-0 w-14 text-right">
-                {timeAgo(entry.timestamp)}
-              </span>
+              </div>
+              <div className="flex flex-col items-end shrink-0">
+                <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                  {entry.author}
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {timeAgo(entry.timestamp)}
+                </span>
+              </div>
             </div>
           </div>
         ))}

@@ -202,20 +202,29 @@ export function GitSidebar() {
       <Separator />
 
       {/* Git log */}
-      <ScrollArea className="h-[140px] shrink-0">
-        <div className="px-1 py-1">
+      <ScrollArea className="h-[180px] shrink-0">
+        <div className="py-1">
           {git.log.map((entry) => (
             <div
               key={entry.hash}
-              className="flex items-center gap-1.5 px-2 py-0.5 text-[10px]"
+              className="flex items-start gap-2 px-2 py-1 border-b border-border/30 hover:bg-accent/50"
             >
-              <span className="text-muted-foreground font-mono shrink-0">
-                {entry.shortHash}
-              </span>
-              <span className="truncate">{entry.subject}</span>
-              <span className="ml-auto shrink-0 text-muted-foreground">
-                {timeAgo(entry.timestamp)}
-              </span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[11px] font-medium leading-tight break-words">
+                  {entry.subject}
+                </span>
+                <span className="font-mono text-[9px] text-muted-foreground/70 leading-tight">
+                  {entry.shortHash}
+                </span>
+              </div>
+              <div className="flex flex-col items-end shrink-0 max-w-[80px]">
+                <span className="text-[9px] text-muted-foreground leading-tight break-words text-right">
+                  {entry.author}
+                </span>
+                <span className="text-[9px] text-muted-foreground/70 leading-tight">
+                  {timeAgo(entry.timestamp)}
+                </span>
+              </div>
             </div>
           ))}
         </div>

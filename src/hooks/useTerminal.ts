@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@/lib/ipc";
 import { dispatch } from "@/stores/eventBus";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -8,6 +9,7 @@ import {
   DEFAULT_MONO_FONT_STACK,
   buildFontStack,
 } from "@shared/lib/fonts";
+import { findLigatureRanges } from "@/lib/terminal-ligatures";
 
 interface ClaudeStatus {
   isClaudeCode: boolean;
@@ -34,8 +36,10 @@ export function useTerminal({
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const ligatureJoinerIdRef = useRef<number | null>(null);
   const activeTheme = useSettingsStore((s) => s.activeTheme);
   const monoFont = useSettingsStore((s) => s.settings.monoFontFamily);
+  const fontLigatures = useSettingsStore((s) => s.settings.monoFontLigatures);
 
   // Poll for foreground process name + Claude status
   useEffect(() => {
@@ -74,6 +78,8 @@ export function useTerminal({
       fontSize: 14,
       fontFamily: buildFontStack(monoFont, DEFAULT_MONO_FONT_STACK),
       theme: activeTheme.terminal,
+      // Required for registerCharacterJoiner (used by the ligatures effect).
+      allowProposedApi: true,
     });
 
     const fitAddon = new FitAddon();
@@ -81,6 +87,17 @@ export function useTerminal({
     term.open(containerRef.current);
     term.focus();
     fitAddon.fit();
+
+    // WebGL renderer is required for character joiners (ligatures). The DOM
+    // renderer positions each cell individually and ignores joiners. Fall
+    // back silently to the DOM renderer if the GPU context is unavailable.
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => webgl.dispose());
+      term.loadAddon(webgl);
+    } catch {
+      /* WebGL unavailable — DOM renderer will be used, ligatures disabled */
+    }
 
     termRef.current = term;
     fitAddonRef.current = fitAddon;
@@ -146,6 +163,35 @@ export function useTerminal({
       invoke("resize_pty", { tabId, cols: term.cols, rows: term.rows });
     });
   }, [monoFont, tabId]);
+
+  // Sync ligatures: register a character joiner that groups common
+  // programming ligature sequences so the WebGL renderer hands them to the
+  // font as a single run, letting the font's OpenType ligature substitution
+  // kick in. registerCharacterJoiner returns -1 on the DOM renderer, in which
+  // case ligatures simply stay off. Wrapped in try/catch because it throws
+  // on Terminal instances created without `allowProposedApi: true` — that
+  // happens on HMR for tabs opened before the option was added.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+
+    if (fontLigatures) {
+      const id = term.registerCharacterJoiner(findLigatureRanges);
+      if (id !== -1) {
+        ligatureJoinerIdRef.current = id;
+        term.refresh(0, term.rows - 1);
+      }
+    }
+
+    return () => {
+      const currentId = ligatureJoinerIdRef.current;
+      if (currentId !== null && termRef.current) {
+        termRef.current.deregisterCharacterJoiner(currentId);
+        termRef.current.refresh(0, termRef.current.rows - 1);
+        ligatureJoinerIdRef.current = null;
+      }
+    };
+  }, [fontLigatures, tabId]);
 
   // Refit on active
   useEffect(() => {
