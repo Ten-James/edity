@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +18,10 @@ interface GitCommitDetailProps {
 
 export function GitCommitDetail({ commit, onClose }: GitCommitDetailProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [commit.hash]);
 
   // Extract diff for selected file from the full commit diff
   const fileDiff = selectedFile

@@ -27,6 +27,8 @@ import {
   IconGitMerge,
   IconBug,
   IconActivityHeartbeat,
+  IconGitFork,
+  IconDeviceMobile,
 } from "@tabler/icons-react";
 import { invoke } from "@/lib/ipc";
 import { toast } from "sonner";
@@ -295,6 +297,25 @@ export const COMMANDS: Command[] = [
     category: "Tab",
     icon: IconActivityHeartbeat,
     execute: () => dispatch({ type: "tab-create-event-log" }),
+  },
+
+  // Git
+  {
+    id: "git.create-worktree",
+    label: "Create Git Worktree",
+    category: "Git",
+    icon: IconGitFork,
+    when: () => !!useProjectStore.getState().activeProject,
+    execute: () => dispatch({ type: "ui-open-worktree-dialog" }),
+  },
+
+  // Remote Access
+  {
+    id: "tab.open-remote-access",
+    label: "Start Remote Access",
+    category: "Tab",
+    icon: IconDeviceMobile,
+    execute: () => dispatch({ type: "tab-create-remote-access" }),
   },
 
   // Debug

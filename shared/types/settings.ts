@@ -9,6 +9,9 @@ export interface GlobalSettings {
   defaultProjectId: string | null;
   claude: ClaudeSettings;
   keybindings: Record<string, string>;
+  uiFontFamily: string | null;
+  monoFontFamily: string | null;
+  monoFontLigatures: boolean;
 }
 
 export interface ThemeCssVars {
@@ -98,4 +101,7 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
     autoExpandTools: ["Edit", "Bash"],
   },
   keybindings: {},
+  uiFontFamily: null,
+  monoFontFamily: null,
+  monoFontLigatures: false,
 };

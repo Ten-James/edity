@@ -1,4 +1,4 @@
-import { useAppContext } from "@/contexts/AppContext";
+import { dispatch } from "@/stores/eventBus";
 import { TerminalView } from "@/components/Terminal";
 import { FileViewer } from "@/components/FileViewer";
 import { BrowserView } from "@/components/BrowserView";
@@ -6,6 +6,7 @@ import { GitView } from "@/components/git/GitView";
 import { ClaudeView } from "@/components/claude/ClaudeView";
 import { DataView } from "@/components/data/DataView";
 import { EventLogView } from "@/components/EventLogView";
+import { RemoteAccessView } from "@/components/RemoteAccessView";
 import { TabBar } from "./TabBar";
 import type { AllTab } from "@/types/tab";
 
@@ -24,13 +25,11 @@ export function PaneContainer({
   activeTabId,
   showTabBar,
 }: PaneContainerProps) {
-  const { setFocusedPane } = useAppContext();
-
   return (
     <div
       className="flex h-full flex-col overflow-hidden"
       onPointerDown={() => {
-        if (!isFocused) setFocusedPane(paneId);
+        if (!isFocused) dispatch({ type: "layout-focus-pane", paneId });
       }}
     >
       {showTabBar && <TabBar paneId={paneId} />}
@@ -44,7 +43,7 @@ export function PaneContainer({
                   key={tab.id}
                   tabId={tab.id}
                   isActive={isActive}
-                  cwd={tab.projectPath}
+                  cwd={tab.cwd ?? tab.projectPath}
                   initialCommand={tab.initialCommand}
                 />
               );
@@ -96,6 +95,13 @@ export function PaneContainer({
             case "event-log":
               return (
                 <EventLogView
+                  key={tab.id}
+                  isActive={isActive}
+                />
+              );
+            case "remote-access":
+              return (
+                <RemoteAccessView
                   key={tab.id}
                   isActive={isActive}
                 />

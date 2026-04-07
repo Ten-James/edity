@@ -208,10 +208,20 @@ export interface IpcHandlerMap {
   get_settings: { args: undefined; ret: GlobalSettings };
   save_settings: { args: { settings: GlobalSettings }; ret: void };
 
+  // Git Worktree
+  git_worktree_add: { args: { cwd: string; branch: string }; ret: { ok: true; path: string } | ErrorResult };
+  git_worktree_list: { args: { cwd: string }; ret: { ok: true; worktrees: Array<{ path: string; branch: string; bare: boolean }> } | ErrorResult };
+  git_worktree_remove: { args: { cwd: string; worktreePath: string }; ret: Result };
+
   // MCP
   mcp_start: { args: { port?: number }; ret: { ok: true; port: number } | ErrorResult };
   mcp_stop: { args: undefined; ret: Result };
   mcp_status: { args: undefined; ret: { running: boolean } };
+
+  // Remote Access
+  remote_access_start: { args: undefined; ret: { ok: true; qrDataUrl: string; serverUrl: string } | ErrorResult };
+  remote_access_stop: { args: undefined; ret: Result };
+  remote_access_status: { args: undefined; ret: { running: boolean; serverUrl: string | null; connectedClients: number } };
 
   // Bug Report
   create_bug_report: { args: { dom: string; consoleLog: string }; ret: { ok: true; filePath: string } | ErrorResult };
@@ -231,4 +241,5 @@ export interface IpcEventMap {
   [key: `file-changed-${string}`]: void;
   [key: `project-run-exit-${string}`]: void;
   [key: `claude-msg-${string}`]: unknown;
+  "remote-access-clients-changed": { count: number };
 }

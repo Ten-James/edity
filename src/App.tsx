@@ -1,19 +1,22 @@
 import { useEffect } from "react";
-import { AppProvider } from "@/contexts/AppContext";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MainContent } from "@/components/layout/MainContent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { WorktreeDialog } from "@/components/WorktreeDialog";
 import { useCommands } from "@/hooks/useCommands";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
+import { useGitStore } from "@/stores/gitStore";
+import { useClaudeStore } from "@/stores/claudeStore";
 import { dispatch } from "@/stores/eventBus";
 import "@/stores/mcpStore"; // side-effect: registers MCP IPC listeners
+import "@/stores/worktreeEffect"; // side-effect: handles worktree-create events
 import "./App.css";
 
 function AppShell() {
-  const { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen } =
+  const { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen, worktreeOpen, setWorktreeOpen } =
     useCommands();
 
   return (
@@ -25,6 +28,7 @@ function AppShell() {
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <WorktreeDialog open={worktreeOpen} onOpenChange={setWorktreeOpen} />
     </div>
   );
 }
@@ -46,16 +50,23 @@ function StoreInitializer() {
           dispatch({ type: "project-switch", projectId: initial.id });
         }
       });
+
+    useGitStore.getState().startPolling();
+    useClaudeStore.getState().startPolling();
+    return () => {
+      useGitStore.getState().stopPolling();
+      useClaudeStore.getState().stopPolling();
+    };
   }, []);
   return null;
 }
 
 function App() {
   return (
-    <AppProvider>
+    <>
       <StoreInitializer />
       <AppShell />
-    </AppProvider>
+    </>
   );
 }
 

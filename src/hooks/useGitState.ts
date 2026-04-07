@@ -47,10 +47,30 @@ interface GitResult<T = unknown> {
   [key: string]: T | boolean | string | undefined;
 }
 
+function fileStatusEqual(a: GitFileStatus, b: GitFileStatus): boolean {
+  return (
+    a.path === b.path &&
+    a.indexStatus === b.indexStatus &&
+    a.workTreeStatus === b.workTreeStatus &&
+    a.originalPath === b.originalPath
+  );
+}
+
+function fileListsEqual(a: GitFileStatus[], b: GitFileStatus[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (!fileStatusEqual(a[i], b[i])) return false;
+  }
+  return true;
+}
+
 export function useGitState(projectPath: string) {
   const [state, setState] = useState<GitState>(initialState);
   const cwdRef = useRef(projectPath);
-  cwdRef.current = projectPath;
+  useEffect(() => {
+    cwdRef.current = projectPath;
+  }, [projectPath]);
 
   const clearSelection = () => {
     setState((s) => ({ ...s, selectedFile: null, selectedDiff: null }));
@@ -58,39 +78,12 @@ export function useGitState(projectPath: string) {
 
   const refreshStatus = async () => {
     const cwd = cwdRef.current;
+    let statusResult: GitResult & { files?: GitFileStatus[] };
     try {
-      const statusResult = await invoke<
-        GitResult & { files?: GitFileStatus[] }
-      >("git_status", { cwd });
-
-      if (cwd !== cwdRef.current) return;
-
-      if (!statusResult.ok) {
-        setState((s) => ({ ...s, isRepo: false, isLoading: false }));
-        return;
-      }
-
-      const files = statusResult.files ?? [];
-      const staged = files.filter(
-        (f) => f.indexStatus !== " " && f.indexStatus !== "?",
+      statusResult = await invoke<GitResult & { files?: GitFileStatus[] }>(
+        "git_status",
+        { cwd },
       );
-      const unstaged = files.filter(
-        (f) =>
-          f.workTreeStatus !== " " &&
-          f.workTreeStatus !== "?" &&
-          f.indexStatus !== "?",
-      );
-      const untracked = files.filter((f) => f.indexStatus === "?");
-
-      setState((s) => ({
-        ...s,
-        isRepo: true,
-        isLoading: false,
-        error: null,
-        staged,
-        unstaged,
-        untracked,
-      }));
     } catch {
       if (cwd !== cwdRef.current) return;
       setState((s) => ({
@@ -99,7 +92,49 @@ export function useGitState(projectPath: string) {
         isLoading: false,
         error: "Failed to get git status",
       }));
+      return;
     }
+
+    if (cwd !== cwdRef.current) return;
+
+    if (!statusResult.ok) {
+      setState((s) => ({ ...s, isRepo: false, isLoading: false }));
+      return;
+    }
+
+    const files = statusResult.files ?? [];
+    const staged = files.filter(
+      (f) => f.indexStatus !== " " && f.indexStatus !== "?",
+    );
+    const unstaged = files.filter(
+      (f) =>
+        f.workTreeStatus !== " " &&
+        f.workTreeStatus !== "?" &&
+        f.indexStatus !== "?",
+    );
+    const untracked = files.filter((f) => f.indexStatus === "?");
+
+    setState((s) => {
+      if (
+        s.isRepo &&
+        !s.isLoading &&
+        s.error === null &&
+        fileListsEqual(s.staged, staged) &&
+        fileListsEqual(s.unstaged, unstaged) &&
+        fileListsEqual(s.untracked, untracked)
+      ) {
+        return s;
+      }
+      return {
+        ...s,
+        isRepo: true,
+        isLoading: false,
+        error: null,
+        staged,
+        unstaged,
+        untracked,
+      };
+    });
   };
 
   useEffect(() => {
@@ -111,7 +146,7 @@ export function useGitState(projectPath: string) {
 
   const selectFile = async (path: string, staged: boolean) => {
     const cwd = cwdRef.current;
-    setState((s) => ({ ...s, selectedFile: { path, staged } }));
+    setState((s) => ({ ...s, selectedFile: { path, staged }, selectedDiff: null }));
 
     const isUntracked = state.untracked.some((f) => f.path === path);
     const isNewStaged =
@@ -125,16 +160,21 @@ export function useGitState(projectPath: string) {
           "read_file_content",
           { path: fullPath },
         );
-        if (fileResult.type === "Text" && fileResult.content) {
-          const lines = fileResult.content.split("\n");
-          const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n`;
-          const body = lines.map((l) => `+${l}`).join("\n");
-          setState((s) => ({ ...s, selectedDiff: header + body }));
-        } else {
-          setState((s) => ({ ...s, selectedDiff: null }));
-        }
+        setState((s) => {
+          if (s.selectedFile?.path !== path || s.selectedFile?.staged !== staged) return s;
+          if (fileResult.type === "Text" && fileResult.content) {
+            const lines = fileResult.content.split("\n");
+            const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n`;
+            const body = lines.map((l) => `+${l}`).join("\n");
+            return { ...s, selectedDiff: header + body };
+          }
+          return { ...s, selectedDiff: null };
+        });
       } catch {
-        setState((s) => ({ ...s, selectedDiff: null }));
+        setState((s) => {
+          if (s.selectedFile?.path !== path || s.selectedFile?.staged !== staged) return s;
+          return { ...s, selectedDiff: null };
+        });
       }
       return;
     }
@@ -144,12 +184,15 @@ export function useGitState(projectPath: string) {
         "git_file_diff",
         { cwd, filePath: path, staged },
       );
-      setState((s) => ({
-        ...s,
-        selectedDiff: result.ok ? ((result.diff as string) ?? "") : null,
-      }));
+      setState((s) => {
+        if (s.selectedFile?.path !== path || s.selectedFile?.staged !== staged) return s;
+        return { ...s, selectedDiff: result.ok ? ((result.diff as string) ?? "") : null };
+      });
     } catch {
-      setState((s) => ({ ...s, selectedDiff: null }));
+      setState((s) => {
+        if (s.selectedFile?.path !== path || s.selectedFile?.staged !== staged) return s;
+        return { ...s, selectedDiff: null };
+      });
     }
   };
 

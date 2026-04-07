@@ -7,6 +7,11 @@ import {
   type ColorTheme,
   type ThemeCssVars,
 } from "@shared/types/settings";
+import {
+  DEFAULT_UI_FONT_STACK,
+  DEFAULT_MONO_FONT_STACK,
+  buildFontStack,
+} from "@shared/lib/fonts";
 import { getThemeById } from "@/lib/themes";
 
 type Mode = "light" | "dark";
@@ -97,6 +102,22 @@ function applyMode(mode: Mode) {
   else html.classList.remove("dark");
 }
 
+function applyFontCssVars(settings: GlobalSettings) {
+  const el = document.documentElement;
+  el.style.setProperty(
+    "--font-sans",
+    buildFontStack(settings.uiFontFamily, DEFAULT_UI_FONT_STACK),
+  );
+  el.style.setProperty(
+    "--font-mono",
+    buildFontStack(settings.monoFontFamily, DEFAULT_MONO_FONT_STACK),
+  );
+  el.style.setProperty(
+    "font-variant-ligatures",
+    settings.monoFontLigatures ? "contextual" : "none",
+  );
+}
+
 const initialMode = loadCachedMode();
 const initialSettings = loadCachedSettings();
 const initialTheme = resolveTheme(initialMode, initialSettings);
@@ -104,6 +125,7 @@ const initialTheme = resolveTheme(initialMode, initialSettings);
 // Apply immediately to prevent flash
 applyMode(initialMode);
 applyThemeCssVars(initialTheme.cssVars);
+applyFontCssVars(initialSettings);
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   mode: initialMode,
@@ -116,6 +138,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     invoke("save_settings", { settings: next }).catch(() => {});
     const theme = resolveTheme(get().mode, next);
     applyThemeCssVars(theme.cssVars);
+    applyFontCssVars(next);
     set({ settings: next, activeTheme: theme });
   },
 
@@ -135,6 +158,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const merged = { ...DEFAULT_SETTINGS, ...s };
       const theme = resolveTheme(get().mode, merged);
       applyThemeCssVars(theme.cssVars);
+      applyFontCssVars(merged);
       set({ settings: merged, activeTheme: theme });
     } catch {
       /* ignore */

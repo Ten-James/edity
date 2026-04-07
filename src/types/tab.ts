@@ -6,6 +6,8 @@ interface BaseTab {
 export interface TerminalTab extends BaseTab {
   type: "terminal";
   initialCommand?: string;
+  cwd?: string;
+  worktreeBranch?: string;
 }
 
 export interface FileTab extends BaseTab {
@@ -36,6 +38,10 @@ export interface EventLogTab extends BaseTab {
   type: "event-log";
 }
 
+export interface RemoteAccessTab extends BaseTab {
+  type: "remote-access";
+}
+
 export type Tab =
   | TerminalTab
   | FileTab
@@ -43,7 +49,8 @@ export type Tab =
   | GitTab
   | ClaudeTab
   | DataTab
-  | EventLogTab;
+  | EventLogTab
+  | RemoteAccessTab;
 
 export type SplitDirection = "horizontal" | "vertical";
 

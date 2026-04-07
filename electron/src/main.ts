@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, systemPreferences } from "electron";
+import { app, BrowserWindow, protocol, net, session, systemPreferences } from "electron";
 import * as path from "path";
 import {
   PROJECT_ROOT,
@@ -25,7 +25,9 @@ import { registerSettingsHandlers } from "./ipc/settings";
 import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
 import { registerBugReportHandlers } from "./ipc/bug-report";
 import { registerMcpHandlers } from "./ipc/mcp";
+import { registerRemoteAccessHandlers } from "./ipc/remote-access";
 import { stopEventLogServer } from "./mcp/event-log-server";
+import { stopRemoteAccessServer } from "./remote-access/server";
 import { setupDevLogger, flushAndClose } from "./lib/logger";
 
 setupDevLogger();
@@ -78,6 +80,7 @@ registerSettingsHandlers();
 registerDataHandlers();
 registerBugReportHandlers();
 registerMcpHandlers();
+registerRemoteAccessHandlers();
 
 // --- App Lifecycle ---
 
@@ -93,6 +96,13 @@ app.whenReady().then(async () => {
   if (process.platform === "darwin") {
     systemPreferences.askForMediaAccess("microphone");
   }
+
+  // Grant local-fonts explicitly; match Electron's default-allow for everything
+  // else so we don't regress other permissions the app relies on.
+  session.defaultSession.setPermissionRequestHandler(
+    (_wc, _permission, callback) => callback(true),
+  );
+  session.defaultSession.setPermissionCheckHandler(() => true);
 
   protocol.handle("edity-file", (request) => {
     let filePath: string;
@@ -140,6 +150,7 @@ app.on("window-all-closed", () => {
   cleanupAllSessions();
   cleanupDataConnections();
   stopEventLogServer().catch(() => {});
+  stopRemoteAccessServer().catch(() => {});
   flushAndClose();
 
   app.quit();

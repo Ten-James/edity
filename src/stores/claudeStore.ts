@@ -5,6 +5,18 @@ import { useLayoutStore } from "./layoutStore";
 
 type ClaudeStatus = "working" | "idle" | "notification" | "active" | null;
 
+function projectStatusesEqual(
+  a: Map<string, ClaudeStatus>,
+  b: Map<string, ClaudeStatus>,
+): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [key, value] of a) {
+    if (b.get(key) !== value) return false;
+  }
+  return true;
+}
+
 interface ClaudeState {
   projectStatuses: Map<string, ClaudeStatus>;
   _pollIntervalId: ReturnType<typeof setInterval> | null;
@@ -53,7 +65,9 @@ export const useClaudeStore = create<ClaudeState>((set, get) => ({
           }
         }
 
-        set({ projectStatuses: perProject });
+        if (!projectStatusesEqual(get().projectStatuses, perProject)) {
+          set({ projectStatuses: perProject });
+        }
       } catch {
         /* ignore */
       }

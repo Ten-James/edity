@@ -3,9 +3,11 @@ import {
   IconFile,
   IconWorld,
   IconGitBranch,
+  IconGitFork,
   IconRobot,
   IconDatabase,
   IconActivityHeartbeat,
+  IconDeviceMobile,
   IconX,
   IconPlus,
   IconLayoutColumns,
@@ -26,7 +28,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useAppContext } from "@/contexts/AppContext";
+import { useLayoutStore, useCurrentPaneState } from "@/stores/layoutStore";
+import { dispatch } from "@/stores/eventBus";
 import { cn } from "@/lib/utils";
 import type { Tab } from "@/types/tab";
 
@@ -35,20 +38,9 @@ interface TabBarProps {
 }
 
 export function TabBar({ paneId }: TabBarProps) {
-  const {
-    panes,
-    setActiveTab,
-    createTab,
-    createBrowserTab,
-    createGitTab,
-    createClaudeTab,
-    createDataTab,
-    closeTab,
-    pinTab,
-    dirtyTabs,
-    splitPane,
-    moveTabToPane,
-  } = useAppContext();
+  const paneState = useCurrentPaneState();
+  const dirtyTabs = useLayoutStore((s) => s.dirtyTabs);
+  const panes = paneState?.panes ?? [];
 
   const pane = panes.find((p) => p.id === paneId);
   const paneTabs = pane?.tabs ?? [];
@@ -58,7 +50,9 @@ export function TabBar({ paneId }: TabBarProps) {
   function getTabIcon(tab: Tab) {
     switch (tab.type) {
       case "terminal":
-        return <IconTerminal2 size={14} />;
+        return tab.worktreeBranch
+          ? <IconGitFork size={14} />
+          : <IconTerminal2 size={14} />;
       case "file":
         return <IconFile size={14} />;
       case "browser":
@@ -71,6 +65,8 @@ export function TabBar({ paneId }: TabBarProps) {
         return <IconDatabase size={14} />;
       case "event-log":
         return <IconActivityHeartbeat size={14} />;
+      case "remote-access":
+        return <IconDeviceMobile size={14} />;
     }
   }
 
@@ -81,10 +77,10 @@ export function TabBar({ paneId }: TabBarProps) {
           <ContextMenu key={tab.id}>
             <ContextMenuTrigger asChild>
               <div
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => dispatch({ type: "tab-set-active", tabId: tab.id })}
                 onDoubleClick={() => {
                   if (tab.type === "file" && tab.isTemporary) {
-                    pinTab(tab.id);
+                    dispatch({ type: "tab-pin", tabId: tab.id });
                   }
                 }}
                 role="tab"
@@ -111,7 +107,7 @@ export function TabBar({ paneId }: TabBarProps) {
                   size="icon-xs"
                   onClick={(e) => {
                     e.stopPropagation();
-                    closeTab(tab.id);
+                    dispatch({ type: "tab-close", tabId: tab.id });
                   }}
                   className="ml-1 size-4 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
                 >
@@ -124,13 +120,17 @@ export function TabBar({ paneId }: TabBarProps) {
               {panes.length < 2 && (
                 <>
                   <ContextMenuItem
-                    onClick={() => splitPane("horizontal", tab.id)}
+                    onClick={() =>
+                      dispatch({ type: "layout-split", direction: "horizontal", tabId: tab.id })
+                    }
                   >
                     <IconLayoutColumns size={14} />
                     Split Right
                   </ContextMenuItem>
                   <ContextMenuItem
-                    onClick={() => splitPane("vertical", tab.id)}
+                    onClick={() =>
+                      dispatch({ type: "layout-split", direction: "vertical", tabId: tab.id })
+                    }
                   >
                     <IconLayoutRows size={14} />
                     Split Down
@@ -141,7 +141,13 @@ export function TabBar({ paneId }: TabBarProps) {
               {panes.length === 2 && otherPaneId && (
                 <>
                   <ContextMenuItem
-                    onClick={() => moveTabToPane(tab.id, otherPaneId)}
+                    onClick={() =>
+                      dispatch({
+                        type: "layout-move-tab",
+                        tabId: tab.id,
+                        targetPaneId: otherPaneId,
+                      })
+                    }
                   >
                     <IconArrowMoveRight size={14} />
                     Move to Other Pane
@@ -149,7 +155,9 @@ export function TabBar({ paneId }: TabBarProps) {
                   <ContextMenuSeparator />
                 </>
               )}
-              <ContextMenuItem onClick={() => closeTab(tab.id)}>
+              <ContextMenuItem
+                onClick={() => dispatch({ type: "tab-close", tabId: tab.id })}
+              >
                 <IconX size={14} />
                 Close
               </ContextMenuItem>
@@ -165,23 +173,23 @@ export function TabBar({ paneId }: TabBarProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => createTab()}>
+          <DropdownMenuItem onClick={() => dispatch({ type: "tab-create-terminal" })}>
             <IconTerminal2 size={14} />
             New Terminal
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => createBrowserTab()}>
+          <DropdownMenuItem onClick={() => dispatch({ type: "tab-create-browser" })}>
             <IconWorld size={14} />
             New Browser
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => createGitTab()}>
+          <DropdownMenuItem onClick={() => dispatch({ type: "tab-create-git" })}>
             <IconGitBranch size={14} />
             Git
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => createClaudeTab()}>
+          <DropdownMenuItem onClick={() => dispatch({ type: "tab-create-claude" })}>
             <IconRobot size={14} />
             Claude
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => createDataTab()}>
+          <DropdownMenuItem onClick={() => dispatch({ type: "tab-create-data" })}>
             <IconDatabase size={14} />
             Data Viewer
           </DropdownMenuItem>

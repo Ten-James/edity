@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAppContext } from "@/contexts/AppContext";
+import { dispatch } from "@/stores/eventBus";
 
 interface BrowserViewProps {
   tabId: string;
@@ -40,7 +40,6 @@ interface WebviewElement {
 export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
   const webviewRef = useRef<HTMLElement>(null);
   const [urlInput, setUrlInput] = useState(initialUrl);
-  const { updateTabTitle, updateBrowserUrl } = useAppContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
@@ -56,14 +55,14 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
       const url = (e as { url: string }).url;
       if (url) {
         setUrlInput(url);
-        updateBrowserUrl(tabId, url);
+        dispatch({ type: "tab-update-browser-url", tabId, url });
       }
     };
 
     const handleTitleUpdate = (e: unknown) => {
       const title = (e as { title: string }).title;
       if (title) {
-        updateTabTitle(tabId, title);
+        dispatch({ type: "tab-update-title", tabId, title });
       }
     };
 
@@ -88,7 +87,22 @@ export function BrowserView({ tabId, isActive, initialUrl }: BrowserViewProps) {
       webview.removeEventListener("page-title-updated", handleTitleUpdate);
       webview.removeEventListener("context-menu", handleContextMenu);
     };
-  }, [tabId, updateTabTitle, updateBrowserUrl]);
+  }, [tabId]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    function handler(e: KeyboardEvent) {
+      if (e.key === "r" && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        getWebview()?.reload();
+      }
+    }
+
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, [isActive]);
 
   const navigate = (url: string) => {
     let normalized = url.trim();

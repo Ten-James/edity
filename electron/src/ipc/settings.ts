@@ -4,7 +4,7 @@ import { CONFIG_DIR, SETTINGS_PATH } from "../lib/state";
 import { DEFAULT_SETTINGS } from "../../../shared/types/settings";
 import type { GlobalSettings } from "../../../shared/types/settings";
 
-function loadSettings(): GlobalSettings {
+export function loadSettings(): GlobalSettings {
   try {
     const raw = JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8"));
     return { ...DEFAULT_SETTINGS, ...raw };

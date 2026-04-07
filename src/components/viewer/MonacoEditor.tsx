@@ -9,12 +9,18 @@ interface MonacoEditorProps {
 }
 
 export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
-  const { mode, handleMount, handleBeforeMount, handleChange } =
-    useMonacoEditor({
-      tabId,
-      content,
-      filePath,
-    });
+  const {
+    mode,
+    fontFamily,
+    fontLigatures,
+    handleMount,
+    handleBeforeMount,
+    handleChange,
+  } = useMonacoEditor({
+    tabId,
+    content,
+    filePath,
+  });
 
   const language = detectLanguage(filePath);
 
@@ -28,6 +34,8 @@ export function MonacoEditor({ tabId, content, filePath }: MonacoEditorProps) {
       onChange={handleChange}
       options={{
         minimap: { enabled: true },
+        fontFamily,
+        fontLigatures,
         fontSize: 13,
         lineNumbers: "on",
         wordWrap: "on",

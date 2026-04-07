@@ -1,4 +1,5 @@
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { useLayoutStore, useAllTabs } from "@/stores/layoutStore";
 import { FileTree } from "./FileTree";
 import { GitSidebar } from "./GitSidebar";
 import { PaneContainer } from "./PaneContainer";
@@ -10,8 +11,11 @@ import {
 import type { AllTab } from "@/types/tab";
 
 export function MainContent() {
-  const { allTabs, projects, activeProject, projectPanes, sidebarPanel } =
-    useAppContext();
+  const projects = useProjectStore((s) => s.projects);
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const projectPanes = useLayoutStore((s) => s.projectPanes);
+  const sidebarPanel = useLayoutStore((s) => s.sidebarPanel);
+  const allTabs = useAllTabs();
 
   const tabsByPane = new Map<string, AllTab[]>();
   for (const tab of allTabs) {

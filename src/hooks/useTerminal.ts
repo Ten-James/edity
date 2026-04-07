@@ -4,6 +4,10 @@ import { FitAddon } from "@xterm/addon-fit";
 import { invoke } from "@/lib/ipc";
 import { dispatch } from "@/stores/eventBus";
 import { useSettingsStore } from "@/stores/settingsStore";
+import {
+  DEFAULT_MONO_FONT_STACK,
+  buildFontStack,
+} from "@shared/lib/fonts";
 
 interface ClaudeStatus {
   isClaudeCode: boolean;
@@ -31,6 +35,7 @@ export function useTerminal({
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const activeTheme = useSettingsStore((s) => s.activeTheme);
+  const monoFont = useSettingsStore((s) => s.settings.monoFontFamily);
 
   // Poll for foreground process name + Claude status
   useEffect(() => {
@@ -67,7 +72,7 @@ export function useTerminal({
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: buildFontStack(monoFont, DEFAULT_MONO_FONT_STACK),
       theme: activeTheme.terminal,
     });
 
@@ -126,6 +131,18 @@ export function useTerminal({
       termRef.current.options.theme = activeTheme.terminal;
     }
   }, [activeTheme]);
+
+  // Sync mono font
+  useEffect(() => {
+    const term = termRef.current;
+    const fit = fitAddonRef.current;
+    if (!term || !fit) return;
+    term.options.fontFamily = buildFontStack(monoFont, DEFAULT_MONO_FONT_STACK);
+    requestAnimationFrame(() => {
+      fit.fit();
+      invoke("resize_pty", { tabId, cols: term.cols, rows: term.rows });
+    });
+  }, [monoFont, tabId]);
 
   // Refit on active
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Component, type ReactNode } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
@@ -35,6 +35,12 @@ function useShikiTokens(
     null,
   );
 
+  // Keep lines in a ref so the effect always reads the latest value
+  // without lines being a dependency (which would cause infinite re-renders
+  // because flatMap creates a new array reference on each render).
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+
   const code = lines
     ? lines
         .filter((l) => l.type !== "header")
@@ -66,11 +72,12 @@ function useShikiTokens(
           theme: shikiTheme,
         });
         const map = new Map<number, TokenSpan[]>();
+        const currentLines = linesRef.current;
 
         let shikiLineIdx = 0;
-        if (lines) {
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].type === "header") continue;
+        if (currentLines) {
+          for (let i = 0; i < currentLines.length; i++) {
+            if (currentLines[i].type === "header") continue;
             const shikiLine = result.tokens[shikiLineIdx];
             if (shikiLine) {
               map.set(
@@ -91,12 +98,57 @@ function useShikiTokens(
     return () => {
       cancelled = true;
     };
-  }, [code, filePath, lines, shikiTheme]);
+  }, [code, filePath, shikiTheme]);
 
   return tokenMap;
 }
 
+interface ErrorBoundaryProps {
+  filePath: string | null;
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  error: Error | null;
+}
+
+class DiffErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (prevProps.filePath !== this.props.filePath && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-xs text-muted-foreground">
+          <span className="text-destructive font-medium">Diff render failed</span>
+          <span className="font-mono text-[10px] max-w-md text-center break-all">
+            {this.state.error.message}
+          </span>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
+  return (
+    <DiffErrorBoundary filePath={filePath}>
+      <GitDiffViewerInner diff={diff} filePath={filePath} />
+    </DiffErrorBoundary>
+  );
+}
+
+function GitDiffViewerInner({ diff, filePath }: GitDiffViewerProps) {
   const { activeTheme } = useTheme();
 
   const parsed = diff && filePath ? parseDiff(diff, filePath) : null;
@@ -128,7 +180,15 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
     );
   }
 
-  let globalLineIdx = 0;
+  // Pre-compute hunk offsets so we don't mutate during render (React Compiler safe)
+  const hunkOffsets: number[] = [];
+  if (parsed) {
+    let offset = 0;
+    for (const hunk of parsed.hunks) {
+      hunkOffsets.push(offset);
+      offset += hunk.lines.length;
+    }
+  }
 
   return (
     <ScrollArea className="h-full">
@@ -136,7 +196,7 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
         {parsed?.hunks.map((hunk, hi) => (
           <div key={hi} className="mb-2">
             {hunk.lines.map((line, li) => {
-              const idx = globalLineIdx++;
+              const idx = hunkOffsets[hi] + li;
               const tokens = tokenizeLine(line, idx, tokenMap);
 
               return (

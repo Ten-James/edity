@@ -20,22 +20,30 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { useRunStore } from "@/stores/runStore";
+import { dispatch } from "@/stores/eventBus";
 import { SetupDialog } from "@/components/SetupDialog";
 import { useScriptDetection } from "@/hooks/useScriptDetection";
 import { getRunCommands, getDefaultRunCommand } from "@/lib/run-commands";
 import type { RunCommand } from "@shared/types/project";
 import type { DetectedScript } from "@shared/types/ipc";
 
+const EMPTY_RUNNING_SET = new Set<string>();
+
 export function RunButton() {
-  const {
-    activeProject,
-    edityConfig,
-    runProject,
-    stopProject,
-    isProjectRunning,
-    runningCommandIds,
-  } = useAppContext();
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const edityConfig = useProjectStore((s) =>
+    s.activeProject ? (s.edityConfigs.get(s.activeProject.id) ?? null) : null,
+  );
+  const runningProjects = useRunStore((s) => s.runningProjects);
+  const runningCommandIds = activeProject
+    ? (runningProjects.get(activeProject.id) ?? EMPTY_RUNNING_SET)
+    : EMPTY_RUNNING_SET;
+  const isProjectRunning = runningCommandIds.size > 0;
+
+  const runProject = (command?: RunCommand) => dispatch({ type: "run-start", command });
+  const stopProject = (commandId?: string) => dispatch({ type: "run-stop", commandId });
 
   const detectedScripts = useScriptDetection(activeProject?.path);
   const [setupOpen, setSetupOpen] = useState(false);

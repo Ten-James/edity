@@ -6,6 +6,7 @@ import {
   tabClaudeState,
   sendToWindow,
 } from "../lib/state";
+import { notifyPtyCreated, notifyPtyDestroyed } from "../remote-access/server";
 
 export function registerTerminalHandlers(): void {
   ipcMain.handle("spawn_shell", (_event, { tabId, cwd, initialCommand }: { tabId: string; cwd: string; initialCommand?: string }) => {
@@ -62,6 +63,7 @@ export function registerTerminalHandlers(): void {
     });
 
     ptyInstances.set(tabId, ptyProcess);
+    notifyPtyCreated(tabId);
   });
 
   ipcMain.handle("write_to_pty", (_event, { tabId, data }: { tabId: string; data: string }) => {
@@ -77,6 +79,7 @@ export function registerTerminalHandlers(): void {
     if (proc) {
       proc.kill();
       ptyInstances.delete(tabId);
+      notifyPtyDestroyed(tabId);
     }
     tabClaudeState.delete(tabId);
   });

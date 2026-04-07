@@ -1,3 +1,4 @@
+import * as path from "path";
 import { ipcMain } from "electron";
 import { execGit, parseGitStatus } from "../lib/git-helpers";
 
@@ -183,6 +184,51 @@ export function registerGitHandlers(): void {
 
   ipcMain.handle("git_delete_branch", (_event, { cwd, branch, force }: { cwd: string; branch: string; force?: boolean }) => {
     const result = execGit(["branch", force ? "-D" : "-d", branch], cwd);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  });
+
+  // ── Worktree ──
+
+  ipcMain.handle("git_worktree_add", (_event, { cwd, branch }: { cwd: string; branch: string }) => {
+    const basename = path.basename(cwd);
+    const safeBranch = branch.replace(/\//g, "-");
+    const worktreePath = path.resolve(cwd, "..", `${basename}-wt-${safeBranch}`);
+
+    // Check if branch already exists (local or remote)
+    const verify = execGit(["rev-parse", "--verify", branch], cwd);
+    const args = verify.ok
+      ? ["worktree", "add", worktreePath, branch]
+      : ["worktree", "add", "-b", branch, worktreePath];
+
+    const result = execGit(args, cwd);
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: true, path: worktreePath };
+  });
+
+  ipcMain.handle("git_worktree_list", (_event, { cwd }: { cwd: string }) => {
+    const result = execGit(["worktree", "list", "--porcelain"], cwd);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    const worktrees: Array<{ path: string; branch: string; bare: boolean }> = [];
+    let current: { path: string; branch: string; bare: boolean } | null = null;
+
+    for (const line of (result.output || "").split("\n")) {
+      if (line.startsWith("worktree ")) {
+        if (current) worktrees.push(current);
+        current = { path: line.slice(9), branch: "", bare: false };
+      } else if (line === "bare" && current) {
+        current.bare = true;
+      } else if (line.startsWith("branch ") && current) {
+        current.branch = line.slice(7).replace("refs/heads/", "");
+      }
+    }
+    if (current) worktrees.push(current);
+
+    return { ok: true, worktrees };
+  });
+
+  ipcMain.handle("git_worktree_remove", (_event, { cwd, worktreePath }: { cwd: string; worktreePath: string }) => {
+    const result = execGit(["worktree", "remove", worktreePath], cwd);
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   });
 }

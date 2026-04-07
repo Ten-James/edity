@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
 import type { EdityConfig, RunCommand } from "@shared/types/project";
 import { cn, PROJECT_COLORS, COLOR_KEYS } from "@/lib/utils";
 
@@ -26,7 +26,6 @@ export function SetupDialog({
   initialConfig,
   projectPath,
 }: SetupDialogProps) {
-  const { saveEdityConfig } = useAppContext();
 
   const [acronym, setAcronym] = useState("");
   const [color, setColor] = useState<string>("blue");
@@ -47,7 +46,7 @@ export function SetupDialog({
     const validCommands = runCommands.filter((c) => c.command.trim());
     if (validCommands.length > 0) config.runCommands = validCommands;
 
-    await saveEdityConfig(config, projectPath);
+    await useProjectStore.getState()._saveConfig(config, projectPath);
     onOpenChange(false);
   };
 

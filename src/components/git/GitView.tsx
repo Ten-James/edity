@@ -12,7 +12,8 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useGitState } from "@/hooks/useGitState";
-import { useAppContext } from "@/contexts/AppContext";
+import { useGitStore } from "@/stores/gitStore";
+import { dispatch } from "@/stores/eventBus";
 import { GitChangesPanel } from "./GitChangesPanel";
 import { GitDiffViewer } from "./GitDiffViewer";
 import { GitCommitPanel } from "./GitCommitPanel";
@@ -31,7 +32,7 @@ interface GitViewProps {
 
 export function GitView({ isActive, projectPath }: GitViewProps) {
   const [mode, setMode] = useState<Mode>("changes");
-  const { refreshGitBranchInfo, gitBranchInfo } = useAppContext();
+  const gitBranchInfo = useGitStore((s) => s.branchInfo);
 
   const git = useGitState(projectPath);
 
@@ -42,7 +43,7 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
     } else {
       toast.error(result.error ?? "Push failed");
     }
-    refreshGitBranchInfo();
+    dispatch({ type: "git-refresh" });
   };
 
   const handlePull = async () => {
@@ -52,18 +53,18 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
     } else {
       toast.error(result.error ?? "Pull failed");
     }
-    refreshGitBranchInfo();
+    dispatch({ type: "git-refresh" });
   };
 
   const handleFetch = async () => {
     await git.fetch();
     toast.success("Fetched latest");
-    refreshGitBranchInfo();
+    dispatch({ type: "git-refresh" });
   };
 
   const handleSwitchBranch = async (branch: string) => {
     const result = await git.switchBranch(branch);
-    refreshGitBranchInfo();
+    dispatch({ type: "git-refresh" });
     return result;
   };
 

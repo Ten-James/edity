@@ -20,6 +20,7 @@ function isEditorFocused(): boolean {
 export function useCommands() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [worktreeOpen, setWorktreeOpen] = useState(false);
 
   const keybindings = useSettingsStore((s) => s.settings.keybindings);
   const keybindingsRef = useRef(resolveKeybindings(COMMANDS, keybindings));
@@ -40,6 +41,9 @@ export function useCommands() {
           break;
         case "ui-open-settings":
           setSettingsOpen(true);
+          break;
+        case "ui-open-worktree-dialog":
+          setWorktreeOpen(true);
           break;
       }
     });
@@ -70,5 +74,5 @@ export function useCommands() {
       window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
-  return { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen };
+  return { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen, worktreeOpen, setWorktreeOpen };
 }

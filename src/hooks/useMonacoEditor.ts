@@ -7,6 +7,10 @@ import { dispatch } from "@/stores/eventBus";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
 import type { MonacoThemeColors } from "@shared/types/settings";
+import {
+  DEFAULT_MONO_FONT_STACK,
+  buildFontStack,
+} from "@shared/lib/fonts";
 
 const loadedProjects = new Set<string>();
 
@@ -98,11 +102,15 @@ export function useMonacoEditor({
 }: UseMonacoEditorOptions) {
   const mode = useSettingsStore((s) => s.mode);
   const activeTheme = useSettingsStore((s) => s.activeTheme);
+  const monoFont = useSettingsStore((s) => s.settings.monoFontFamily);
+  const fontLigatures = useSettingsStore((s) => s.settings.monoFontLigatures);
   const activeProject = useProjectStore((s) => s.activeProject);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const savedContentRef = useRef(content);
+
+  const fontFamily = buildFontStack(monoFont, DEFAULT_MONO_FONT_STACK);
 
   // Sync content from file watcher
   useEffect(() => {
@@ -178,6 +186,15 @@ export function useMonacoEditor({
     m.editor.setTheme(themeName);
   }, [activeTheme, mode]);
 
+  // Sync mono font + ligatures
+  useEffect(() => {
+    const ed = editorRef.current;
+    const m = monacoRef.current;
+    if (!ed || !m) return;
+    ed.updateOptions({ fontFamily, fontLigatures });
+    m.editor.remeasureFonts();
+  }, [fontFamily, fontLigatures]);
+
   const handleBeforeMount: BeforeMount = (monacoInstance) => {
     const themeName = mode === "dark" ? "edity-dark" : "edity-light";
     monacoInstance.editor.defineTheme(themeName, {
@@ -198,6 +215,8 @@ export function useMonacoEditor({
 
   return {
     mode,
+    fontFamily,
+    fontLigatures,
     handleMount,
     handleBeforeMount,
     handleChange,

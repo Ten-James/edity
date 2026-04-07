@@ -7,7 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getFileIcon } from "@/lib/file-icons";
-import { useAppContext } from "@/contexts/AppContext";
+import { dispatch } from "@/stores/eventBus";
 import { invoke } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import type { FileEntry, FileTreeContextMenu } from "@/hooks/useFileTree";
@@ -64,11 +64,9 @@ export function FileTreeNode({
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[]>([]);
 
-  const { openFileTab } = useAppContext();
-
   const toggle = async () => {
     if (!entry.is_dir) {
-      openFileTab(entry.path);
+      dispatch({ type: "tab-open-file", filePath: entry.path });
       return;
     }
     if (!expanded) {

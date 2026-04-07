@@ -11,6 +11,7 @@ import type {
   ClaudeTab,
   DataTab,
   EventLogTab,
+  RemoteAccessTab,
   AllTab,
   Pane,
   ProjectPaneState,
@@ -20,13 +21,21 @@ import type {
 
 let globalTabCounter = 0;
 
-function makeTerminalTab(initialCommand?: string): TerminalTab {
+function makeTerminalTab(opts?: {
+  initialCommand?: string;
+  cwd?: string;
+  worktreeBranch?: string;
+}): TerminalTab {
   globalTabCounter += 1;
   return {
     id: crypto.randomUUID(),
-    title: `Terminal ${globalTabCounter}`,
+    title: opts?.worktreeBranch
+      ? `${opts.worktreeBranch} (worktree)`
+      : `Terminal ${globalTabCounter}`,
     type: "terminal",
-    initialCommand,
+    initialCommand: opts?.initialCommand,
+    cwd: opts?.cwd,
+    worktreeBranch: opts?.worktreeBranch,
   };
 }
 
@@ -255,7 +264,11 @@ subscribe((event) => {
 
     // ── Tab creation ──
     case "tab-create-terminal": {
-      const tab = makeTerminalTab(event.initialCommand);
+      const tab = makeTerminalTab({
+        initialCommand: event.initialCommand,
+        cwd: event.cwd,
+        worktreeBranch: event.worktreeBranch,
+      });
       updateProjectPanes((prev, pid) => addTabToFocusedPane(prev, pid, tab));
       break;
     }
@@ -418,6 +431,24 @@ subscribe((event) => {
       break;
     }
 
+    case "tab-create-remote-access": {
+      const projectId = getActiveProjectId();
+      if (!projectId) break;
+      useLayoutStore.setState((s) => ({
+        projectPanes: openOrCreateSingletonTab(
+          s.projectPanes,
+          projectId,
+          (t) => t.type === "remote-access",
+          (): RemoteAccessTab => ({
+            id: crypto.randomUUID(),
+            title: "Remote Access",
+            type: "remote-access",
+          }),
+        ),
+      }));
+      break;
+    }
+
     // ── Tab operations ──
     case "tab-close": {
       const projectId = getActiveProjectId();
@@ -430,6 +461,9 @@ subscribe((event) => {
         const closingTab = pane.tabs.find((t) => t.id === event.tabId);
         if (closingTab?.type === "file") {
           invoke("unwatch_file", { tabId: event.tabId }).catch(() => {});
+        }
+        if (closingTab?.type === "remote-access") {
+          invoke("remote_access_stop").catch(() => {});
         }
         const next = new Map(s.projectPanes);
         next.set(projectId, removeTabFromState(state, event.tabId));

@@ -4,6 +4,34 @@ import { invoke } from "@/lib/ipc";
 import { useProjectStore } from "./projectStore";
 import type { GitBranchInfo, GitDiffStats } from "@/types/git";
 
+function branchInfoEqual(
+  a: GitBranchInfo | null,
+  b: GitBranchInfo | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.current === b.current &&
+    a.upstream === b.upstream &&
+    a.ahead === b.ahead &&
+    a.behind === b.behind &&
+    a.detached === b.detached
+  );
+}
+
+function diffStatsEqual(
+  a: GitDiffStats | null,
+  b: GitDiffStats | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.additions === b.additions &&
+    a.deletions === b.deletions &&
+    a.changedFiles === b.changedFiles
+  );
+}
+
 interface GitState {
   branchInfo: GitBranchInfo | null;
   diffStats: GitDiffStats | null;
@@ -22,7 +50,10 @@ export const useGitStore = create<GitState>((set, get) => ({
   refresh: async () => {
     const proj = useProjectStore.getState().activeProject;
     if (!proj) {
-      set({ branchInfo: null, diffStats: null });
+      const current = get();
+      if (current.branchInfo !== null || current.diffStats !== null) {
+        set({ branchInfo: null, diffStats: null });
+      }
       return;
     }
 
@@ -66,7 +97,16 @@ export const useGitStore = create<GitState>((set, get) => ({
           }
         : null;
 
-    set({ branchInfo, diffStats });
+    const prev = get();
+    const branchChanged = !branchInfoEqual(prev.branchInfo, branchInfo);
+    const diffChanged = !diffStatsEqual(prev.diffStats, diffStats);
+    if (branchChanged && diffChanged) {
+      set({ branchInfo, diffStats });
+    } else if (branchChanged) {
+      set({ branchInfo });
+    } else if (diffChanged) {
+      set({ diffStats });
+    }
   },
 
   startPolling: () => {

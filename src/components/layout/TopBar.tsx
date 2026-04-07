@@ -5,21 +5,20 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { useLayoutStore } from "@/stores/layoutStore";
+import { useGitStore } from "@/stores/gitStore";
+import { dispatch } from "@/stores/eventBus";
 import { useTopBar } from "@/hooks/useTopBar";
 import { RunButton } from "@/components/layout/RunButton";
 
 const isDev = import.meta.env.DEV;
 
 export function TopBar() {
-  const {
-    activeProject,
-    sidebarPanel,
-    toggleSidebarPanel,
-    gitBranchInfo,
-    gitDiffStats,
-    createGitTab,
-  } = useAppContext();
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const sidebarPanel = useLayoutStore((s) => s.sidebarPanel);
+  const gitBranchInfo = useGitStore((s) => s.branchInfo);
+  const gitDiffStats = useGitStore((s) => s.diffStats);
 
   const { isFullscreen, formatProjectPath } = useTopBar();
 
@@ -48,7 +47,7 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="xs"
-          onClick={createGitTab}
+          onClick={() => dispatch({ type: "tab-create-git" })}
           className="flex items-center gap-1 text-xs text-muted-foreground ml-1 hover:text-foreground transition-colors"
         >
           <IconGitBranch size={12} />
@@ -97,7 +96,7 @@ export function TopBar() {
           <Button
             variant={sidebarPanel === "git" ? "secondary" : "ghost"}
             size="icon-xs"
-            onClick={() => toggleSidebarPanel("git")}
+            onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "git" })}
           >
             <IconGitBranch size={14} />
           </Button>
@@ -110,7 +109,7 @@ export function TopBar() {
           <Button
             variant={sidebarPanel === "files" ? "secondary" : "ghost"}
             size="icon-xs"
-            onClick={() => toggleSidebarPanel("files")}
+            onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "files" })}
           >
             <IconFolder size={14} />
           </Button>

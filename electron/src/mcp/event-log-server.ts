@@ -140,6 +140,29 @@ const TOOLS: ToolDef[] = [
     },
   },
 
+  // ── Worktree ──
+  {
+    name: "create_worktree",
+    description: "Create a git worktree and open a terminal tab in it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Branch name for the worktree" },
+        command: { type: "string", description: "Initial command to run in the worktree terminal" },
+      },
+      required: ["branch"],
+    },
+    handle: (args) => {
+      const branch = String(args.branch);
+      dispatchEvent({
+        type: "worktree-create",
+        branch,
+        ...(args.command ? { initialCommand: String(args.command) } : {}),
+      });
+      return `Creating worktree for branch: ${branch}`;
+    },
+  },
+
   // ── Git ──
   {
     name: "refresh_git",

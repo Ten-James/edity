@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import type { ClaudeToolUse } from "@/types/claude";
 import { Button } from "@/components/ui/button";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { dispatch } from "@/stores/eventBus";
 import { getToolSummary, getFilePath } from "@/lib/claude-utils";
 import { getToolIcon, getStatusIcon, INLINE_TOOLS } from "./claude-tool-config";
 import {
@@ -69,7 +70,7 @@ export function ClaudeToolCall({
   toolUse,
   autoExpand = false,
 }: ClaudeToolCallProps) {
-  const { openFileTab, activeProject } = useAppContext();
+  const activeProject = useProjectStore((s) => s.activeProject);
   const projectPath = activeProject?.path ?? "";
   const isQuestion = toolUse.name === "AskUserQuestion";
   const isActiveAgent = toolUse.name === "Agent" && getEffectiveStatus(toolUse) === "running";
@@ -114,7 +115,7 @@ export function ClaudeToolCall({
     return (
       <div
         className={`flex items-center gap-1.5 py-0.5 text-xs ${clickable ? "cursor-pointer hover:bg-accent/50 rounded-sm px-1 -mx-1 transition-colors" : ""}`}
-        onClick={clickable ? () => openFileTab(filePath) : undefined}
+        onClick={clickable ? () => dispatch({ type: "tab-open-file", filePath }) : undefined}
       >
         <span className="shrink-0 text-muted-foreground">
           {getToolIcon(toolUse.name)}

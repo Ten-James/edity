@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,7 +18,7 @@ interface LineSelection {
 
 export function TextFileViewer({ content, filePath }: TextFileViewerProps) {
   const { activeTheme } = useTheme();
-  const { activeProject } = useAppContext();
+  const activeProject = useProjectStore((s) => s.activeProject);
   const [lines, setLines] = useState<string[]>([]);
   const [selection, setSelection] = useState<LineSelection | null>(null);
   const lastClickedLine = useRef<number | null>(null);

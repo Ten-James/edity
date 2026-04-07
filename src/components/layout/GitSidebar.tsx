@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { useGitStore } from "@/stores/gitStore";
+import { dispatch } from "@/stores/eventBus";
 import { useGitState } from "@/hooks/useGitState";
 import type { GitFileStatus } from "@/types/git";
 import { cn } from "@/lib/utils";
@@ -26,16 +28,10 @@ function fileStatus(f: GitFileStatus): { label: string; staged: boolean } {
 }
 
 export function GitSidebar() {
-  const {
-    activeProject,
-    gitBranchInfo,
-    createGitTab,
-    toggleSidebarPanel,
-    openFileTab,
-  } = useAppContext();
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const gitBranchInfo = useGitStore((s) => s.branchInfo);
 
-  const projectPath = activeProject?.path ?? "";
-  const git = useGitState(projectPath);
+  const git = useGitState(activeProject!.path);
   const [commitMsg, setCommitMsg] = useState("");
 
   useEffect(() => {
@@ -55,8 +51,8 @@ export function GitSidebar() {
   };
 
   const handleOpenFullView = () => {
-    createGitTab();
-    toggleSidebarPanel("git");
+    dispatch({ type: "tab-create-git" });
+    dispatch({ type: "layout-toggle-sidebar", panel: "git" });
   };
 
   if (!activeProject) return null;
@@ -142,7 +138,7 @@ export function GitSidebar() {
                 variant="ghost"
                 size="xs"
                 className="w-full justify-start gap-1.5 font-normal h-6"
-                onClick={() => openFileTab(f.path)}
+                onClick={() => dispatch({ type: "tab-open-file", filePath: f.path })}
               >
                 <span
                   className={cn(
@@ -153,7 +149,7 @@ export function GitSidebar() {
                   {st.label}
                 </span>
                 <span className="truncate text-xs">
-                  {relPath(f.path, projectPath)}
+                  {relPath(f.path, activeProject!.path)}
                 </span>
                 {f._staged && (
                   <IconCheck

@@ -19,7 +19,10 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useAppContext, type Project } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
+import { useClaudeStore } from "@/stores/claudeStore";
+import { dispatch } from "@/stores/eventBus";
+import type { Project } from "@shared/types/project";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn, PROJECT_COLORS } from "@/lib/utils";
 import { SetupDialog } from "@/components/SetupDialog";
@@ -38,16 +41,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onOpenSettings }: SidebarProps) {
-  const {
-    projects,
-    activeProject,
-    setActiveProject,
-    addProject,
-    removeProject,
-    reorderProjects,
-    projectConfigs,
-    projectClaudeStatus,
-  } = useAppContext();
+  const projects = useProjectStore((s) => s.projects);
+  const activeProject = useProjectStore((s) => s.activeProject);
+  const projectConfigs = useProjectStore((s) => s.edityConfigs);
+  const projectClaudeStatus = useClaudeStore((s) => s.projectStatuses);
   const { theme, toggleTheme } = useTheme();
 
   const [editProject, setEditProject] = useState<Project | null>(null);
@@ -90,7 +87,11 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                               dragOverIdx !== null &&
                               dragIdx !== dragOverIdx
                             ) {
-                              reorderProjects(dragIdx, dragOverIdx);
+                              dispatch({
+                                type: "project-reorder",
+                                fromIndex: dragIdx,
+                                toIndex: dragOverIdx,
+                              });
                             }
                             setDragIdx(null);
                             setDragOverIdx(null);
@@ -100,7 +101,9 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => setActiveProject(project)}
+                            onClick={() =>
+                              dispatch({ type: "project-switch", projectId: project.id })
+                            }
                             className={cn(
                               "flex h-8 w-8 items-center justify-center text-[11px] font-semibold transition-colors",
                               !isActive &&
@@ -146,7 +149,11 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                       <IconSettings size={14} />
                       Change
                     </ContextMenuItem>
-                    <ContextMenuItem onClick={() => removeProject(project.id)}>
+                    <ContextMenuItem
+                      onClick={() =>
+                        dispatch({ type: "project-remove", projectId: project.id })
+                      }
+                    >
                       <IconTrash size={14} />
                       Remove
                     </ContextMenuItem>
@@ -160,7 +167,11 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         <div className="flex flex-col items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" onClick={addProject}>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => dispatch({ type: "project-add" })}
+              >
                 <IconPlus size={16} />
               </Button>
             </TooltipTrigger>

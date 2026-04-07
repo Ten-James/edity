@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { useAppContext } from "@/contexts/AppContext";
+import { useProjectStore } from "@/stores/projectStore";
 import { LIGHT_THEMES, DARK_THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 import { KeybindingsSettings } from "@/components/KeybindingsSettings";
+import { FontPicker } from "@/components/settings/FontPicker";
 import type { ColorTheme } from "@shared/types/settings";
 
 interface SettingsDialogProps {
@@ -78,7 +79,7 @@ function ThemeCard({
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, updateSettings } = useTheme();
-  const { projects } = useAppContext();
+  const projects = useProjectStore((s) => s.projects);
 
   const [lightTheme, setLightTheme] = useState(settings.lightTheme);
   const [darkTheme, setDarkTheme] = useState(settings.darkTheme);
@@ -91,6 +92,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [keybindings, setKeybindings] = useState<Record<string, string>>(
     settings.keybindings,
   );
+  const [uiFontFamily, setUiFontFamily] = useState(settings.uiFontFamily);
+  const [monoFontFamily, setMonoFontFamily] = useState(settings.monoFontFamily);
+  const [monoFontLigatures, setMonoFontLigatures] = useState(
+    settings.monoFontLigatures,
+  );
   useEffect(() => {
     if (open) {
       setLightTheme(settings.lightTheme);
@@ -98,6 +104,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setDefaultProjectId(settings.defaultProjectId);
       setShowChatAvatars(settings.claude.showChatAvatars);
       setKeybindings(settings.keybindings);
+      setUiFontFamily(settings.uiFontFamily);
+      setMonoFontFamily(settings.monoFontFamily);
+      setMonoFontLigatures(settings.monoFontLigatures);
     }
   }, [open, settings]);
 
@@ -108,6 +117,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       defaultProjectId,
       claude: { ...settings.claude, showChatAvatars },
       keybindings,
+      uiFontFamily,
+      monoFontFamily,
+      monoFontLigatures,
     });
     onOpenChange(false);
   };
@@ -152,6 +164,50 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onClick={() => setDarkTheme(t.id)}
                   />
                 ))}
+              </div>
+            </div>
+
+            {/* Interface font */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Interface Font
+              </label>
+              <div className="mt-1.5">
+                <FontPicker
+                  value={uiFontFamily}
+                  onChange={setUiFontFamily}
+                  placeholder="System default"
+                />
+              </div>
+            </div>
+
+            {/* Editor & terminal font */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Editor & Terminal Font
+              </label>
+              <div className="mt-1.5">
+                <FontPicker
+                  value={monoFontFamily}
+                  onChange={setMonoFontFamily}
+                  monoOnly
+                  placeholder="System default"
+                />
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Checkbox
+                  id="mono-font-ligatures"
+                  checked={monoFontLigatures}
+                  onCheckedChange={(v) => setMonoFontLigatures(v === true)}
+                />
+                <label
+                  htmlFor="mono-font-ligatures"
+                  className="cursor-pointer text-xs"
+                >
+                  Enable font ligatures (joins{" "}
+                  <code className="font-mono">=&gt;</code>,{" "}
+                  <code className="font-mono">!=</code>, etc. — editor only)
+                </label>
               </div>
             </div>
 

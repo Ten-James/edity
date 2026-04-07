@@ -41,6 +41,8 @@ export interface ProjectConfigSavedEvent {
 export interface TabCreateTerminalEvent {
   type: "tab-create-terminal";
   initialCommand?: string;
+  cwd?: string;
+  worktreeBranch?: string;
 }
 
 /** Open a file in a tab (or focus existing). */
@@ -227,6 +229,23 @@ export interface UIOpenSettingsEvent {
   type: "ui-open-settings";
 }
 
+/** Open worktree creation dialog. */
+export interface UIOpenWorktreeDialogEvent {
+  type: "ui-open-worktree-dialog";
+}
+
+/** Open (or focus) the singleton Remote Access tab. */
+export interface TabCreateRemoteAccessEvent {
+  type: "tab-create-remote-access";
+}
+
+/** Create a worktree and open a terminal in it (dispatched by MCP). */
+export interface WorktreeCreateEvent {
+  type: "worktree-create";
+  branch: string;
+  initialCommand?: string;
+}
+
 // ─── Union Type ─────────────────────────────────────────────────
 
 export type EdityEvent =
@@ -273,7 +292,12 @@ export type EdityEvent =
   // UI
   | UIOpenPaletteEvent
   | UIClosePaletteEvent
-  | UIOpenSettingsEvent;
+  | UIOpenSettingsEvent
+  | UIOpenWorktreeDialogEvent
+  // Remote Access
+  | TabCreateRemoteAccessEvent
+  // Worktree
+  | WorktreeCreateEvent;
 
 /** Extract the event interface for a specific event type string. */
 export type EventPayload<T extends EdityEvent["type"]> = Extract<
