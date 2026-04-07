@@ -11,6 +11,11 @@ import {
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { useGitState } from "@/hooks/useGitState";
 import { useGitStore } from "@/stores/gitStore";
 import { dispatch } from "@/stores/eventBus";
@@ -176,63 +181,94 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {mode === "changes" && (
-          <div className="flex h-full">
-            <div className="flex w-[320px] flex-col border-r border-border shrink-0 overflow-hidden">
-              <GitChangesPanel
-                staged={git.staged}
-                unstaged={git.unstaged}
-                untracked={git.untracked}
-                selectedFile={git.selectedFile}
-                onSelectFile={git.selectFile}
-                onStage={git.stage}
-                onUnstage={git.unstage}
-                onDiscard={git.discard}
-              />
-              <GitCommitPanel
-                stagedCount={git.staged.length}
-                isCommitting={git.isCommitting}
-                onCommit={git.commit}
-                ahead={gitBranchInfo?.ahead ?? 0}
-                isPushing={git.isPushing}
-                onPush={handlePush}
-              />
-            </div>
-            <div className="flex-1">
-              <GitDiffViewer
-                diff={git.selectedDiff}
-                filePath={git.selectedFile?.path ?? null}
-              />
-            </div>
-          </div>
+          <ResizablePanelGroup
+            orientation="horizontal"
+            id="git-changes-layout"
+            className="h-full"
+          >
+            <ResizablePanel
+              defaultSize="28%"
+              minSize="15%"
+              maxSize="60%"
+            >
+              <div className="flex h-full flex-col overflow-hidden">
+                <GitChangesPanel
+                  staged={git.staged}
+                  unstaged={git.unstaged}
+                  untracked={git.untracked}
+                  selectedFile={git.selectedFile}
+                  onSelectFile={git.selectFile}
+                  onStage={git.stage}
+                  onUnstage={git.unstage}
+                  onDiscard={git.discard}
+                />
+                <GitCommitPanel
+                  stagedCount={git.staged.length}
+                  isCommitting={git.isCommitting}
+                  onCommit={git.commit}
+                  ahead={gitBranchInfo?.ahead ?? 0}
+                  isPushing={git.isPushing}
+                  onPush={handlePush}
+                />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize="72%" minSize="30%">
+              <div className="h-full">
+                <GitDiffViewer
+                  diff={git.selectedDiff}
+                  filePath={git.selectedFile?.path ?? null}
+                />
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
 
-        {mode === "history" && (
-          <div className="flex h-full">
-            <div
-              className={cn(
-                "flex flex-col overflow-hidden h-full",
-                git.selectedCommit
-                  ? "w-[400px] border-r border-border shrink-0"
-                  : "flex-1",
-              )}
+        {mode === "history" &&
+          // Keyed remount on selection toggle — react-resizable-panels needs
+          // a stable set of panels, and conditionally rendering the detail
+          // panel would otherwise confuse its size tracking.
+          (git.selectedCommit ? (
+            <ResizablePanelGroup
+              key="history-with-commit"
+              orientation="horizontal"
+              id="git-history-layout"
+              className="h-full"
             >
+              <ResizablePanel
+                defaultSize="40%"
+                minSize="20%"
+                maxSize="70%"
+              >
+                <div className="flex h-full flex-col overflow-hidden">
+                  <GitLogPanel
+                    log={git.log}
+                    selectedHash={git.selectedCommit.hash}
+                    onLoadLog={git.loadLog}
+                    onSelectCommit={git.selectCommit}
+                  />
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize="60%" minSize="30%">
+                <div className="h-full">
+                  <GitCommitDetail
+                    commit={git.selectedCommit}
+                    onClose={git.clearSelectedCommit}
+                  />
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            <div className="flex h-full flex-col overflow-hidden">
               <GitLogPanel
                 log={git.log}
-                selectedHash={git.selectedCommit?.hash ?? null}
+                selectedHash={null}
                 onLoadLog={git.loadLog}
                 onSelectCommit={git.selectCommit}
               />
             </div>
-            {git.selectedCommit && (
-              <div className="flex-1">
-                <GitCommitDetail
-                  commit={git.selectedCommit}
-                  onClose={git.clearSelectedCommit}
-                />
-              </div>
-            )}
-          </div>
-        )}
+          ))}
 
         {mode === "branches" && (
           <GitBranchPanel

@@ -31,6 +31,80 @@ function getGitIgnoredSet(dirPath: string, filePaths: string[]): Set<string> {
 }
 
 export function registerFileHandlers(): void {
+  // Recursive file search — used by the tree filter to know which folders
+  // contain matches so we can hide ones that don't. Uses `git ls-files`
+  // because it's drastically faster than walking the FS ourselves and it
+  // already respects gitignore + tracks untracked files in one shot.
+  // Returns absolute paths to keep parity with `list_directory`.
+  ipcMain.handle(
+    "search_files",
+    (
+      _event,
+      {
+        rootPath,
+        query,
+        showIgnored,
+      }: { rootPath: string; query: string; showIgnored?: boolean },
+    ) => {
+      const trimmed = query.trim().toLowerCase();
+      if (!trimmed) {
+        return { matchedFiles: [] as string[], matchedDirs: [] as string[] };
+      }
+
+      const args = ["ls-files", "--cached", "--others"];
+      if (!showIgnored) args.push("--exclude-standard");
+
+      let stdout: string;
+      try {
+        const result = spawnSync("git", args, {
+          cwd: rootPath,
+          encoding: "utf-8",
+          maxBuffer: 64 * 1024 * 1024,
+          timeout: 10000,
+        });
+        if (result.status !== 0) {
+          return { matchedFiles: [] as string[], matchedDirs: [] as string[] };
+        }
+        stdout = result.stdout;
+      } catch {
+        return { matchedFiles: [] as string[], matchedDirs: [] as string[] };
+      }
+
+      const matchedFiles = new Set<string>();
+      const matchedDirs = new Set<string>();
+
+      for (const relPath of stdout.split("\n")) {
+        if (!relPath) continue;
+        const segments = relPath.split("/");
+
+        // A path matches if any of its segments (file name OR an ancestor
+        // dir name) contains the query. This way searching for "comp" also
+        // surfaces files inside `src/components/`, not just files literally
+        // named "comp*".
+        const matched = segments.some((seg) =>
+          seg.toLowerCase().includes(trimmed),
+        );
+        if (!matched) continue;
+
+        const fullPath = path.join(rootPath, relPath);
+        matchedFiles.add(fullPath);
+
+        // Walk up and mark every ancestor dir as containing a match so the
+        // tree can keep them visible. Stop at the project root.
+        let cursor = path.dirname(fullPath);
+        while (cursor.length > rootPath.length && cursor.startsWith(rootPath)) {
+          matchedDirs.add(cursor);
+          cursor = path.dirname(cursor);
+        }
+      }
+
+      return {
+        matchedFiles: [...matchedFiles],
+        matchedDirs: [...matchedDirs],
+      };
+    },
+  );
+
   // File Tree
   ipcMain.handle("list_directory", (_event, { path: dirPath, showIgnored }: { path: string; showIgnored?: boolean }) => {
     try {

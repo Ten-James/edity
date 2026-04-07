@@ -62,7 +62,8 @@ export function RunButton() {
 
   if (!activeProject) return null;
 
-  // No config at all — show setup button
+  // No config at all — return a borderless Setup button so the parent
+  // TopBar can place it inside the joined action-button container.
   if (!edityConfig) {
     return (
       <>
@@ -71,7 +72,7 @@ export function RunButton() {
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1"
+              className="gap-1 border-0"
               onClick={() => setSetupOpen(true)}
             >
               <IconSettings size={16} />
@@ -100,42 +101,49 @@ export function RunButton() {
 
   return (
     <>
-      <div className="flex items-center">
-        {/* Primary button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`gap-1 ${hasDropdownItems ? "rounded-r-none" : ""} ${isProjectRunning ? "text-red-500 hover:text-red-600" : ""}`}
-              onClick={() => (isProjectRunning ? stopProject() : runProject())}
-              disabled={!isProjectRunning && !hasAnyCommand}
-            >
-              {isProjectRunning ? (
-                <IconPlayerStop size={16} />
-              ) : (
-                <IconPlayerPlay size={16} />
-              )}
-              <span className="text-xs">
+      {/* Returns a flat sequence: [Run primary, divider?, chevron?]. The
+          parent TopBar wraps this together with Git/Files into a single
+          bordered container, so RunButton itself emits no border. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="xs"
+            className={`gap-1 border-0 leading-none ${isProjectRunning ? "text-red-500 hover:text-red-600" : ""}`}
+            onClick={() => (isProjectRunning ? stopProject() : runProject())}
+            disabled={!isProjectRunning && !hasAnyCommand}
+          >
+            {isProjectRunning ? (
+              <IconPlayerStop size={12} />
+            ) : (
+              <IconPlayerPlay size={12} />
+            )}
+            <span className="text-xs">
                 {isProjectRunning ? "Stop" : "Run"}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {isProjectRunning
-              ? "Stop all running processes"
-              : (defaultCommand?.command ?? "No run command configured")}
-          </TooltipContent>
-        </Tooltip>
+            </span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isProjectRunning
+            ? "Stop all running processes"
+            : (defaultCommand?.command ?? "No run command configured")}
+        </TooltipContent>
+      </Tooltip>
 
-        {/* Dropdown chevron */}
-        {hasDropdownItems && (
+      {/* Dropdown chevron — divider in front of it is rendered by TopBar
+          as part of the global divider strategy. */}
+      {hasDropdownItems && (
+        <>
+          <span
+            aria-hidden
+            className="self-stretch w-px bg-border"
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="rounded-l-none border-l border-border/50"
+                className="border-0"
               >
                 <IconChevronDown size={12} />
               </Button>
@@ -198,9 +206,14 @@ export function RunButton() {
                     >
                       <IconPlayerPlay size={12} />
                       {script.name}
-                      <DropdownMenuShortcut>
-                        {script.source}
-                      </DropdownMenuShortcut>
+                      {/* Hide the source label for package.json — npm
+                          scripts dominate the list and the "package.json"
+                          tag added visual noise without info value. */}
+                      {script.source !== "package.json" && (
+                        <DropdownMenuShortcut>
+                          {script.source}
+                        </DropdownMenuShortcut>
+                      )}
                     </DropdownMenuItem>
                   ))}
                 </>
@@ -217,8 +230,8 @@ export function RunButton() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
-      </div>
+        </>
+      )}
 
       <SetupDialog
         open={setupOpen}

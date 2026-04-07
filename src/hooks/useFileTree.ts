@@ -19,6 +19,16 @@ export interface FileTreeContextMenu {
 
 export type GitFilter = "all" | "M" | "A" | "D" | "?";
 
+export interface SearchMatch {
+  files: Set<string>;
+  dirs: Set<string>;
+}
+
+interface SearchFilesResponse {
+  matchedFiles: string[];
+  matchedDirs: string[];
+}
+
 export function hasGitStatusInTree(
   entry: FileEntry,
   gitStatusMap: Map<string, string>,
@@ -59,6 +69,47 @@ export function useFileTree() {
     name: string;
   } | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
+  const [searchMatch, setSearchMatch] = useState<SearchMatch | null>(null);
+
+  // Debounced recursive search — fetches the set of files & ancestor dirs
+  // that match the current filter so the tree can hide folders without any
+  // matching descendants. When the filter is empty we fall back to the
+  // normal lazy-loaded tree (searchMatch === null).
+  useEffect(() => {
+    if (!activeProject) {
+      setSearchMatch(null);
+      return;
+    }
+    const trimmed = filter.trim();
+    if (!trimmed) {
+      setSearchMatch(null);
+      return;
+    }
+
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      invoke<SearchFilesResponse>("search_files", {
+        rootPath: activeProject.path,
+        query: trimmed,
+        showIgnored,
+      })
+        .then((result) => {
+          if (cancelled) return;
+          setSearchMatch({
+            files: new Set(result.matchedFiles),
+            dirs: new Set(result.matchedDirs),
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setSearchMatch(null);
+        });
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [filter, showIgnored, activeProject]);
 
   function refreshTree() {
     if (!activeProject) return;
@@ -270,23 +321,24 @@ export function useFileTree() {
     });
   }
 
-  // Filtering
-  let filtered = filter
-    ? entries.filter((e) => {
-        const lf = filter.toLowerCase();
-        if (e.name.toLowerCase().includes(lf)) return true;
-        if (!e.is_dir || !activeProject) return false;
-        const rel = e.path.replace(activeProject.path + "/", "");
-        for (const [filePath] of gitStatusMap) {
-          if (
-            filePath.startsWith(rel + "/") &&
-            filePath.toLowerCase().includes(lf)
-          )
-            return true;
-        }
-        return true;
-      })
-    : entries;
+  // Filtering: when a recursive search has resolved, hide entries that
+  // neither match the query themselves nor contain a matching descendant.
+  // While the search is still in flight (`filter` set but `searchMatch`
+  // not yet populated) we fall back to a name-only filter so the tree
+  // doesn't flash an empty state.
+  let filtered: FileEntry[];
+  if (searchMatch) {
+    filtered = entries.filter(
+      (e) => searchMatch.files.has(e.path) || searchMatch.dirs.has(e.path),
+    );
+  } else if (filter) {
+    const lf = filter.toLowerCase();
+    filtered = entries.filter(
+      (e) => e.name.toLowerCase().includes(lf) || e.is_dir,
+    );
+  } else {
+    filtered = entries;
+  }
 
   if (gitFilter !== "all" && activeProject) {
     filtered = filtered.filter((e) =>
@@ -318,6 +370,7 @@ export function useFileTree() {
     setCreating,
     showIgnored,
     setShowIgnored,
+    searchMatch,
     handleSelect,
     handleContextMenuOpen,
     handleDelete,

@@ -1,11 +1,25 @@
-import { useState, useEffect, Component, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  Component,
+  type ReactNode,
+} from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { parseDiff } from "@/lib/diff-parser";
 import { getHighlighter, detectLang, ensureShikiTheme } from "@/lib/shiki";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
-import type { DiffLine } from "@/types/git";
+import type { DiffLine, FileDiff } from "@/types/git";
 import type { Highlighter } from "shiki";
+
+// Above this many lines we skip shiki tokenization entirely — it would block
+// the main thread for too long. The diff still renders, just without syntax
+// colors. Below this we highlight normally.
+const MAX_HIGHLIGHT_LINES = 2000;
+// Above this we show a placeholder instead of rendering all rows. The user
+// can still force-render via the button if they really want to scroll it.
+const MAX_RENDER_LINES = 10000;
 
 interface GitDiffViewerProps {
   diff: string | null;
@@ -26,23 +40,32 @@ function tokenizeLine(
   return tokenMap.get(lineIndex) ?? [{ content: line.content }];
 }
 
+interface TokenCache {
+  map: Map<number, TokenSpan[]>;
+  // Stored inputs so the render path can tell whether `map` still belongs
+  // to the currently-requested (code, lang, theme) combo. Using derived-
+  // state comparison instead of clearing state in an effect avoids the
+  // React "setState in effect" anti-pattern.
+  code: string;
+  lang: string;
+  theme: string;
+}
+
 function useShikiTokens(
   lines: DiffLine[] | null,
-  filePath: string | null,
+  code: string | null,
+  lang: string | null,
   shikiTheme: string,
 ) {
-  const [tokenMap, setTokenMap] = useState<Map<number, TokenSpan[]> | null>(
-    null,
-  );
+  const [cache, setCache] = useState<TokenCache | null>(null);
 
-  const code = lines
-    ? lines
-        .filter((l) => l.type !== "header")
-        .map((l) => l.content)
-        .join("\n")
-    : null;
-  const lang = filePath ? detectLang(filePath) : null;
-  const canHighlight = !!(code && filePath && lines && lang && lang !== "text");
+  const canHighlight = !!(
+    code &&
+    lines &&
+    lang &&
+    lang !== "text" &&
+    lines.length <= MAX_HIGHLIGHT_LINES
+  );
 
   useEffect(() => {
     if (!canHighlight) return;
@@ -73,9 +96,11 @@ function useShikiTokens(
           shikiLineIdx++;
         }
 
-        if (!cancelled) setTokenMap(map);
+        if (!cancelled) {
+          setCache({ map, code, lang, theme: shikiTheme });
+        }
       } catch {
-        if (!cancelled) setTokenMap(null);
+        /* highlighting failed — derived tokenMap stays null */
       }
     })();
 
@@ -84,7 +109,16 @@ function useShikiTokens(
     };
   }, [canHighlight, code, lang, shikiTheme, lines]);
 
-  return canHighlight ? tokenMap : null;
+  if (
+    !canHighlight ||
+    !cache ||
+    cache.code !== code ||
+    cache.lang !== lang ||
+    cache.theme !== shikiTheme
+  ) {
+    return null;
+  }
+  return cache.map;
 }
 
 interface ErrorBoundaryProps {
@@ -134,11 +168,50 @@ export function GitDiffViewer({ diff, filePath }: GitDiffViewerProps) {
 
 function GitDiffViewerInner({ diff, filePath }: GitDiffViewerProps) {
   const { activeTheme } = useTheme();
+  // Track which file the user explicitly opted into rendering. Storing the
+  // filePath (instead of a boolean) auto-resets the opt-in when the user
+  // navigates to a different file, without needing an effect to clear it.
+  const [forceRenderFile, setForceRenderFile] = useState<string | null>(null);
+  const forceRender = forceRenderFile !== null && forceRenderFile === filePath;
 
-  const parsed = diff && filePath ? parseDiff(diff, filePath) : null;
-  const allLines = parsed ? parsed.hunks.flatMap((h) => h.lines) : null;
+  // Memoize all derived values so they only recompute when inputs actually
+  // change. Without this, parseDiff + flatMap + code-join run on every
+  // render, and the shiki effect re-fires on every render because `lines`
+  // and `code` are new references each time — that's the freeze.
+  const parsed = useMemo<FileDiff | null>(
+    () => (diff && filePath ? parseDiff(diff, filePath) : null),
+    [diff, filePath],
+  );
+  const allLines = useMemo(
+    () => (parsed ? parsed.hunks.flatMap((h) => h.lines) : null),
+    [parsed],
+  );
+  const code = useMemo(
+    () =>
+      allLines
+        ? allLines
+            .filter((l) => l.type !== "header")
+            .map((l) => l.content)
+            .join("\n")
+        : null,
+    [allLines],
+  );
+  const lang = useMemo(
+    () => (filePath ? detectLang(filePath) : null),
+    [filePath],
+  );
+  const hunkOffsets = useMemo(() => {
+    if (!parsed) return [];
+    const offsets: number[] = [];
+    let offset = 0;
+    for (const hunk of parsed.hunks) {
+      offsets.push(offset);
+      offset += hunk.lines.length;
+    }
+    return offsets;
+  }, [parsed]);
 
-  const tokenMap = useShikiTokens(allLines, filePath, activeTheme.shikiTheme);
+  const tokenMap = useShikiTokens(allLines, code, lang, activeTheme.shikiTheme);
 
   if (!filePath) {
     return (
@@ -164,14 +237,22 @@ function GitDiffViewerInner({ diff, filePath }: GitDiffViewerProps) {
     );
   }
 
-  // Pre-compute hunk offsets so we don't mutate during render (React Compiler safe)
-  const hunkOffsets: number[] = [];
-  if (parsed) {
-    let offset = 0;
-    for (const hunk of parsed.hunks) {
-      hunkOffsets.push(offset);
-      offset += hunk.lines.length;
-    }
+  const lineCount = allLines?.length ?? 0;
+  if (lineCount > MAX_RENDER_LINES && !forceRender) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-xs text-muted-foreground">
+        <span>
+          Diff too large to render ({lineCount.toLocaleString()} lines).
+        </span>
+        <button
+          type="button"
+          onClick={() => setForceRenderFile(filePath)}
+          className="border border-border bg-input/30 px-3 py-1 hover:bg-accent"
+        >
+          Render anyway
+        </button>
+      </div>
+    );
   }
 
   return (

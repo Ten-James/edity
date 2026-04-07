@@ -38,9 +38,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      // Override the dialog's default `sm:max-w-sm` (384px) — far too
+      // narrow for a palette listing keybindings + categories.
+      className="sm:max-w-2xl"
+    >
       <CommandInput placeholder="Search commands..." />
-      <CommandList>
+      <CommandList className="max-h-[480px]">
         <CommandEmpty>No commands found</CommandEmpty>
         {Array.from(grouped.entries()).map(([category, cmds]) => (
           <CommandGroup key={category} heading={category}>

@@ -30,7 +30,7 @@ export function TopBar() {
   return (
     <div
       onMouseDown={onMouseDown}
-      className={`flex h-8 items-center bg-background pr-3 gap-2 shrink-0 ${isFullscreen ? "pl-3" : "pl-20"}`}
+      className={`flex items-center bg-sidebar p-2 gap-2 shrink-0 ${isFullscreen ? "pl-1" : "pl-18"}`}
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {isDev && (
@@ -89,33 +89,42 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      <RunButton />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={sidebarPanel === "git" ? "secondary" : "ghost"}
-            size="icon-xs"
-            onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "git" })}
-          >
-            <IconGitBranch size={14} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Git</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={sidebarPanel === "files" ? "secondary" : "ghost"}
-            size="icon-xs"
-            onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "files" })}
-          >
-            <IconFolder size={14} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Files</TooltipContent>
-      </Tooltip>
+      {/* Single joined action group: [Run [+ chevron]] | Git | Files.
+          All buttons inside are borderless (`border-0`), the container
+          provides the single outer 1px border, and `<span>` dividers add
+          the internal separators. The parent's `pr-3` keeps the group
+          off the right edge of the window. */}
+      <div className="flex items-center border border-border h-[26px]">
+        <RunButton />
+        <span aria-hidden className="self-stretch w-px bg-border" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={sidebarPanel === "git" ? "secondary" : "ghost"}
+              size="icon-xs"
+              className="border-0"
+              onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "git" })}
+            >
+              <IconGitBranch size={14} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Git</TooltipContent>
+        </Tooltip>
+        <span aria-hidden className="self-stretch w-px bg-border" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={sidebarPanel === "files" ? "secondary" : "ghost"}
+              size="icon-xs"
+              className="border-0"
+              onClick={() => dispatch({ type: "layout-toggle-sidebar", panel: "files" })}
+            >
+              <IconFolder size={14} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Files</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   );
 }

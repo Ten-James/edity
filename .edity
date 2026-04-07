@@ -5,7 +5,7 @@
     {
       "name": "npm run dev",
       "command": "npm run dev",
-      "mode": "terminal"
+      "mode": "background"
     }
   ]
 }

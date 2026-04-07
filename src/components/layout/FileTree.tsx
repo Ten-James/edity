@@ -122,6 +122,7 @@ export function FileTree() {
               entry={entry}
               depth={0}
               filter={tree.filter}
+              searchMatch={tree.searchMatch}
               gitStatusMap={tree.gitStatusMap}
               projectPath={tree.activeProject?.path ?? ""}
               refreshSignal={tree.refreshSignal}

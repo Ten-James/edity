@@ -10,7 +10,11 @@ import { getFileIcon } from "@/lib/file-icons";
 import { dispatch } from "@/stores/eventBus";
 import { invoke } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import type { FileEntry, FileTreeContextMenu } from "@/hooks/useFileTree";
+import type {
+  FileEntry,
+  FileTreeContextMenu,
+  SearchMatch,
+} from "@/hooks/useFileTree";
 
 function statusIndicatorColor(status: string) {
   switch (status) {
@@ -40,6 +44,7 @@ interface FileTreeNodeProps {
   entry: FileEntry;
   depth: number;
   filter: string;
+  searchMatch: SearchMatch | null;
   gitStatusMap: Map<string, string>;
   projectPath: string;
   refreshSignal: number;
@@ -53,6 +58,7 @@ export function FileTreeNode({
   entry,
   depth,
   filter,
+  searchMatch,
   gitStatusMap,
   projectPath,
   refreshSignal,
@@ -63,6 +69,31 @@ export function FileTreeNode({
 }: FileTreeNodeProps) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[]>([]);
+
+  // While a search is active, force any folder that contains a match to be
+  // visually expanded so the user can see the matching descendants without
+  // having to click into every folder. The user's manual `expanded` state
+  // is preserved and takes effect again when the search is cleared.
+  const isInSearch =
+    searchMatch !== null && entry.is_dir && searchMatch.dirs.has(entry.path);
+  const effectiveExpanded = isInSearch ? true : expanded;
+
+  // Auto-load children when a folder becomes part of the search results.
+  // Without this, lazy-loaded folders that the user never opened manually
+  // would render expanded but empty during search.
+  useEffect(() => {
+    if (!isInSearch || !entry.is_dir) return;
+    let cancelled = false;
+    invoke<FileEntry[]>("list_directory", {
+      path: entry.path,
+      showIgnored,
+    }).then((entries) => {
+      if (!cancelled) setChildren(entries);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isInSearch, entry.is_dir, entry.path, showIgnored]);
 
   const toggle = async () => {
     if (!entry.is_dir) {
@@ -88,13 +119,23 @@ export function FileTreeNode({
     }
   }, [refreshSignal, expanded, entry.is_dir, entry.path, showIgnored]);
 
-  const filtered = filter
-    ? children.filter((c) => {
-        if (c.name.toLowerCase().includes(filter.toLowerCase())) return true;
-        // Keep folders — their children may match
-        return c.is_dir;
-      })
-    : children;
+  // Children filtering: when a search is in progress, only keep entries
+  // that the backend reported as matching (or whose ancestor chain
+  // matches). Outside of search mode, fall back to a name-only filter
+  // and keep folders unconditionally so the user can drill into them.
+  let filtered: FileEntry[];
+  if (searchMatch) {
+    filtered = children.filter(
+      (c) => searchMatch.files.has(c.path) || searchMatch.dirs.has(c.path),
+    );
+  } else if (filter) {
+    const lf = filter.toLowerCase();
+    filtered = children.filter(
+      (c) => c.name.toLowerCase().includes(lf) || c.is_dir,
+    );
+  } else {
+    filtered = children;
+  }
 
   const gitStatus = !entry.is_dir
     ? getFileGitStatus(entry.path, projectPath, gitStatusMap)
@@ -133,12 +174,12 @@ export function FileTreeNode({
       >
         {entry.is_dir ? (
           <>
-            {expanded ? (
+            {effectiveExpanded ? (
               <IconChevronDown size={13} className="shrink-0" />
             ) : (
               <IconChevronRight size={13} className="shrink-0" />
             )}
-            {expanded ? (
+            {effectiveExpanded ? (
               <IconFolderOpen size={13} className="shrink-0" />
             ) : (
               <IconFolder size={13} className="shrink-0" />
@@ -165,13 +206,14 @@ export function FileTreeNode({
           </span>
         )}
       </Button>
-      {expanded &&
+      {effectiveExpanded &&
         filtered.map((child) => (
           <FileTreeNode
             key={child.path}
             entry={child}
             depth={depth + 1}
             filter={filter}
+            searchMatch={searchMatch}
             gitStatusMap={gitStatusMap}
             projectPath={projectPath}
             refreshSignal={refreshSignal}
