@@ -662,17 +662,30 @@ subscribe((event) => {
         const state = s.projectPanes.get(projectId);
         if (!state || state.panes.length <= 1) return s;
 
-        const allTabsMerged: Tab[] = [];
-        let mergedActiveTabId: string | null = null;
+        // Reuse the focused pane (preserving its id) and merge other panes'
+        // tabs into it. Creating a fresh merged pane would change pane.id and
+        // force React to remount PaneContainer, disposing terminals.
+        const focusedPane =
+          state.panes.find((p) => p.id === state.focusedPaneId) ??
+          state.panes[0];
+
+        const mergedTabs: Tab[] = [];
         for (const pane of state.panes) {
-          allTabsMerged.push(...pane.tabs);
-          if (pane.id === state.focusedPaneId) {
-            mergedActiveTabId = pane.activeTabId;
+          if (pane.id === focusedPane.id) {
+            mergedTabs.push(...pane.tabs);
+          }
+        }
+        for (const pane of state.panes) {
+          if (pane.id !== focusedPane.id) {
+            mergedTabs.push(...pane.tabs);
           }
         }
 
-        const merged = makePane(allTabsMerged);
-        merged.activeTabId = mergedActiveTabId ?? allTabsMerged[0]?.id ?? null;
+        const merged: Pane = {
+          ...focusedPane,
+          tabs: mergedTabs,
+          activeTabId: focusedPane.activeTabId ?? mergedTabs[0]?.id ?? null,
+        };
 
         const next = new Map(s.projectPanes);
         next.set(projectId, {
