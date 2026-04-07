@@ -1,4 +1,12 @@
-import { IconFolder, IconGitBranch } from "@tabler/icons-react";
+import {
+  IconArrowDown,
+  IconArrowUp,
+  IconFile,
+  IconFolder,
+  IconGitBranch,
+  IconMinus,
+  IconPlus,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -53,13 +61,15 @@ export function TopBar() {
           <IconGitBranch size={12} />
           {gitBranchInfo.current}
           {gitBranchInfo.ahead > 0 && (
-            <span className="text-green-500 text-[10px]">
-              {gitBranchInfo.ahead}↑
+            <span className="flex items-center gap-0.5 text-green-500 text-[10px]">
+              <IconArrowUp size={10} stroke={2.5} />
+              {gitBranchInfo.ahead}
             </span>
           )}
           {gitBranchInfo.behind > 0 && (
-            <span className="text-orange-500 text-[10px]">
-              {gitBranchInfo.behind}↓
+            <span className="flex items-center gap-0.5 text-orange-500 text-[10px]">
+              <IconArrowDown size={10} stroke={2.5} />
+              {gitBranchInfo.behind}
             </span>
           )}
           {gitDiffStats &&
@@ -68,18 +78,21 @@ export function TopBar() {
               gitDiffStats.changedFiles > 0) && (
               <span className="flex items-center gap-1 ml-1 text-[10px]">
                 {gitDiffStats.additions > 0 && (
-                  <span className="text-green-500">
-                    +{gitDiffStats.additions}
+                  <span className="flex items-center gap-0.5 text-green-500">
+                    <IconPlus size={10} stroke={2.5} />
+                    {gitDiffStats.additions}
                   </span>
                 )}
                 {gitDiffStats.deletions > 0 && (
-                  <span className="text-red-500">
-                    -{gitDiffStats.deletions}
+                  <span className="flex items-center gap-0.5 text-red-500">
+                    <IconMinus size={10} stroke={2.5} />
+                    {gitDiffStats.deletions}
                   </span>
                 )}
                 {gitDiffStats.changedFiles > 0 && (
-                  <span className="text-muted-foreground">
-                    ^{gitDiffStats.changedFiles}
+                  <span className="flex items-center gap-0.5 text-muted-foreground">
+                    <IconFile size={10} stroke={2.5} />
+                    {gitDiffStats.changedFiles}
                   </span>
                 )}
               </span>
