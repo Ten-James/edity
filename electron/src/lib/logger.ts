@@ -1,9 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
+import { CONFIG_DIR } from "./state";
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
-const CONFIG_DIR = path.join(os.homedir(), ".config", "edity");
 const LOG_PATH = path.join(CONFIG_DIR, "edity-dev.log");
 const MODULE_PAD = 16;
 const MAX_LOG_BUFFER = 10000;

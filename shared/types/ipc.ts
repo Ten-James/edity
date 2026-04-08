@@ -135,7 +135,6 @@ export interface IpcHandlerMap {
 
   // Claude detection (legacy terminal)
   get_claude_status: { args: { tabId: string }; ret: ClaudeStatusResult | null };
-  get_all_claude_statuses: { args: undefined; ret: Record<string, { status: string }> };
 
   // Claude Agent SDK
   claude_start: { args: { sessionId: string; projectPath: string; prompt: string; model?: string; permissionMode?: string; resume?: string }; ret: { sessionId: string } };

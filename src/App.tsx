@@ -62,10 +62,10 @@ function StoreInitializer() {
       });
 
     useGitStore.getState().startPolling();
-    useClaudeStore.getState().startPolling();
+    useClaudeStore.getState().startSubscription();
     return () => {
       useGitStore.getState().stopPolling();
-      useClaudeStore.getState().stopPolling();
+      useClaudeStore.getState().stopSubscription();
     };
   }, []);
   return null;

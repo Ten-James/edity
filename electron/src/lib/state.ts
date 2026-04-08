@@ -54,11 +54,19 @@ export interface TabClaudeState {
   oscTitle: string | null;
   status: string | null;
   claudePid: number | null;
+  sessionId: string | null;
   oscBuffer: string;
   pidLookupAt: number;
 }
 
 export const tabClaudeState = new Map<string, TabClaudeState>();
+
+/**
+ * Reverse lookup used by the Claude IPC server to route hook messages
+ * to the right tab without re-walking the PID tree on every event. Populated
+ * lazily on the first hook arriving for each session.
+ */
+export const sessionIdToTabId = new Map<string, string>();
 
 // --- Project dir watcher ---
 
@@ -74,11 +82,16 @@ export function setProjectDirDebounce(d: ReturnType<typeof setTimeout> | null): 
 }
 
 // --- Config paths ---
+//
+// In dev mode (running via the Vite dev server) we keep all global state in
+// a separate `edity-dev` directory so local development can't corrupt the
+// production app's projects, settings, claude IPC config, or Claude hooks.
+const CONFIG_DIR_NAME = process.env.VITE_DEV_SERVER_URL ? "edity-dev" : "edity";
 
-export const CONFIG_DIR = path.join(os.homedir(), ".config", "edity");
+export const CONFIG_DIR = path.join(os.homedir(), ".config", CONFIG_DIR_NAME);
 export const PROJECTS_PATH = path.join(CONFIG_DIR, "projects.json");
-export const CLAUDE_STATUS_DIR = path.join(CONFIG_DIR, "claude-status");
 export const HOOK_SCRIPT_PATH = path.join(CONFIG_DIR, "claude-hook.sh");
+export const CLAUDE_IPC_CONFIG_PATH = path.join(CONFIG_DIR, "claude-ipc.json");
 export const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 export const CLAUDE_SETTINGS_PATH = path.join(os.homedir(), ".claude", "settings.json");
 export const CLAUDE_SESSIONS_DIR = path.join(os.homedir(), ".claude", "sessions");

@@ -26,7 +26,7 @@ Always write clean code and ensure if its possible one component per file, no mo
 
 **Git integration**: All git commands run via `execFileSync` in the Electron main process, exposed through IPC. UI state managed by `src/hooks/useGitState.ts`.
 
-**Claude Code integration**: Detects Claude via OSC title sequences in PTY output. Installs hooks into `~/.claude/settings.json` on startup. Status tracked per-tab via files in `~/.config/edity/claude-status/`.
+**Claude Code integration**: Detects Claude via OSC title sequences in PTY output. Installs hooks into `~/.claude/settings.json` on startup. Hook script POSTs status updates over localhost HTTP to the main process; address + token are written to `~/.config/edity/claude-ipc.json` on boot. Status flows main → renderer via the `claude-status-changed` IPC channel (no polling, no status files).
 
 
 ## Data Persistence

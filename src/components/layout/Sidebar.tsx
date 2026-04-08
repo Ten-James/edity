@@ -8,6 +8,7 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useProjectStore } from "@/stores/projectStore";
 import { useClaudeStore } from "@/stores/claudeStore";
+import { useActiveProjectIds } from "@/stores/layoutStore";
 import { dispatch } from "@/stores/eventBus";
 import type { Project } from "@shared/types/project";
 import { useTheme } from "@/components/theme/ThemeProvider";
@@ -45,122 +47,139 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const activeProject = useProjectStore((s) => s.activeProject);
   const projectConfigs = useProjectStore((s) => s.edityConfigs);
   const projectClaudeStatus = useClaudeStore((s) => s.projectStatuses);
+  const activeProjectIds = useActiveProjectIds();
   const { theme, toggleTheme } = useTheme();
 
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
+  const renderProject = ({ project, idx }: { project: Project; idx: number }) => {
+    const config = projectConfigs.get(project.id);
+    const label = config?.acronym || getInitials(project.name);
+    const isActive = activeProject?.id === project.id;
+    const isInActiveGroup = activeProjectIds.has(project.id);
+    const claudeStatus = projectClaudeStatus.get(project.id);
+    const color = config?.color ? PROJECT_COLORS[config.color] : null;
+
+    return (
+      <ContextMenu key={project.id}>
+        <Tooltip>
+          <ContextMenuTrigger asChild>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  "relative flex flex-col items-center",
+                  dragOverIdx === idx &&
+                    dragIdx !== idx &&
+                    "border-t-2 border-primary",
+                )}
+                draggable
+                onDragStart={() => setDragIdx(idx)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOverIdx(idx);
+                }}
+                onDragEnd={() => {
+                  if (
+                    dragIdx !== null &&
+                    dragOverIdx !== null &&
+                    dragIdx !== dragOverIdx
+                  ) {
+                    dispatch({
+                      type: "project-reorder",
+                      fromIndex: dragIdx,
+                      toIndex: dragOverIdx,
+                    });
+                  }
+                  setDragIdx(null);
+                  setDragOverIdx(null);
+                }}
+                onDragLeave={() => setDragOverIdx(null)}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() =>
+                    dispatch({ type: "project-switch", projectId: project.id })
+                  }
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center text-[11px] font-semibold transition-colors",
+                    !isInActiveGroup &&
+                      "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    dragIdx === idx && "opacity-50",
+                  )}
+                  style={
+                    isInActiveGroup && color
+                      ? {
+                          backgroundColor: color.hex,
+                          color: color.textHex,
+                          opacity: isActive ? 1 : 0.55,
+                        }
+                      : isActive
+                        ? {
+                            backgroundColor: "var(--accent)",
+                            color: "var(--foreground)",
+                          }
+                        : undefined
+                  }
+                >
+                  {label}
+                </Button>
+                {claudeStatus && (
+                  <div
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-sidebar transition-colors",
+                      claudeStatus === "working" && "bg-blue-500",
+                      claudeStatus === "idle" && "bg-green-500",
+                      claudeStatus === "notification" &&
+                        "bg-red-500 animate-pulse",
+                      claudeStatus === "active" && "bg-blue-500",
+                    )}
+                  />
+                )}
+              </div>
+            </TooltipTrigger>
+          </ContextMenuTrigger>
+          <TooltipContent side="right">{project.name}</TooltipContent>
+        </Tooltip>
+
+        <ContextMenuContent>
+          <ContextMenuItem onClick={() => setEditProject(project)}>
+            <IconSettings size={14} />
+            Change
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() =>
+              dispatch({ type: "project-remove", projectId: project.id })
+            }
+          >
+            <IconTrash size={14} />
+            Remove
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    );
+  };
+
+  const indexedProjects = projects.map((project, idx) => ({ project, idx }));
+  const activeProjects = indexedProjects.filter(({ project }) =>
+    activeProjectIds.has(project.id),
+  );
+  const otherProjects = indexedProjects.filter(
+    ({ project }) => !activeProjectIds.has(project.id),
+  );
+
   return (
     <>
       <div className="flex h-full w-12 flex-col items-center bg-sidebar pt-1 pb-2 gap-1.5">
         <ScrollArea className="flex-1 w-full">
           <div className="flex flex-col items-center gap-1.5 px-1.5">
-            {projects.map((project, idx) => {
-              const config = projectConfigs.get(project.id);
-              const label = config?.acronym || getInitials(project.name);
-              const isActive = activeProject?.id === project.id;
-              const claudeStatus = projectClaudeStatus.get(project.id);
-              const color = config?.color ? PROJECT_COLORS[config.color] : null;
-
-              return (
-                <ContextMenu key={project.id}>
-                  <Tooltip>
-                    <ContextMenuTrigger asChild>
-                      <TooltipTrigger asChild>
-                        <div
-                          className={cn(
-                            "flex flex-col items-center gap-1",
-                            dragOverIdx === idx &&
-                              dragIdx !== idx &&
-                              "border-t-2 border-primary",
-                          )}
-                          draggable
-                          onDragStart={() => setDragIdx(idx)}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragOverIdx(idx);
-                          }}
-                          onDragEnd={() => {
-                            if (
-                              dragIdx !== null &&
-                              dragOverIdx !== null &&
-                              dragIdx !== dragOverIdx
-                            ) {
-                              dispatch({
-                                type: "project-reorder",
-                                fromIndex: dragIdx,
-                                toIndex: dragOverIdx,
-                              });
-                            }
-                            setDragIdx(null);
-                            setDragOverIdx(null);
-                          }}
-                          onDragLeave={() => setDragOverIdx(null)}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() =>
-                              dispatch({ type: "project-switch", projectId: project.id })
-                            }
-                            className={cn(
-                              "flex h-8 w-8 items-center justify-center text-[11px] font-semibold transition-colors",
-                              !isActive &&
-                                "text-muted-foreground hover:bg-accent hover:text-foreground",
-                              dragIdx === idx && "opacity-50",
-                            )}
-                            style={
-                              isActive && color
-                                ? {
-                                    backgroundColor: color.hex,
-                                    color: color.textHex,
-                                  }
-                                : isActive
-                                  ? {
-                                      backgroundColor: "var(--accent)",
-                                      color: "var(--foreground)",
-                                    }
-                                  : undefined
-                            }
-                          >
-                            {label}
-                          </Button>
-                          {claudeStatus && (
-                            <div
-                              className={cn(
-                                "h-1 w-1 rounded-full transition-colors",
-                                claudeStatus === "working" && "bg-blue-500",
-                                claudeStatus === "idle" && "bg-green-500",
-                                claudeStatus === "notification" &&
-                                  "bg-red-500 animate-pulse",
-                                claudeStatus === "active" && "bg-blue-500",
-                              )}
-                            />
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                    </ContextMenuTrigger>
-                    <TooltipContent side="right">{project.name}</TooltipContent>
-                  </Tooltip>
-
-                  <ContextMenuContent>
-                    <ContextMenuItem onClick={() => setEditProject(project)}>
-                      <IconSettings size={14} />
-                      Change
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onClick={() =>
-                        dispatch({ type: "project-remove", projectId: project.id })
-                      }
-                    >
-                      <IconTrash size={14} />
-                      Remove
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              );
-            })}
+            {activeProjects.map(renderProject)}
+            {activeProjects.length > 0 && otherProjects.length > 0 && (
+              <Separator className="my-1 w-6 bg-border/60" />
+            )}
+            {otherProjects.map(renderProject)}
           </div>
         </ScrollArea>
 

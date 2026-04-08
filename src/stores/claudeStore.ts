@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import { subscribe } from "./eventBus";
-import { invoke, listen } from "@/lib/ipc";
+import { listen } from "@/lib/ipc";
 import { useLayoutStore } from "./layoutStore";
 import { flattenPanes } from "@/lib/paneTree";
 
 type ClaudeStatus = "working" | "idle" | "notification" | "active" | null;
+
+interface StatusChangedPayload {
+  tabId: string;
+  sessionId: string;
+  status: string;
+}
 
 function projectStatusesEqual(
   a: Map<string, ClaudeStatus>,
@@ -18,112 +24,115 @@ function projectStatusesEqual(
   return true;
 }
 
+/**
+ * Aggregate per-tab statuses into per-project statuses with the priority
+ * notification > working > anything else > idle > null. Identical to the
+ * previous polling-based implementation; just runs on every inbound event
+ * instead of every 2 seconds.
+ */
+function aggregate(
+  tabStatuses: Map<string, ClaudeStatus>,
+): Map<string, ClaudeStatus> {
+  const projectPanes = useLayoutStore.getState().projectPanes;
+  const tabToProject = new Map<string, string>();
+  for (const [projectId, state] of projectPanes) {
+    for (const pane of flattenPanes(state.root)) {
+      for (const tab of pane.tabs) {
+        tabToProject.set(tab.id, projectId);
+      }
+    }
+  }
+
+  const perProject = new Map<string, ClaudeStatus>();
+  for (const [tabId, status] of tabStatuses) {
+    const projectId = tabToProject.get(tabId);
+    if (!projectId || !status) continue;
+    const current = perProject.get(projectId);
+    if (status === "notification") {
+      perProject.set(projectId, "notification");
+    } else if (status === "working" && current !== "notification") {
+      perProject.set(projectId, "working");
+    } else if (!current) {
+      perProject.set(projectId, status);
+    }
+  }
+  return perProject;
+}
+
+function playNotificationSound(): void {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.value = 0.3;
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+    osc.onended = () => ctx.close();
+  } catch {
+    /* ignore */
+  }
+}
+
 interface ClaudeState {
   projectStatuses: Map<string, ClaudeStatus>;
-  _pollIntervalId: ReturnType<typeof setInterval> | null;
+  _tabStatuses: Map<string, ClaudeStatus>;
+  _statusCleanup: (() => void) | null;
   _notificationCleanup: (() => void) | null;
 
-  startPolling: () => void;
-  stopPolling: () => void;
+  startSubscription: () => void;
+  stopSubscription: () => void;
 }
 
 export const useClaudeStore = create<ClaudeState>((set, get) => ({
   projectStatuses: new Map(),
-  _pollIntervalId: null,
+  _tabStatuses: new Map(),
+  _statusCleanup: null,
   _notificationCleanup: null,
 
-  startPolling: () => {
-    get().stopPolling();
+  /**
+   * Subscribe to push updates from the main process. Called once on app
+   * startup; replaces the former 2-second polling loop. Status updates
+   * arrive via the claude-status-changed IPC channel that the HTTP server
+   * in electron/src/ipc/claude-ipc-server.ts publishes whenever the hook
+   * script POSTs a new status.
+   */
+  startSubscription: () => {
+    get().stopSubscription();
 
-    const poll = async () => {
-      try {
-        const statuses = await invoke<Record<string, { status: string }>>(
-          "get_all_claude_statuses",
-          {},
-        );
-        const projectPanes = useLayoutStore.getState().projectPanes;
+    listen<StatusChangedPayload>("claude-status-changed", ({ payload }) => {
+      const tabStatuses = new Map(get()._tabStatuses);
+      tabStatuses.set(payload.tabId, payload.status as ClaudeStatus);
+      const perProject = aggregate(tabStatuses);
+      const changed = !projectStatusesEqual(get().projectStatuses, perProject);
+      set({
+        _tabStatuses: tabStatuses,
+        ...(changed ? { projectStatuses: perProject } : {}),
+      });
+    }).then((cleanup) => {
+      set({ _statusCleanup: cleanup });
+    });
 
-        const tabToProject = new Map<string, string>();
-        for (const [projectId, state] of projectPanes) {
-          for (const pane of flattenPanes(state.root)) {
-            for (const tab of pane.tabs) {
-              tabToProject.set(tab.id, projectId);
-            }
-          }
-        }
-
-        const perProject = new Map<string, ClaudeStatus>();
-        for (const [tabId, { status }] of Object.entries(statuses)) {
-          const projectId = tabToProject.get(tabId);
-          if (!projectId) continue;
-          const current = perProject.get(projectId);
-          if (status === "notification") {
-            perProject.set(projectId, "notification");
-          } else if (status === "working" && current !== "notification") {
-            perProject.set(projectId, "working");
-          } else if (!current) {
-            perProject.set(projectId, (status as ClaudeStatus) || "idle");
-          }
-        }
-
-        if (!projectStatusesEqual(get().projectStatuses, perProject)) {
-          set({ projectStatuses: perProject });
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    poll();
-    const id = setInterval(poll, 2_000);
-
-    // Listen for notification sound
     listen("claude-notification", () => {
-      try {
-        const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 880;
-        gain.gain.value = 0.3;
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
-        osc.onended = () => ctx.close();
-      } catch {
-        /* ignore */
-      }
+      playNotificationSound();
     }).then((cleanup) => {
       set({ _notificationCleanup: cleanup });
     });
-
-    set({ _pollIntervalId: id });
   },
 
-  stopPolling: () => {
-    const { _pollIntervalId, _notificationCleanup } = get();
-    if (_pollIntervalId) clearInterval(_pollIntervalId);
+  stopSubscription: () => {
+    const { _statusCleanup, _notificationCleanup } = get();
+    _statusCleanup?.();
     _notificationCleanup?.();
-    set({ _pollIntervalId: null, _notificationCleanup: null });
+    set({ _statusCleanup: null, _notificationCleanup: null });
   },
 }));
 
-// Also play sound on explicit event dispatch
+// Also play sound on explicit event dispatch (e.g. MCP tool forwards it)
 subscribe((event) => {
   if (event.type === "claude-notification") {
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.value = 0.3;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-      osc.onended = () => ctx.close();
-    } catch {
-      /* ignore */
-    }
+    playNotificationSound();
   }
 });

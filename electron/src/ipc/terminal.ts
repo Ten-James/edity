@@ -4,6 +4,7 @@ import * as pty from "node-pty";
 import {
   ptyInstances,
   tabClaudeState,
+  sessionIdToTabId,
   sendToWindow,
 } from "../lib/state";
 import { notifyPtyCreated, notifyPtyDestroyed } from "../remote-access/server";
@@ -24,6 +25,7 @@ export function registerTerminalHandlers(): void {
       oscTitle: null,
       status: null,
       claudePid: null,
+      sessionId: null,
       oscBuffer: "",
       pidLookupAt: 0,
     });
@@ -81,6 +83,8 @@ export function registerTerminalHandlers(): void {
       ptyInstances.delete(tabId);
       notifyPtyDestroyed(tabId);
     }
+    const state = tabClaudeState.get(tabId);
+    if (state?.sessionId) sessionIdToTabId.delete(state.sessionId);
     tabClaudeState.delete(tabId);
   });
 

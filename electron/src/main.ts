@@ -20,6 +20,7 @@ import { registerGitHandlers } from "./ipc/git";
 import { registerFileHandlers } from "./ipc/files";
 import { registerProjectHandlers } from "./ipc/projects";
 import { ensureClaudeHooks, registerClaudeDetectionHandlers } from "./ipc/claude-detection";
+import { startClaudeIpcServer, stopClaudeIpcServer } from "./ipc/claude-ipc-server";
 import { registerClaudeSdkHandlers, cleanupAllSessions } from "./ipc/claude-sdk";
 import { registerSettingsHandlers } from "./ipc/settings";
 import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
@@ -128,6 +129,12 @@ app.whenReady().then(async () => {
   });
 
   ensureClaudeHooks();
+  // Start the localhost HTTP server that receives hook status updates from
+  // claude-hook.sh. Non-blocking — if it fails we still boot the window;
+  // the sidebar dot will just stay idle until the next Edity restart.
+  startClaudeIpcServer().catch((err) => {
+    console.error("Failed to start Claude IPC server:", err);
+  });
   createWindow();
 });
 
@@ -152,6 +159,7 @@ app.on("window-all-closed", () => {
 
   shutdownAllLspServers().catch(() => {});
 
+  stopClaudeIpcServer();
   tabClaudeState.clear();
   cleanupAllSessions();
   cleanupDataConnections();

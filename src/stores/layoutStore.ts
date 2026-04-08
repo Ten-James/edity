@@ -271,6 +271,21 @@ export function useAllTabs(): AllTab[] {
   return result;
 }
 
+/** Set of project IDs that currently have at least one tab open. */
+export function useActiveProjectIds(): Set<string> {
+  const projectPanes = useLayoutStore((s) => s.projectPanes);
+  const ids = new Set<string>();
+  for (const [projectId, state] of projectPanes) {
+    for (const leaf of getLeaves(state.root)) {
+      if (leaf.pane.tabs.length > 0) {
+        ids.add(projectId);
+        break;
+      }
+    }
+  }
+  return ids;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────
 
 function getActiveProjectId(): string | null {
