@@ -1,15 +1,18 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke } from "@/lib/ipc";
 import { dispatch } from "@/stores/eventBus";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useClaudeStore } from "@/stores/claudeStore";
 import {
   DEFAULT_MONO_FONT_STACK,
   buildFontStack,
 } from "@shared/lib/fonts";
 import { findLigatureRanges } from "@/lib/terminal-ligatures";
+import { claudeTintedBackground } from "@/lib/claude-colors";
+import type { TerminalThemeColors } from "@shared/types/settings";
 
 interface ClaudeStatus {
   isClaudeCode: boolean;
@@ -40,6 +43,25 @@ export function useTerminal({
   const activeTheme = useSettingsStore((s) => s.activeTheme);
   const monoFont = useSettingsStore((s) => s.settings.monoFontFamily);
   const fontLigatures = useSettingsStore((s) => s.settings.monoFontLigatures);
+  const coloredBgForClaude = useSettingsStore(
+    (s) => s.settings.claude.coloredBgForClaude ?? false,
+  );
+  // Subscribe to this tab's Claude status. Zustand's default Object.is
+  // equality means unrelated tab-status updates don't re-render this hook.
+  const claudeStatus = useClaudeStore((s) => s.tabStatuses.get(tabId) ?? null);
+
+  // Effective terminal theme: when the tab is running Claude AND the user
+  // enabled the tint setting, overlay the status color (blue/green/red) at
+  // a fixed alpha over the base theme background. Otherwise return the
+  // theme untouched so we don't keep re-allocating objects.
+  const effectiveTheme = useMemo<TerminalThemeColors>(() => {
+    const base = activeTheme.terminal;
+    if (!coloredBgForClaude || !claudeStatus) return base;
+    return {
+      ...base,
+      background: claudeTintedBackground(base.background, claudeStatus),
+    };
+  }, [activeTheme, coloredBgForClaude, claudeStatus]);
 
   // Poll for foreground process name + Claude status
   useEffect(() => {
@@ -77,7 +99,7 @@ export function useTerminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: buildFontStack(monoFont, DEFAULT_MONO_FONT_STACK),
-      theme: activeTheme.terminal,
+      theme: effectiveTheme,
       // Required for registerCharacterJoiner (used by the ligatures effect).
       allowProposedApi: true,
     });
@@ -145,12 +167,13 @@ export function useTerminal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
-  // Sync theme
+  // Sync theme — runs whenever the base theme changes OR the Claude tint
+  // effective background changes (setting toggled, status changed).
   useEffect(() => {
     if (termRef.current) {
-      termRef.current.options.theme = activeTheme.terminal;
+      termRef.current.options.theme = effectiveTheme;
     }
-  }, [activeTheme]);
+  }, [effectiveTheme]);
 
   // Sync mono font
   useEffect(() => {

@@ -4,7 +4,12 @@ import { listen } from "@/lib/ipc";
 import { useLayoutStore } from "./layoutStore";
 import { flattenPanes } from "@/lib/paneTree";
 
-type ClaudeStatus = "working" | "idle" | "notification" | "active" | null;
+export type ClaudeStatus =
+  | "working"
+  | "idle"
+  | "notification"
+  | "active"
+  | null;
 
 interface StatusChangedPayload {
   tabId: string;
@@ -78,7 +83,12 @@ function playNotificationSound(): void {
 
 interface ClaudeState {
   projectStatuses: Map<string, ClaudeStatus>;
-  _tabStatuses: Map<string, ClaudeStatus>;
+  /**
+   * Per-tab Claude status, updated via push from the main process.
+   * Consumed by the terminal hook to tint the background of the tab that
+   * actually runs Claude (see src/lib/claude-colors.ts).
+   */
+  tabStatuses: Map<string, ClaudeStatus>;
   _statusCleanup: (() => void) | null;
   _notificationCleanup: (() => void) | null;
 
@@ -88,7 +98,7 @@ interface ClaudeState {
 
 export const useClaudeStore = create<ClaudeState>((set, get) => ({
   projectStatuses: new Map(),
-  _tabStatuses: new Map(),
+  tabStatuses: new Map(),
   _statusCleanup: null,
   _notificationCleanup: null,
 
@@ -103,12 +113,12 @@ export const useClaudeStore = create<ClaudeState>((set, get) => ({
     get().stopSubscription();
 
     listen<StatusChangedPayload>("claude-status-changed", ({ payload }) => {
-      const tabStatuses = new Map(get()._tabStatuses);
+      const tabStatuses = new Map(get().tabStatuses);
       tabStatuses.set(payload.tabId, payload.status as ClaudeStatus);
       const perProject = aggregate(tabStatuses);
       const changed = !projectStatusesEqual(get().projectStatuses, perProject);
       set({
-        _tabStatuses: tabStatuses,
+        tabStatuses,
         ...(changed ? { projectStatuses: perProject } : {}),
       });
     }).then((cleanup) => {

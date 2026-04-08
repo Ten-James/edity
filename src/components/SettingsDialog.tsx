@@ -89,6 +89,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [showChatAvatars, setShowChatAvatars] = useState(
     settings.claude.showChatAvatars,
   );
+  const [coloredBgForClaude, setColoredBgForClaude] = useState(
+    settings.claude.coloredBgForClaude ?? false,
+  );
   const [keybindings, setKeybindings] = useState<Record<string, string>>(
     settings.keybindings,
   );
@@ -106,6 +109,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setDarkTheme(settings.darkTheme);
       setDefaultProjectId(settings.defaultProjectId);
       setShowChatAvatars(settings.claude.showChatAvatars);
+      setColoredBgForClaude(settings.claude.coloredBgForClaude ?? false);
       setKeybindings(settings.keybindings);
       setUiFontFamily(settings.uiFontFamily);
       setMonoFontFamily(settings.monoFontFamily);
@@ -118,7 +122,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       lightTheme,
       darkTheme,
       defaultProjectId,
-      claude: { ...settings.claude, showChatAvatars },
+      claude: { ...settings.claude, showChatAvatars, coloredBgForClaude },
       keybindings,
       uiFontFamily,
       monoFontFamily,
@@ -230,6 +234,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   className="text-xs cursor-pointer"
                 >
                   Show avatars in chat
+                </label>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Checkbox
+                  id="colored-bg-claude"
+                  checked={coloredBgForClaude}
+                  onCheckedChange={(v) => setColoredBgForClaude(v === true)}
+                />
+                <label
+                  htmlFor="colored-bg-claude"
+                  className="text-xs cursor-pointer"
+                >
+                  Colored background for Claude (tint terminal with status
+                  color)
                 </label>
               </div>
             </div>

@@ -1,6 +1,13 @@
 export interface ClaudeSettings {
   showChatAvatars: boolean;
   autoExpandTools: string[];
+  /**
+   * When true, terminals running Claude Code get their background tinted
+   * with the same color as the Claude status dot (blue=working, green=idle,
+   * red=notification). The tint is a linear blend over the terminal's
+   * current theme background, not a replacement.
+   */
+  coloredBgForClaude: boolean;
 }
 
 export interface GlobalSettings {
@@ -99,6 +106,7 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   claude: {
     showChatAvatars: true,
     autoExpandTools: ["Edit", "Bash"],
+    coloredBgForClaude: false,
   },
   keybindings: {},
   uiFontFamily: null,
