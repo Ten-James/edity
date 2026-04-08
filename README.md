@@ -205,7 +205,7 @@ All shortcuts are customizable via Settings (`Mod+,`):
 ### Install
 
 ```bash
-git clone https://github.com/your-username/edity.git
+git clone https://github.com/ten-james/edity.git
 cd edity
 npm install
 npm run rebuild   # rebuild native modules (node-pty) for Electron
