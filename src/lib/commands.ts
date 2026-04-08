@@ -29,6 +29,7 @@ import {
   IconBug,
   IconActivityHeartbeat,
   IconGitFork,
+  IconCloudDownload,
   IconDeviceMobile,
   IconBrush,
 } from "@tabler/icons-react";
@@ -360,6 +361,14 @@ export const COMMANDS: Command[] = [
     icon: IconGitFork,
     when: () => !!useProjectStore.getState().activeProject,
     execute: () => dispatch({ type: "ui-open-worktree-dialog" }),
+  },
+  {
+    id: "git.clone",
+    label: "Clone Repository",
+    category: "Git",
+    icon: IconCloudDownload,
+    alwaysActive: true,
+    execute: () => dispatch({ type: "ui-open-clone-dialog" }),
   },
 
   // Remote Access

@@ -5,6 +5,7 @@ import { MainContent } from "@/components/layout/MainContent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { WorktreeDialog } from "@/components/WorktreeDialog";
+import { CloneDialog } from "@/components/CloneDialog";
 import { FuzzyFinder } from "@/components/FuzzyFinder/FuzzyFinder";
 import { useCommands } from "@/hooks/useCommands";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -24,6 +25,8 @@ function AppShell() {
     setSettingsOpen,
     worktreeOpen,
     setWorktreeOpen,
+    cloneOpen,
+    setCloneOpen,
     fuzzyFinderOpen,
     setFuzzyFinderOpen,
   } = useCommands();
@@ -38,6 +41,7 @@ function AppShell() {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <WorktreeDialog open={worktreeOpen} onOpenChange={setWorktreeOpen} />
+      <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
       <FuzzyFinder open={fuzzyFinderOpen} onOpenChange={setFuzzyFinderOpen} />
     </div>
   );

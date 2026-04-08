@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import { ipcMain } from "electron";
 import { execGit, parseGitStatus } from "../lib/git-helpers";
@@ -231,4 +232,45 @@ export function registerGitHandlers(): void {
     const result = execGit(["worktree", "remove", worktreePath], cwd);
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   });
+
+  ipcMain.handle(
+    "git_clone",
+    (
+      _event,
+      {
+        parentDir,
+        folderName,
+        remoteUrl,
+      }: { parentDir: string; folderName: string; remoteUrl: string },
+    ) => {
+      try {
+        if (fs.existsSync(parentDir)) {
+          if (!fs.statSync(parentDir).isDirectory()) {
+            return { ok: false, error: `${parentDir} is not a directory` };
+          }
+        } else {
+          fs.mkdirSync(parentDir, { recursive: true });
+        }
+
+        const targetPath = path.join(parentDir, folderName);
+        if (fs.existsSync(targetPath)) {
+          return { ok: false, error: `Target already exists: ${targetPath}` };
+        }
+
+        // 10-minute timeout for large repos / slow connections
+        const result = execGit(
+          ["clone", remoteUrl, folderName],
+          parentDir,
+          10 * 60 * 1000,
+        );
+        if (!result.ok) return { ok: false, error: result.error };
+        return { ok: true, path: targetPath };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 }

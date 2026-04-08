@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import { useProjectStore } from "@/stores/projectStore";
 import { LIGHT_THEMES, DARK_THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
+import { invoke } from "@/lib/ipc";
 import { KeybindingsSettings } from "@/components/KeybindingsSettings";
 import { FontPicker } from "@/components/settings/FontPicker";
 import type { ColorTheme } from "@shared/types/settings";
@@ -86,6 +88,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [defaultProjectId, setDefaultProjectId] = useState(
     settings.defaultProjectId,
   );
+  const [defaultSrcFolder, setDefaultSrcFolder] = useState(
+    settings.defaultSrcFolder,
+  );
   const [showChatAvatars, setShowChatAvatars] = useState(
     settings.claude.showChatAvatars,
   );
@@ -108,6 +113,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setLightTheme(settings.lightTheme);
       setDarkTheme(settings.darkTheme);
       setDefaultProjectId(settings.defaultProjectId);
+      setDefaultSrcFolder(settings.defaultSrcFolder);
       setShowChatAvatars(settings.claude.showChatAvatars);
       setColoredBgForClaude(settings.claude.coloredBgForClaude ?? false);
       setKeybindings(settings.keybindings);
@@ -122,6 +128,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       lightTheme,
       darkTheme,
       defaultProjectId,
+      defaultSrcFolder,
       claude: { ...settings.claude, showChatAvatars, coloredBgForClaude },
       keybindings,
       uiFontFamily,
@@ -250,6 +257,44 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   color)
                 </label>
               </div>
+            </div>
+
+            {/* Default source folder */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Default Source Folder
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <Input
+                  value={defaultSrcFolder ?? ""}
+                  onChange={(e) =>
+                    setDefaultSrcFolder(e.target.value || null)
+                  }
+                  placeholder="~/src"
+                  className="h-8 text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    const r = await invoke<{
+                      canceled: boolean;
+                      filePaths: string[];
+                    }>("show-open-dialog", {
+                      properties: ["openDirectory", "createDirectory"],
+                    });
+                    if (!r.canceled && r.filePaths[0]) {
+                      setDefaultSrcFolder(r.filePaths[0]);
+                    }
+                  }}
+                >
+                  Browse…
+                </Button>
+              </div>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Prefilled as the parent folder when cloning repositories.
+              </span>
             </div>
 
             {/* Default project */}

@@ -14,6 +14,7 @@ export interface GlobalSettings {
   lightTheme: string;
   darkTheme: string;
   defaultProjectId: string | null;
+  defaultSrcFolder: string | null;
   claude: ClaudeSettings;
   keybindings: Record<string, string>;
   uiFontFamily: string | null;
@@ -103,6 +104,7 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   lightTheme: "edity-light",
   darkTheme: "edity-dark",
   defaultProjectId: null,
+  defaultSrcFolder: null,
   claude: {
     showChatAvatars: true,
     autoExpandTools: ["Edit", "Bash"],

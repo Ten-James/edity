@@ -258,6 +258,11 @@ export interface UIOpenWorktreeDialogEvent {
   type: "ui-open-worktree-dialog";
 }
 
+/** Open clone repository dialog. */
+export interface UIOpenCloneDialogEvent {
+  type: "ui-open-clone-dialog";
+}
+
 /** Open the fuzzy finder dialog. */
 export interface UIOpenFuzzyFinderEvent {
   type: "ui-open-fuzzy-finder";
@@ -334,6 +339,7 @@ export type EdityEvent =
   | UIClosePaletteEvent
   | UIOpenSettingsEvent
   | UIOpenWorktreeDialogEvent
+  | UIOpenCloneDialogEvent
   | UIOpenFuzzyFinderEvent
   | EditorRevealPositionEvent
   // Remote Access

@@ -21,6 +21,7 @@ export function useCommands() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [worktreeOpen, setWorktreeOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
   const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
 
   const keybindings = useSettingsStore((s) => s.settings.keybindings);
@@ -45,6 +46,9 @@ export function useCommands() {
           break;
         case "ui-open-worktree-dialog":
           setWorktreeOpen(true);
+          break;
+        case "ui-open-clone-dialog":
+          setCloneOpen(true);
           break;
         case "ui-open-fuzzy-finder":
           setFuzzyFinderOpen(true);
@@ -85,6 +89,8 @@ export function useCommands() {
     setSettingsOpen,
     worktreeOpen,
     setWorktreeOpen,
+    cloneOpen,
+    setCloneOpen,
     fuzzyFinderOpen,
     setFuzzyFinderOpen,
   };
