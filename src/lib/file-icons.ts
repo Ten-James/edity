@@ -35,6 +35,7 @@ import {
   IconMusic,
   IconVideo,
   IconCode,
+  IconBrush,
 } from "@tabler/icons-react";
 
 const SPECIAL_FILENAMES: Record<string, Icon> = {
@@ -133,6 +134,7 @@ const EXTENSION_MAP: Record<string, Icon> = {
   lua: IconCode,
   graphql: IconCode,
   gql: IconCode,
+  excalidraw: IconBrush,
 };
 
 const PREFIX_PATTERNS: Array<[string, Icon]> = [

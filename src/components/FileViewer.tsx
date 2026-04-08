@@ -2,11 +2,16 @@ import { useFileContent } from "@/hooks/useFileContent";
 import { MonacoEditor } from "@/components/viewer/MonacoEditor";
 import { MarkdownViewer } from "@/components/viewer/MarkdownViewer";
 import { ImageViewer } from "@/components/viewer/ImageViewer";
+import { ExcalidrawViewer } from "@/components/viewer/ExcalidrawViewer";
 import { formatSize } from "@/lib/utils";
 
 function isMarkdownFile(filePath: string): boolean {
   const ext = filePath.split(".").pop()?.toLowerCase();
   return ext === "md" || ext === "mdx";
+}
+
+function isExcalidrawFile(filePath: string): boolean {
+  return filePath.toLowerCase().endsWith(".excalidraw");
 }
 
 interface FileViewerProps {
@@ -45,13 +50,23 @@ export function FileViewer({ tabId, filePath, isActive }: FileViewerProps) {
             />
           )}
 
-          {content.type === "Text" && !isMarkdownFile(filePath) && (
-            <MonacoEditor
+          {content.type === "Text" && isExcalidrawFile(filePath) && (
+            <ExcalidrawViewer
               tabId={tabId}
               content={content.content}
               filePath={filePath}
             />
           )}
+
+          {content.type === "Text" &&
+            !isMarkdownFile(filePath) &&
+            !isExcalidrawFile(filePath) && (
+              <MonacoEditor
+                tabId={tabId}
+                content={content.content}
+                filePath={filePath}
+              />
+            )}
 
           {content.type === "Image" && (
             <ImageViewer url={content.url} size={content.size} />

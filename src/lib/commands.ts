@@ -30,6 +30,7 @@ import {
   IconActivityHeartbeat,
   IconGitFork,
   IconDeviceMobile,
+  IconBrush,
 } from "@tabler/icons-react";
 import { invoke } from "@/lib/ipc";
 import { toast } from "sonner";
@@ -81,6 +82,22 @@ function cycleProject(direction: 1 | -1) {
   dispatch({ type: "project-switch", projectId: next.id });
 }
 
+/**
+ * Wait until any open Radix overlay has finished closing and restored the
+ * body's scroll lock / pointer-events / aria-hidden state. `react-remove-scroll`
+ * adds `data-scroll-locked` to body when any Dialog/Popover is open and
+ * removes it when the last one is fully unmounted (after its exit animation).
+ * Polls at ~60fps up to `maxMs` then bails out so a genuinely stuck overlay
+ * still gets captured rather than hanging the command.
+ */
+async function waitForBodyUnlocked(maxMs: number): Promise<void> {
+  const start = performance.now();
+  while (performance.now() - start < maxMs) {
+    if (!document.body.hasAttribute("data-scroll-locked")) return;
+    await new Promise((resolve) => setTimeout(resolve, 16));
+  }
+}
+
 export const COMMANDS: Command[] = [
   // General
   {
@@ -100,6 +117,15 @@ export const COMMANDS: Command[] = [
     defaultKeybinding: "Mod+,",
     alwaysActive: true,
     execute: () => dispatch({ type: "ui-open-settings" }),
+  },
+  {
+    id: "palette.fuzzy-finder",
+    label: "Find in Project",
+    category: "General",
+    icon: IconSearch,
+    defaultKeybinding: "Mod+Shift+p",
+    alwaysActive: true,
+    execute: () => dispatch({ type: "ui-open-fuzzy-finder" }),
   },
 
   // Tab
@@ -170,6 +196,32 @@ export const COMMANDS: Command[] = [
     category: "Tab",
     icon: IconDatabase,
     execute: () => dispatch({ type: "tab-create-data" }),
+  },
+  {
+    id: "tab.new-excalidraw",
+    label: "New Excalidraw Drawing",
+    category: "Tab",
+    icon: IconBrush,
+    when: () => !!useProjectStore.getState().activeProject,
+    execute: async () => {
+      const proj = useProjectStore.getState().activeProject;
+      if (!proj) return;
+      const stamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .replace("T", "_")
+        .slice(0, 19);
+      const filePath = `${proj.path}/drawing-${stamp}.excalidraw`;
+      const result = await invoke<{ ok: boolean; error?: string }>(
+        "create_file",
+        { filePath },
+      );
+      if (result.ok) {
+        dispatch({ type: "tab-open-file", filePath });
+      } else {
+        toast.error(result.error ?? "Failed to create drawing");
+      }
+    },
   },
 
   // Pane
@@ -327,6 +379,18 @@ export const COMMANDS: Command[] = [
     icon: IconBug,
     alwaysActive: true,
     execute: async () => {
+      // Wait for any closing Radix overlay (command palette, popover, etc.)
+      // to finish its exit animation AND its cleanup effects before we
+      // snapshot the DOM. Radix Dialog has a 100ms close animation driven by
+      // `tailwindcss-animate`, and `react-remove-scroll` only restores
+      // `pointer-events`, `aria-hidden`, and the focus guards *after* that
+      // animation unmounts the content. If we capture before that happens,
+      // the report ends up showing a stuck Dialog — nothing to do with the
+      // real bug. Poll `data-scroll-locked` as the authoritative signal:
+      // react-remove-scroll adds/removes it in lock-step with its side
+      // effects. Bail out after 500 ms so a genuinely stuck Dialog is still
+      // captured (it's then a real bug, not an artifact).
+      await waitForBodyUnlocked(500);
       const dom = document.documentElement.outerHTML;
       const consoleLog = getConsoleLog();
       const result = await invoke<

@@ -22,11 +22,18 @@ export function PaneContainer({
   // pane content.
   const isDragging = useDragStore((s) => s.draggingTabId !== null);
 
-  // Expose this pane's content slot to TabHost so it can portal tab views
-  // into it without ever unmounting them when the user splits, unsplits, or
-  // moves a tab between panes. useLayoutEffect (not useEffect) so the slot
-  // is registered before the next paint and tab content appears in the same
-  // frame as the pane itself.
+  // Expose this pane's content slot to TabHost. useLayoutEffect with a
+  // paneId dependency — not a callback ref — so this only runs when the
+  // pane actually mounts, unmounts, or changes its id. A callback ref
+  // (even wrapped in useCallback) can be re-attached by React on routine
+  // re-renders, and since registerPaneSlot re-parents host divs whenever
+  // a slot is attached, a spurious detach/attach cycle would yank the
+  // xterm textarea out of the document mid-frame and blur its focus —
+  // that's why clicking on an unfocused pane used to kill input.
+  //
+  // registerPaneSlot synchronously re-parents every host div that belongs
+  // to this pane (read from layoutStore) when the slot is registered, so
+  // we don't need to worry about TabHost effect timing anymore.
   useLayoutEffect(() => {
     registerPaneSlot(paneId, slotRef.current);
     return () => registerPaneSlot(paneId, null);

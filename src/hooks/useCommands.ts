@@ -21,6 +21,7 @@ export function useCommands() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [worktreeOpen, setWorktreeOpen] = useState(false);
+  const [fuzzyFinderOpen, setFuzzyFinderOpen] = useState(false);
 
   const keybindings = useSettingsStore((s) => s.settings.keybindings);
   const keybindingsRef = useRef(resolveKeybindings(COMMANDS, keybindings));
@@ -44,6 +45,9 @@ export function useCommands() {
           break;
         case "ui-open-worktree-dialog":
           setWorktreeOpen(true);
+          break;
+        case "ui-open-fuzzy-finder":
+          setFuzzyFinderOpen(true);
           break;
       }
     });
@@ -74,5 +78,14 @@ export function useCommands() {
       window.removeEventListener("keydown", handler, { capture: true });
   }, []);
 
-  return { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen, worktreeOpen, setWorktreeOpen };
+  return {
+    paletteOpen,
+    setPaletteOpen,
+    settingsOpen,
+    setSettingsOpen,
+    worktreeOpen,
+    setWorktreeOpen,
+    fuzzyFinderOpen,
+    setFuzzyFinderOpen,
+  };
 }

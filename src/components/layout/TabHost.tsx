@@ -72,7 +72,13 @@ function TabHostEntry({ tab, paneId, isActive }: TabHostEntryProps) {
 
   const slot = usePaneSlot(paneId);
 
-  // Move the host div into the current pane's slot whenever the slot changes.
+  // Move the host div into the current pane's slot whenever the slot value
+  // changes. For *pane-split* commits the host div is already in the right
+  // place because registerPaneSlot re-parents host divs atomically as each
+  // new slot is attached. This effect still matters for the `layout-move-tab`
+  // case: the destination pane's slot was already in the registry so
+  // registerPaneSlot wasn't triggered, and only this effect carries the host
+  // div over to the new parent.
   useLayoutEffect(() => {
     if (slot) moveTabHostDivToSlot(tab.id, slot);
   }, [slot, tab.id]);

@@ -4,6 +4,7 @@ import * as os from "os";
 import type { BrowserWindow } from "electron";
 import type { IPty } from "node-pty";
 import type { ChildProcess } from "child_process";
+import type { MessageConnection } from "vscode-jsonrpc/node";
 
 // Runtime __dirname is electron/dist/electron/src/lib/ -> project root is 5 levels up
 export const PROJECT_ROOT = path.resolve(__dirname, "../../../../..");
@@ -27,6 +28,26 @@ export function sendToWindow(channel: string, ...args: unknown[]): void {
 export const ptyInstances = new Map<string, IPty>();
 export const fileWatchers = new Map<string, fs.FSWatcher>();
 export const runningProcesses = new Map<string, ChildProcess>();
+
+// --- LSP state ---
+//
+// Servers are keyed by `${projectId}:${serverName}` so e.g. clangd is shared
+// across all C/C++ files in a project but scoped per-project.
+
+export interface LspServerHandle {
+  key: string;
+  projectId: string;
+  serverName: string;
+  projectPath: string;
+  rootPath: string;
+  process: ChildProcess;
+  connection: MessageConnection;
+  initialized: boolean;
+  // Set of absolute file paths currently `didOpen`ed with this server.
+  openDocuments: Set<string>;
+}
+
+export const lspServers = new Map<string, LspServerHandle>();
 
 export interface TabClaudeState {
   isClaudeCode: boolean;

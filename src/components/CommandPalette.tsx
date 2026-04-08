@@ -34,7 +34,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     const cmd = COMMANDS.find((c) => c.id === cmdId);
     if (!cmd) return;
     onOpenChange(false);
-    requestAnimationFrame(() => cmd.execute());
+    // setTimeout(0), not requestAnimationFrame: rAF runs inside the same
+    // frame *before* React flushes effect cleanups, so the command would
+    // execute while the Radix Dialog is still mounted and react-remove-scroll
+    // still has `pointer-events: none` / `aria-hidden` applied to body+root.
+    // That broke `debug.create-bug-report` (polluted DOM snapshot) and is a
+    // latent hazard for any command that inspects the DOM or opens a new
+    // focus target. A macrotask runs after React's synchronous flush.
+    setTimeout(() => cmd.execute(), 0);
   }
 
   return (

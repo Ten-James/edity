@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { dispatch } from "@/stores/eventBus";
+import { setDraggingTabId } from "@/stores/dragStore";
 import { cn } from "@/lib/utils";
 import type { DropZone } from "@/types/tab";
 
@@ -67,6 +68,15 @@ export function PaneDropZones({ paneId }: PaneDropZonesProps) {
     e.preventDefault();
     const zone = pickZone(e);
     setActive(null);
+    // Clear the drag flag synchronously on drop. We can't rely on the
+    // dragged tab's onDragEnd handler in TabBar to clean up — when an edge
+    // drop creates a new pane, the tab's old TabBar entry unmounts as part
+    // of the layout reshuffle, and `dragend` is then dispatched to a node
+    // that no longer has React handlers attached. Without this line the
+    // PaneDropZones overlay (`pointer-events-auto z-30`) stays mounted on
+    // every pane and silently swallows every subsequent mouse click on
+    // pane content — Tab key navigation still works, but clicks don't.
+    setDraggingTabId(null);
     dispatch({
       type: "layout-drop-tab",
       tabId,

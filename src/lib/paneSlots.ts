@@ -3,9 +3,26 @@
 // React tree (TabHost) and is physically moved between panes by re-parenting
 // each tab's host div via appendChild — no React unmount, so terminals,
 // editor state, scroll position, etc. survive split / unsplit / move-tab.
+//
+// Slot registration is driven by a callback ref in PaneContainer, which fires
+// during React's mutation phase. When a new slot is registered we SYNCHRONOUSLY
+// re-parent every host div whose tab currently belongs to this pane — reading
+// the current layout straight from layoutStore. This eliminates the window
+// where TabHostEntry's layout effect would otherwise run with a stale slot
+// snapshot and leave the host div orphaned in a detached DOM subtree (which
+// broke terminal input + focus after drag-drop edge splits).
+
+import { useLayoutStore } from "@/stores/layoutStore";
+import { getLeaves } from "@/lib/paneTree";
 
 const slots = new Map<string, HTMLDivElement>();
 const listeners = new Set<() => void>();
+
+// Per-tab "host divs" — stable DOM nodes that the TabHost portals each tab's
+// React subtree into. Stored in a module-level map (not React state) so we
+// can mutate them imperatively without tripping React Compiler immutability
+// rules, and so the same node persists for a tab id across re-renders.
+const tabHostDivs = new Map<string, HTMLDivElement>();
 
 function notify(): void {
   listeners.forEach((l) => l());
@@ -18,6 +35,22 @@ export function registerPaneSlot(
   if (el) {
     if (slots.get(paneId) === el) return;
     slots.set(paneId, el);
+    // Re-parent any host div whose tab currently lives in this pane. We
+    // look up the layout store directly — at ref-callback time (mutation
+    // phase) the store already reflects the new tree, and this is the only
+    // authoritative source of "which tabs belong to which pane".
+    const projectPanes = useLayoutStore.getState().projectPanes;
+    for (const state of projectPanes.values()) {
+      for (const leaf of getLeaves(state.root)) {
+        if (leaf.pane.id !== paneId) continue;
+        for (const tab of leaf.pane.tabs) {
+          const div = tabHostDivs.get(tab.id);
+          if (div && div.parentElement !== el) {
+            el.appendChild(div);
+          }
+        }
+      }
+    }
   } else {
     if (!slots.has(paneId)) return;
     slots.delete(paneId);
@@ -35,13 +68,6 @@ export function subscribePaneSlots(listener: () => void): () => void {
     listeners.delete(listener);
   };
 }
-
-// Per-tab "host divs" — stable DOM nodes that the TabHost portals each tab's
-// React subtree into. Stored in a module-level map (not React state) so we
-// can mutate them imperatively without tripping React Compiler immutability
-// rules, and so the same node persists for a tab id across re-renders.
-
-const tabHostDivs = new Map<string, HTMLDivElement>();
 
 export function getOrCreateTabHostDiv(tabId: string): HTMLDivElement {
   let div = tabHostDivs.get(tabId);

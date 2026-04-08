@@ -26,6 +26,8 @@ import { registerDataHandlers, cleanupDataConnections } from "./ipc/data";
 import { registerBugReportHandlers } from "./ipc/bug-report";
 import { registerMcpHandlers } from "./ipc/mcp";
 import { registerRemoteAccessHandlers } from "./ipc/remote-access";
+import { registerLspHandlers, shutdownAllLspServers } from "./ipc/lsp";
+import { registerSearchHandlers } from "./ipc/search";
 import { stopEventLogServer } from "./mcp/event-log-server";
 import { stopRemoteAccessServer } from "./remote-access/server";
 import { setupDevLogger, flushAndClose } from "./lib/logger";
@@ -81,6 +83,8 @@ registerDataHandlers();
 registerBugReportHandlers();
 registerMcpHandlers();
 registerRemoteAccessHandlers();
+registerLspHandlers();
+registerSearchHandlers();
 
 // --- App Lifecycle ---
 
@@ -145,6 +149,8 @@ app.on("window-all-closed", () => {
 
   for (const proc of runningProcesses.values()) proc.kill();
   runningProcesses.clear();
+
+  shutdownAllLspServers().catch(() => {});
 
   tabClaudeState.clear();
   cleanupAllSessions();

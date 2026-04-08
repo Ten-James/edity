@@ -5,6 +5,7 @@ import { MainContent } from "@/components/layout/MainContent";
 import { CommandPalette } from "@/components/CommandPalette";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { WorktreeDialog } from "@/components/WorktreeDialog";
+import { FuzzyFinder } from "@/components/FuzzyFinder/FuzzyFinder";
 import { useCommands } from "@/hooks/useCommands";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
@@ -16,8 +17,16 @@ import "@/stores/worktreeEffect"; // side-effect: handles worktree-create events
 import "./App.css";
 
 function AppShell() {
-  const { paletteOpen, setPaletteOpen, settingsOpen, setSettingsOpen, worktreeOpen, setWorktreeOpen } =
-    useCommands();
+  const {
+    paletteOpen,
+    setPaletteOpen,
+    settingsOpen,
+    setSettingsOpen,
+    worktreeOpen,
+    setWorktreeOpen,
+    fuzzyFinderOpen,
+    setFuzzyFinderOpen,
+  } = useCommands();
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -29,6 +38,7 @@ function AppShell() {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <WorktreeDialog open={worktreeOpen} onOpenChange={setWorktreeOpen} />
+      <FuzzyFinder open={fuzzyFinderOpen} onOpenChange={setFuzzyFinderOpen} />
     </div>
   );
 }

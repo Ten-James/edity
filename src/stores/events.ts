@@ -246,6 +246,19 @@ export interface UIOpenWorktreeDialogEvent {
   type: "ui-open-worktree-dialog";
 }
 
+/** Open the fuzzy finder dialog. */
+export interface UIOpenFuzzyFinderEvent {
+  type: "ui-open-fuzzy-finder";
+}
+
+/** Tell the Monaco editor for the given file to scroll to a position. */
+export interface EditorRevealPositionEvent {
+  type: "editor-reveal-position";
+  filePath: string;
+  line: number;
+  column: number;
+}
+
 /** Open (or focus) the singleton Remote Access tab. */
 export interface TabCreateRemoteAccessEvent {
   type: "tab-create-remote-access";
@@ -307,6 +320,8 @@ export type EdityEvent =
   | UIClosePaletteEvent
   | UIOpenSettingsEvent
   | UIOpenWorktreeDialogEvent
+  | UIOpenFuzzyFinderEvent
+  | EditorRevealPositionEvent
   // Remote Access
   | TabCreateRemoteAccessEvent
   // Worktree
