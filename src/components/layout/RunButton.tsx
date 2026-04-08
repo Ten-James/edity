@@ -25,7 +25,11 @@ import { useRunStore } from "@/stores/runStore";
 import { dispatch } from "@/stores/eventBus";
 import { SetupDialog } from "@/components/SetupDialog";
 import { useScriptDetection } from "@/hooks/useScriptDetection";
-import { getRunCommands, getDefaultRunCommand } from "@/lib/run-commands";
+import {
+  getRunCommands,
+  getDefaultRunCommand,
+  pickAutoDefault,
+} from "@/lib/run-commands";
 import type { RunCommand } from "@shared/types/project";
 import type { DetectedScript } from "@shared/types/ipc";
 
@@ -49,22 +53,28 @@ export function RunButton() {
   const [setupOpen, setSetupOpen] = useState(false);
 
   const configuredCommands = getRunCommands(edityConfig);
-  const defaultCommand = getDefaultRunCommand(edityConfig);
+  const configuredDefault = getDefaultRunCommand(edityConfig);
+  // Implicit default from detected project files (npm run dev/start,
+  // go build, cargo build) — used when the project has no .edity config
+  // or its runCommands list is empty. Lets Run work out of the box.
+  const autoDefault = pickAutoDefault(detectedScripts);
+  const effectiveDefault = configuredDefault ?? autoDefault;
 
   // Filter detected scripts that aren't already configured
   const extraScripts = detectedScripts.filter(
     (s) => !configuredCommands.some((c) => c.command === s.command),
   );
 
-  const hasAnyCommand = defaultCommand || extraScripts.length > 0;
+  const hasAnyCommand = !!effectiveDefault || extraScripts.length > 0;
   const hasDropdownItems =
     configuredCommands.length > 0 || extraScripts.length > 0;
 
   if (!activeProject) return null;
 
-  // No config at all — return a borderless Setup button so the parent
-  // TopBar can place it inside the joined action-button container.
-  if (!edityConfig) {
+  // No config AND no detected scripts — fall back to a standalone Setup
+  // button so the user can configure the project manually. Once any run
+  // source exists (detected or configured), the full Run interface shows.
+  if (!edityConfig && detectedScripts.length === 0) {
     return (
       <>
         <Tooltip>
@@ -110,7 +120,11 @@ export function RunButton() {
             variant="ghost"
             size="xs"
             className={`gap-1 border-0 leading-none ${isProjectRunning ? "text-red-500 hover:text-red-600" : ""}`}
-            onClick={() => (isProjectRunning ? stopProject() : runProject())}
+            onClick={() =>
+              isProjectRunning
+                ? stopProject()
+                : runProject(effectiveDefault ?? undefined)
+            }
             disabled={!isProjectRunning && !hasAnyCommand}
           >
             {isProjectRunning ? (
@@ -126,7 +140,7 @@ export function RunButton() {
         <TooltipContent>
           {isProjectRunning
             ? "Stop all running processes"
-            : (defaultCommand?.command ?? "No run command configured")}
+            : (effectiveDefault?.command ?? "No run command configured")}
         </TooltipContent>
       </Tooltip>
 
@@ -198,24 +212,35 @@ export function RunButton() {
                   <DropdownMenuLabel className="text-[10px]">
                     Detected Scripts
                   </DropdownMenuLabel>
-                  {extraScripts.map((script, i) => (
-                    <DropdownMenuItem
-                      key={`det-${i}`}
-                      onClick={() => handleRunDetected(script)}
-                      className="text-xs"
-                    >
-                      <IconPlayerPlay size={12} />
-                      {script.name}
-                      {/* Hide the source label for package.json — npm
-                          scripts dominate the list and the "package.json"
-                          tag added visual noise without info value. */}
-                      {script.source !== "package.json" && (
-                        <DropdownMenuShortcut>
-                          {script.source}
-                        </DropdownMenuShortcut>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
+                  {extraScripts.map((script, i) => {
+                    // Mark the auto-detected default when there are no
+                    // configured commands taking priority over it.
+                    const isAutoDefault =
+                      configuredCommands.length === 0 &&
+                      autoDefault?.command === script.command;
+                    return (
+                      <DropdownMenuItem
+                        key={`det-${i}`}
+                        onClick={() => handleRunDetected(script)}
+                        className="text-xs"
+                      >
+                        <IconPlayerPlay size={12} />
+                        {script.name}
+                        {isAutoDefault ? (
+                          <DropdownMenuShortcut>Default</DropdownMenuShortcut>
+                        ) : (
+                          /* Hide the source label for package.json — npm
+                             scripts dominate the list and the "package.json"
+                             tag added visual noise without info value. */
+                          script.source !== "package.json" && (
+                            <DropdownMenuShortcut>
+                              {script.source}
+                            </DropdownMenuShortcut>
+                          )
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </>
               )}
 

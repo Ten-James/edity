@@ -114,6 +114,13 @@ export function registerProjectHandlers(): void {
       scripts.push({ name: "cargo test", command: "cargo test", source: "Cargo.toml" });
     }
 
+    // go.mod
+    if (fs.existsSync(path.join(projectPath, "go.mod"))) {
+      scripts.push({ name: "go build", command: "go build ./...", source: "go.mod" });
+      scripts.push({ name: "go run", command: "go run .", source: "go.mod" });
+      scripts.push({ name: "go test", command: "go test ./...", source: "go.mod" });
+    }
+
     // Makefile
     const makefilePath = path.join(projectPath, "Makefile");
     if (fs.existsSync(makefilePath)) {
