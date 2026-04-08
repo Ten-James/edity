@@ -45,6 +45,7 @@ interface SidebarProps {
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const projects = useProjectStore((s) => s.projects);
   const activeProject = useProjectStore((s) => s.activeProject);
+  const projectStack = useProjectStore((s) => s.projectStack);
   const projectConfigs = useProjectStore((s) => s.edityConfigs);
   const projectClaudeStatus = useClaudeStore((s) => s.projectStatuses);
   const activeProjectIds = useActiveProjectIds();
@@ -58,6 +59,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     const config = projectConfigs.get(project.id);
     const label = config?.acronym || getInitials(project.name);
     const isActive = activeProject?.id === project.id;
+    const isInStack = projectStack.includes(project.id);
     const isInActiveGroup = activeProjectIds.has(project.id);
     const claudeStatus = projectClaudeStatus.get(project.id);
     const color = config?.color ? PROJECT_COLORS[config.color] : null;
@@ -100,9 +102,19 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() =>
-                    dispatch({ type: "project-switch", projectId: project.id })
-                  }
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey) {
+                      dispatch({
+                        type: "project-stack-add",
+                        projectId: project.id,
+                      });
+                    } else {
+                      dispatch({
+                        type: "project-switch",
+                        projectId: project.id,
+                      });
+                    }
+                  }}
                   className={cn(
                     "flex h-8 w-8 items-center justify-center text-[11px] font-semibold transition-colors",
                     !isInActiveGroup &&
@@ -114,7 +126,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                       ? {
                           backgroundColor: color.hex,
                           color: color.textHex,
-                          opacity: isActive ? 1 : 0.55,
+                          opacity: isActive ? 1 : isInStack ? 0.85 : 0.55,
                         }
                       : isActive
                         ? {

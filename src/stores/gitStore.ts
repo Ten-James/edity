@@ -126,7 +126,9 @@ export const useGitStore = create<GitState>((set, get) => ({
 subscribe((event) => {
   switch (event.type) {
     case "project-switch":
-      // Restart polling for new project
+    case "project-stack-add":
+      // Restart polling for the newly focused project (the stack focus
+      // is always reflected in projectStore.activeProject).
       useGitStore.getState().startPolling();
       break;
     case "git-refresh":

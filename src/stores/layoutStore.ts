@@ -310,7 +310,8 @@ function updateProjectPanes(
 subscribe((event) => {
   switch (event.type) {
     // ── Project lifecycle ──
-    case "project-switch": {
+    case "project-switch":
+    case "project-stack-add": {
       useLayoutStore.setState((s) => {
         if (s.projectPanes.has(event.projectId)) return s;
         const next = new Map(s.projectPanes);

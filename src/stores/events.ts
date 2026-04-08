@@ -35,6 +35,18 @@ export interface ProjectConfigSavedEvent {
   config: EdityConfig;
 }
 
+/** Add a project to the horizontal project stack (meta/ctrl-click). */
+export interface ProjectStackAddEvent {
+  type: "project-stack-add";
+  projectId: string;
+}
+
+/** Remove a project from the horizontal project stack. */
+export interface ProjectStackRemoveEvent {
+  type: "project-stack-remove";
+  projectId: string;
+}
+
 // ─── Tab Events ─────────────────────────────────────────────────
 
 /** Create a new terminal tab. */
@@ -280,6 +292,8 @@ export type EdityEvent =
   | ProjectRemoveEvent
   | ProjectReorderEvent
   | ProjectConfigSavedEvent
+  | ProjectStackAddEvent
+  | ProjectStackRemoveEvent
   // Tab
   | TabCreateTerminalEvent
   | TabOpenFileEvent

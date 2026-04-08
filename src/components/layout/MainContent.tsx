@@ -1,6 +1,10 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef } from "react";
+import { IconX } from "@tabler/icons-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useLayoutStore } from "@/stores/layoutStore";
+import { dispatch } from "@/stores/eventBus";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { FileTree } from "./FileTree";
 import { GitSidebar } from "./GitSidebar";
 import { PaneContainer } from "./PaneContainer";
@@ -11,12 +15,22 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import type { LayoutNode, ProjectPaneState } from "@/types/tab";
+import type { Project } from "@shared/types/project";
 
 export function MainContent() {
   const projects = useProjectStore((s) => s.projects);
+  const projectStack = useProjectStore((s) => s.projectStack);
   const activeProject = useProjectStore((s) => s.activeProject);
   const projectPanes = useLayoutStore((s) => s.projectPanes);
   const sidebarPanel = useLayoutStore((s) => s.sidebarPanel);
+
+  const stackSet = new Set(projectStack);
+  const hiddenProjects = projects.filter((p) => !stackSet.has(p.id));
+  const stackProjects = projectStack
+    .map((id) => projects.find((p) => p.id === id))
+    .filter((p): p is Project => !!p);
+
+  const isStackMode = stackProjects.length > 1;
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -26,28 +40,149 @@ export function MainContent() {
           or moves a tab — terminals, editor state, scroll, etc. all survive. */}
       <TabHost />
 
-      {/* Render pane layouts for ALL projects — inactive ones are hidden but stay mounted */}
-      {projects.map((project) => {
-        const state = projectPanes.get(project.id);
-        if (!state) return null;
-        const isActive = project.id === activeProject?.id;
-        return (
-          <div
-            key={project.id}
-            className="flex-1 flex overflow-hidden"
-            style={{ display: isActive ? "flex" : "none" }}
-          >
+      {/* Hidden projects stay mounted so their PaneContainers keep their
+          slot registration — TabHost host divs re-parent through any pane
+          container remount. */}
+      <div style={{ display: "none" }}>
+        {hiddenProjects.map((project) => {
+          const state = projectPanes.get(project.id);
+          if (!state) return null;
+          return (
             <NodeRenderer
+              key={project.id}
               node={state.root}
               state={state}
-              isActive={isActive}
+              isActive={false}
               projectId={project.id}
             />
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {isStackMode ? (
+        <ResizablePanelGroup
+          id="project-stack"
+          orientation="horizontal"
+          className="flex-1"
+        >
+          {stackProjects.map((project, idx) => {
+            const state = projectPanes.get(project.id);
+            if (!state) return null;
+            const isFocused = project.id === activeProject?.id;
+            return (
+              <Fragment key={project.id}>
+                {idx > 0 && <ResizableHandle withHandle />}
+                <ResizablePanel
+                  id={`stack-project-${project.id}`}
+                  defaultSize={100 / stackProjects.length}
+                  minSize={15}
+                  className="flex flex-col"
+                >
+                  <StackProjectFrame project={project} isFocused={isFocused}>
+                    <NodeRenderer
+                      node={state.root}
+                      state={state}
+                      isActive
+                      projectId={project.id}
+                    />
+                  </StackProjectFrame>
+                </ResizablePanel>
+              </Fragment>
+            );
+          })}
+        </ResizablePanelGroup>
+      ) : (
+        stackProjects.map((project) => {
+          const state = projectPanes.get(project.id);
+          if (!state) return null;
+          return (
+            <div
+              key={project.id}
+              className="flex-1 flex overflow-hidden"
+            >
+              <NodeRenderer
+                node={state.root}
+                state={state}
+                isActive
+                projectId={project.id}
+              />
+            </div>
+          );
+        })
+      )}
+
       {sidebarPanel === "files" && <FileTree />}
       {sidebarPanel === "git" && <GitSidebar />}
+    </div>
+  );
+}
+
+interface StackProjectFrameProps {
+  project: Project;
+  isFocused: boolean;
+  children: React.ReactNode;
+}
+
+/**
+ * Wraps one project's pane tree inside the horizontal stack: adds a header
+ * strip with the project name and a close (×) button, and a focus border
+ * that highlights which project currently drives the TopBar.
+ *
+ * Focus handling uses a NATIVE DOM pointerdown listener (not React's
+ * synthetic `onPointerDown`). Tab content (terminals, editors, etc.) lives
+ * in React portals created by TabHost, whose synthetic events bubble
+ * through the React tree — which means they reach TabHost, NOT the
+ * StackProjectFrame that visually contains the portaled host div. Native
+ * DOM events, on the other hand, bubble through the actual DOM tree, so a
+ * click on an xterm canvas does reach the StackProjectFrame's root div
+ * because the host div is appendChild'd into the slot beneath it.
+ */
+function StackProjectFrame({
+  project,
+  isFocused,
+  children,
+}: StackProjectFrameProps) {
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isFocused) return;
+    const el = frameRef.current;
+    if (!el) return;
+    const handler = () => {
+      dispatch({ type: "project-switch", projectId: project.id });
+    };
+    el.addEventListener("pointerdown", handler);
+    return () => {
+      el.removeEventListener("pointerdown", handler);
+    };
+  }, [project.id, isFocused]);
+
+  return (
+    <div
+      ref={frameRef}
+      className={cn(
+        "flex flex-col flex-1 overflow-hidden border-t-2 transition-colors",
+        isFocused ? "border-primary" : "border-transparent",
+      )}
+    >
+      <div className="flex items-center justify-between px-2 py-0.5 bg-sidebar/50 text-[10px] text-muted-foreground shrink-0 select-none">
+        <span className="truncate font-medium">{project.name}</span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="h-4 w-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            dispatch({
+              type: "project-stack-remove",
+              projectId: project.id,
+            });
+          }}
+        >
+          <IconX size={10} />
+        </Button>
+      </div>
+      {children}
     </div>
   );
 }
