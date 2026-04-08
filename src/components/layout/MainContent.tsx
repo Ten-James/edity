@@ -9,6 +9,8 @@ import { FileTree } from "./FileTree";
 import { GitSidebar } from "./GitSidebar";
 import { PaneContainer } from "./PaneContainer";
 import { TabHost } from "./TabHost";
+import { GlobalIntro } from "@/components/intro/GlobalIntro";
+import { ProjectIntro } from "@/components/intro/ProjectIntro";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -31,6 +33,7 @@ export function MainContent() {
     .filter((p): p is Project => !!p);
 
   const isStackMode = stackProjects.length > 1;
+  const showGlobalIntro = !activeProject && stackProjects.length === 0;
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -42,7 +45,8 @@ export function MainContent() {
 
       {/* Hidden projects stay mounted so their PaneContainers keep their
           slot registration — TabHost host divs re-parent through any pane
-          container remount. */}
+          container remount. Always renders NodeRenderer (never ProjectIntro)
+          so slot registration survives. */}
       <div style={{ display: "none" }}>
         {hiddenProjects.map((project) => {
           const state = projectPanes.get(project.id);
@@ -59,7 +63,9 @@ export function MainContent() {
         })}
       </div>
 
-      {isStackMode ? (
+      {showGlobalIntro ? (
+        <GlobalIntro />
+      ) : isStackMode ? (
         <ResizablePanelGroup
           id="project-stack"
           orientation="horizontal"
@@ -79,12 +85,16 @@ export function MainContent() {
                   className="flex flex-col"
                 >
                   <StackProjectFrame project={project} isFocused={isFocused}>
-                    <NodeRenderer
-                      node={state.root}
-                      state={state}
-                      isActive
-                      projectId={project.id}
-                    />
+                    {isProjectFresh(state) ? (
+                      <ProjectIntro projectName={project.name} />
+                    ) : (
+                      <NodeRenderer
+                        node={state.root}
+                        state={state}
+                        isActive
+                        projectId={project.id}
+                      />
+                    )}
                   </StackProjectFrame>
                 </ResizablePanel>
               </Fragment>
@@ -100,12 +110,16 @@ export function MainContent() {
               key={project.id}
               className="flex-1 flex overflow-hidden"
             >
-              <NodeRenderer
-                node={state.root}
-                state={state}
-                isActive
-                projectId={project.id}
-              />
+              {isProjectFresh(state) ? (
+                <ProjectIntro projectName={project.name} />
+              ) : (
+                <NodeRenderer
+                  node={state.root}
+                  state={state}
+                  isActive
+                  projectId={project.id}
+                />
+              )}
             </div>
           );
         })
@@ -252,4 +266,15 @@ function NodeRenderer({
 
 function childKey(node: LayoutNode): string {
   return node.type === "leaf" ? node.pane.id : node.id;
+}
+
+/**
+ * A project is "fresh" when it has a single unsplit pane with zero tabs —
+ * either just created or all tabs closed. In that case we show ProjectIntro
+ * instead of an empty pane. If the user has explicitly split the layout,
+ * we preserve the split (empty panes stay empty) because that's a
+ * deliberate workspace state, not a blank-slate prompt.
+ */
+function isProjectFresh(state: ProjectPaneState): boolean {
+  return state.root.type === "leaf" && state.root.pane.tabs.length === 0;
 }
