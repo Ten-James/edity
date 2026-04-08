@@ -13,8 +13,6 @@ import {
   ptyInstances,
 } from "../lib/state";
 
-const EDITY_HOOK_MARKER = "claude-hook.sh";
-
 interface HookAction {
   type?: string;
   command?: string;
@@ -27,8 +25,14 @@ interface HookEntry {
 
 type HookSettings = Record<string, HookEntry[]>;
 
-function isEdityHookEntry(entry: HookEntry): boolean {
-  return !!entry.hooks?.some((h) => h.command?.includes(EDITY_HOOK_MARKER));
+/**
+ * Match only hook entries that point to *this* instance's HOOK_SCRIPT_PATH.
+ * Dev and prod each install their own script (edity-dev vs edity config dir)
+ * and must only manage their own entries in the shared ~/.claude/settings.json
+ * — otherwise running dev would clobber prod's hooks and vice versa.
+ */
+function isOurHookEntry(entry: HookEntry): boolean {
+  return !!entry.hooks?.some((h) => h.command?.includes(HOOK_SCRIPT_PATH));
 }
 
 function installHookScript(): void {
@@ -79,7 +83,7 @@ export function ensureClaudeHooks(): void {
     const before = JSON.stringify(hooks);
     for (const [event, hookEntry] of Object.entries(edityHooks)) {
       if (!hooks[event]) hooks[event] = [];
-      hooks[event] = hooks[event].filter((entry) => !isEdityHookEntry(entry));
+      hooks[event] = hooks[event].filter((entry) => !isOurHookEntry(entry));
       hooks[event].push(hookEntry);
     }
 
