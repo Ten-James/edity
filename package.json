@@ -76,7 +76,6 @@
     "wait-on": "^8.0.3"
   },
   "dependencies": {
-    "-": "^0.0.1",
     "@anthropic-ai/claude-agent-sdk": "^0.2.88",
     "@excalidraw/excalidraw": "^0.18.0",
     "@fontsource-variable/inter": "^5.2.8",
@@ -94,7 +93,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "fix-path": "^5.0.0",
-    "g": "^2.0.1",
     "ioredis": "^5.10.1",
     "node-pty": "^1.0.0",
     "qrcode": "^1.5.4",
