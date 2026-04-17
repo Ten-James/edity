@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import {
-  IconGitBranch,
-  IconTrash,
-  IconCheck,
-  IconPlus,
-} from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { pairBranches, groupPairsByPrefix } from "@/lib/branch-utils";
+import { BranchPairGroup } from "./BranchPairGroup";
 import type { GitBranch } from "@/types/git";
 
 interface GitBranchPanelProps {
@@ -18,6 +20,10 @@ interface GitBranchPanelProps {
   onSwitch: (branch: string) => Promise<unknown>;
   onCreate: (branch: string, checkout: boolean) => Promise<unknown>;
   onDelete: (branch: string, force?: boolean) => Promise<unknown>;
+  onRename: (oldName: string, newName: string) => Promise<unknown>;
+  onDeleteRemote: (remote: string, branch: string) => Promise<unknown>;
+  onPush: () => Promise<unknown>;
+  onPull: () => Promise<unknown>;
 }
 
 export function GitBranchPanel({
@@ -26,15 +32,23 @@ export function GitBranchPanel({
   onSwitch,
   onCreate,
   onDelete,
+  onRename,
+  onDeleteRemote,
+  onPush,
+  onPull,
 }: GitBranchPanelProps) {
   const [newBranch, setNewBranch] = useState("");
+  const [renaming, setRenaming] = useState<{
+    name: string;
+    newName: string;
+  } | null>(null);
 
   useEffect(() => {
     onLoadBranches();
   }, [onLoadBranches]);
 
-  const localBranches = branches.filter((b) => !b.isRemote);
-  const remoteBranches = branches.filter((b) => b.isRemote);
+  const pairs = pairBranches(branches);
+  const groups = groupPairsByPrefix(pairs);
 
   const handleCreate = async () => {
     if (!newBranch.trim()) return;
@@ -62,8 +76,75 @@ export function GitBranchPanel({
     }
   };
 
+  const handleDelete = async (branch: string, force?: boolean) => {
+    const result = (await onDelete(branch, force)) as {
+      ok: boolean;
+      error?: string;
+    };
+    if (result.ok) {
+      toast.success("Deleted branch: " + branch);
+    } else {
+      toast.error(result.error ?? "Failed to delete branch");
+    }
+  };
+
+  const handleDeleteRemote = async (remote: string, branch: string) => {
+    const result = (await onDeleteRemote(remote, branch)) as {
+      ok: boolean;
+      error?: string;
+    };
+    if (result.ok) {
+      toast.success(`Deleted ${remote}/${branch}`);
+    } else {
+      toast.error(result.error ?? "Failed to delete remote branch");
+    }
+  };
+
+  const handleRenameStart = (branch: GitBranch) => {
+    setRenaming({ name: branch.name, newName: branch.name });
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!renaming || !renaming.newName.trim()) {
+      setRenaming(null);
+      return;
+    }
+    if (renaming.newName.trim() === renaming.name) {
+      setRenaming(null);
+      return;
+    }
+    const result = (await onRename(renaming.name, renaming.newName.trim())) as {
+      ok: boolean;
+      error?: string;
+    };
+    if (result.ok) {
+      toast.success(`Renamed to ${renaming.newName.trim()}`);
+    } else {
+      toast.error(result.error ?? "Failed to rename branch");
+    }
+    setRenaming(null);
+  };
+
+  const handlePush = async () => {
+    const result = (await onPush()) as { ok: boolean; error?: string };
+    if (result.ok) {
+      toast.success("Pushed");
+    } else {
+      toast.error(result.error ?? "Failed to push");
+    }
+  };
+
+  const handlePull = async () => {
+    const result = (await onPull()) as { ok: boolean; error?: string };
+    if (result.ok) {
+      toast.success("Pulled");
+    } else {
+      toast.error(result.error ?? "Failed to pull");
+    }
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b border-border p-2 flex gap-1">
         <Input
           value={newBranch}
@@ -83,82 +164,62 @@ export function GitBranchPanel({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-1">
-          {localBranches.length > 0 && (
-            <div>
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Local
-              </div>
-              {localBranches.map((branch) => (
-                <div
-                  key={branch.name}
-                  className={cn(
-                    "group flex items-center gap-1.5 px-2 py-1 text-xs",
-                    branch.isCurrent
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent cursor-pointer",
-                  )}
-                  onClick={() => !branch.isCurrent && handleSwitch(branch.name)}
-                >
-                  <IconGitBranch size={13} className="shrink-0" />
-                  <span className="flex-1 truncate">{branch.name}</span>
-                  {branch.isCurrent && (
-                    <IconCheck size={13} className="shrink-0 text-green-400" />
-                  )}
-                  {!branch.isCurrent && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 shrink-0 opacity-0 group-hover:opacity-100"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const result = (await onDelete(branch.name)) as {
-                          ok: boolean;
-                          error?: string;
-                        };
-                        if (result.ok) {
-                          toast.success("Deleted branch: " + branch.name);
-                        } else {
-                          toast.error(
-                            result.error ?? "Failed to delete branch",
-                          );
-                        }
-                      }}
-                      title="Delete branch"
-                    >
-                      <IconTrash size={12} />
-                    </Button>
-                  )}
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    {branch.shortHash}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="grid grid-cols-[1fr_auto_1fr] px-2 py-1 border-b border-border">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Local
+        </span>
+        <div className="w-5" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Remote
+        </span>
+      </div>
 
-          {remoteBranches.length > 0 && (
-            <div className="mt-2">
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Remote
-              </div>
-              {remoteBranches.map((branch) => (
-                <div
-                  key={branch.name}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground"
-                >
-                  <IconGitBranch size={13} className="shrink-0" />
-                  <span className="flex-1 truncate">{branch.name}</span>
-                  <span className="font-mono text-[10px]">
-                    {branch.shortHash}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-1 space-y-1">
+          {groups.map((group) => (
+            <BranchPairGroup
+              key={group.prefix || "__ungrouped"}
+              group={group}
+              onSwitch={handleSwitch}
+              onRename={handleRenameStart}
+              onDelete={handleDelete}
+              onDeleteRemote={handleDeleteRemote}
+              onPush={handlePush}
+              onPull={handlePull}
+            />
+          ))}
         </div>
       </ScrollArea>
+
+      <Dialog
+        open={renaming !== null}
+        onOpenChange={(open) => {
+          if (!open) setRenaming(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Rename branch</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleRenameSubmit();
+            }}
+          >
+            <Input
+              autoFocus
+              value={renaming?.newName ?? ""}
+              onChange={(e) =>
+                setRenaming((prev) =>
+                  prev ? { ...prev, newName: e.target.value } : null,
+                )
+              }
+              className="h-7 text-xs"
+            />
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

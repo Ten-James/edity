@@ -222,7 +222,8 @@ export function useFileTree() {
 
   function handleRenameStart() {
     if (!contextMenu) return;
-    setRenaming({ path: contextMenu.entry.path, name: contextMenu.entry.name });
+    const { path, name } = contextMenu.entry;
+    setRenaming({ path, name });
     setContextMenu(null);
   }
 
@@ -263,7 +264,8 @@ export function useFileTree() {
   }
 
   async function handleCreateSubmit() {
-    if (!creating || !creating.name.trim()) {
+    if (!creating) return;
+    if (!creating.name.trim()) {
       setCreating(null);
       return;
     }

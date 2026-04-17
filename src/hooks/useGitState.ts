@@ -315,6 +315,30 @@ export function useGitState(projectPath: string) {
     return result;
   };
 
+  const renameBranch = async (oldName: string, newName: string) => {
+    const result = await invoke<GitResult>("git_rename_branch", {
+      cwd: cwdRef.current,
+      oldName,
+      newName,
+    });
+    if (result.ok) {
+      await loadBranches();
+    }
+    return result;
+  };
+
+  const deleteRemoteBranch = async (remote: string, branch: string) => {
+    const result = await invoke<GitResult>("git_delete_remote_branch", {
+      cwd: cwdRef.current,
+      remote,
+      branch,
+    });
+    if (result.ok) {
+      await loadBranches();
+    }
+    return result;
+  };
+
   const loadLog = async (count = 50, skip = 0) => {
     const result = await invoke<GitResult & { entries?: GitLogEntry[] }>(
       "git_log",
@@ -377,6 +401,8 @@ export function useGitState(projectPath: string) {
     switchBranch,
     createBranch,
     deleteBranch,
+    renameBranch,
+    deleteRemoteBranch,
     loadLog,
     selectCommit,
     clearSelectedCommit,

@@ -277,6 +277,10 @@ export function GitView({ isActive, projectPath }: GitViewProps) {
             onSwitch={handleSwitchBranch}
             onCreate={git.createBranch}
             onDelete={git.deleteBranch}
+            onRename={git.renameBranch}
+            onDeleteRemote={git.deleteRemoteBranch}
+            onPush={() => git.push(!gitBranchInfo?.upstream)}
+            onPull={git.pull}
           />
         )}
       </div>

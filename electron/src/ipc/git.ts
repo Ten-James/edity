@@ -60,15 +60,64 @@ export function registerGitHandlers(): void {
   });
 
   ipcMain.handle("git_branches", (_event, { cwd }: { cwd: string }) => {
-    const result = execGit(["branch", "-a", "--format=%(refname:short)\t%(objectname:short)\t%(HEAD)"], cwd);
+    const result = execGit(
+      [
+        "for-each-ref",
+        "--format=%(refname:short)\t%(objectname:short)\t%(HEAD)\t%(subject)\t%(upstream:short)\t%(upstream:track)",
+        "refs/heads/",
+        "refs/remotes/",
+      ],
+      cwd,
+    );
     if (!result.ok) return { ok: false, error: result.error };
+
+    // Detect default branch for merge status
+    let defaultBranch: string | null = null;
+    const headRef = execGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd);
+    if (headRef.ok && headRef.output) {
+      defaultBranch = headRef.output.replace(/^origin\//, "");
+    } else {
+      for (const candidate of ["main", "master"]) {
+        const check = execGit(["rev-parse", "--verify", `refs/heads/${candidate}`], cwd);
+        if (check.ok) { defaultBranch = candidate; break; }
+      }
+    }
+
+    // Build merged set
+    const mergedSet = new Set<string>();
+    if (defaultBranch) {
+      const merged = execGit(["branch", "--merged", defaultBranch], cwd);
+      if (merged.ok && merged.output) {
+        for (const line of merged.output.split("\n")) {
+          const name = line.replace(/^\*?\s+/, "").trim();
+          if (name) mergedSet.add(name);
+        }
+      }
+    }
 
     const branches = (result.output || "")
       .split("\n")
       .filter(Boolean)
+      .filter((line) => {
+        const name = line.split("\t")[0];
+        return name !== "origin/HEAD" && !name.endsWith("/HEAD");
+      })
       .map((line) => {
-        const [name, shortHash, head] = line.split("\t");
-        return { name, shortHash, isCurrent: head === "*", isRemote: name.startsWith("origin/") };
+        const [name, shortHash, head, subject, upstream, track] = line.split("\t");
+        const isRemote = name.startsWith("origin/");
+        const aheadMatch = (track || "").match(/ahead (\d+)/);
+        const behindMatch = (track || "").match(/behind (\d+)/);
+        return {
+          name,
+          shortHash,
+          isCurrent: head === "*",
+          isRemote,
+          commitSubject: subject || "",
+          upstream: upstream || null,
+          ahead: aheadMatch ? parseInt(aheadMatch[1], 10) : 0,
+          behind: behindMatch ? parseInt(behindMatch[1], 10) : 0,
+          isMerged: !isRemote && mergedSet.has(name),
+        };
       });
     return { ok: true, branches };
   });
@@ -185,6 +234,16 @@ export function registerGitHandlers(): void {
 
   ipcMain.handle("git_delete_branch", (_event, { cwd, branch, force }: { cwd: string; branch: string; force?: boolean }) => {
     const result = execGit(["branch", force ? "-D" : "-d", branch], cwd);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  });
+
+  ipcMain.handle("git_rename_branch", (_event, { cwd, oldName, newName }: { cwd: string; oldName: string; newName: string }) => {
+    const result = execGit(["branch", "-m", oldName, newName], cwd);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  });
+
+  ipcMain.handle("git_delete_remote_branch", (_event, { cwd, remote, branch }: { cwd: string; remote: string; branch: string }) => {
+    const result = execGit(["push", remote, "--delete", branch], cwd, 30000);
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   });
 

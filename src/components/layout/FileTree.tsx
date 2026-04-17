@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import {
   IconFile,
   IconFolderPlus,
@@ -19,6 +18,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useFileTree, type GitFilter } from "@/hooks/useFileTree";
 import { FileTreeNode } from "./FileTreeNode";
@@ -33,15 +38,6 @@ const GIT_FILTERS: { value: GitFilter; label: string; color: string }[] = [
 
 export function FileTree() {
   const tree = useFileTree();
-  const renameInputRef = useRef<HTMLInputElement>(null);
-  const createInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (tree.renaming) renameInputRef.current?.focus();
-  }, [tree.renaming]);
-  useEffect(() => {
-    if (tree.creating) createInputRef.current?.focus();
-  }, [tree.creating]);
 
   const menuOpen = tree.contextMenu !== null;
 
@@ -55,60 +51,6 @@ export function FileTree() {
           className="h-6 text-xs"
         />
       </div>
-
-      {tree.renaming && (
-        <div className="px-1.5 py-1 border-b border-border">
-          <Input
-            ref={renameInputRef}
-            value={tree.renaming.name}
-            onChange={(e) =>
-              tree.setRenaming((prev) =>
-                prev ? { ...prev, name: e.target.value } : null,
-              )
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") tree.handleRenameSubmit();
-              if (e.key === "Escape") tree.setRenaming(null);
-            }}
-            onBlur={tree.handleRenameSubmit}
-            className="h-6 text-xs"
-          />
-        </div>
-      )}
-
-      {tree.creating && (
-        <div className="px-1.5 py-1 border-b border-border">
-          <div className="flex items-center gap-1 mb-0.5">
-            {tree.creating.type === "file" ? (
-              <IconFile size={12} className="text-muted-foreground" />
-            ) : (
-              <IconFolder size={12} className="text-muted-foreground" />
-            )}
-            <span className="text-[10px] text-muted-foreground">
-              New {tree.creating.type === "file" ? "file" : "folder"} in{" "}
-              {tree.creating.parentDir.split("/").pop()}
-            </span>
-          </div>
-          <Input
-            ref={createInputRef}
-            value={tree.creating.name}
-            onChange={(e) =>
-              tree.setCreating((prev) =>
-                prev ? { ...prev, name: e.target.value } : null,
-              )
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter") tree.handleCreateSubmit();
-              if (e.key === "Escape") tree.setCreating(null);
-            }}
-            onBlur={tree.handleCreateSubmit}
-            placeholder={
-              tree.creating.type === "file" ? "filename.ext" : "folder name"
-            }
-            className="h-6 text-xs"
-          />
-        </div>
-      )}
 
       <ScrollArea className="flex-1 overflow-hidden">
         <div
@@ -198,31 +140,31 @@ export function FileTree() {
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">
           {tree.contextMenu && !tree.contextMenu.entry.is_dir && (
-            <DropdownMenuItem onClick={tree.handleOpenFile}>
+            <DropdownMenuItem onSelect={tree.handleOpenFile}>
               <IconFile size={14} />
               Open
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => tree.handleNewEntry("file")}>
+          <DropdownMenuItem onSelect={() => tree.handleNewEntry("file")}>
             <IconFilePlus size={14} />
             New File
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => tree.handleNewEntry("directory")}>
+          <DropdownMenuItem onSelect={() => tree.handleNewEntry("directory")}>
             <IconFolderPlus size={14} />
             New Folder
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={tree.handleRenameStart}>
+          <DropdownMenuItem onSelect={tree.handleRenameStart}>
             <IconCursorText size={14} />
             Rename
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={tree.handleCopyPath}>
+          <DropdownMenuItem onSelect={tree.handleCopyPath}>
             <IconCopy size={14} />
             Copy Path
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={tree.handleDelete}
+            onSelect={tree.handleDelete}
             className="text-red-400 focus:text-red-400"
           >
             <IconTrash size={14} />
@@ -231,6 +173,80 @@ export function FileTree() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog
+        open={tree.creating !== null}
+        onOpenChange={(open) => {
+          if (!open) tree.setCreating(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {tree.creating?.type === "file" ? (
+                <IconFile size={16} />
+              ) : (
+                <IconFolder size={16} />
+              )}
+              New {tree.creating?.type === "file" ? "file" : "folder"} in{" "}
+              {tree.creating?.parentDir.split("/").pop()}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              tree.handleCreateSubmit();
+            }}
+          >
+            <Input
+              autoFocus
+              value={tree.creating?.name ?? ""}
+              onChange={(e) =>
+                tree.setCreating((prev) =>
+                  prev ? { ...prev, name: e.target.value } : null,
+                )
+              }
+              placeholder={
+                tree.creating?.type === "file" ? "filename.ext" : "folder name"
+              }
+              className="h-7 text-xs"
+            />
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={tree.renaming !== null}
+        onOpenChange={(open) => {
+          if (!open) tree.setRenaming(null);
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconCursorText size={16} />
+              Rename
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              tree.handleRenameSubmit();
+            }}
+          >
+            <Input
+              autoFocus
+              value={tree.renaming?.name ?? ""}
+              onChange={(e) =>
+                tree.setRenaming((prev) =>
+                  prev ? { ...prev, name: e.target.value } : null,
+                )
+              }
+              className="h-7 text-xs"
+            />
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -56,6 +56,11 @@ export interface GitBranch {
   shortHash: string;
   isCurrent: boolean;
   isRemote: boolean;
+  commitSubject: string;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  isMerged: boolean;
 }
 
 export interface GitLogEntry {
@@ -191,6 +196,8 @@ export interface IpcHandlerMap {
   git_switch_branch: { args: { cwd: string; branch: string }; ret: Result };
   git_create_branch: { args: { cwd: string; branch: string; checkout?: boolean }; ret: Result };
   git_delete_branch: { args: { cwd: string; branch: string; force?: boolean }; ret: Result };
+  git_rename_branch: { args: { cwd: string; oldName: string; newName: string }; ret: Result };
+  git_delete_remote_branch: { args: { cwd: string; remote: string; branch: string }; ret: Result };
 
   // Edity Config
   read_edity_config: { args: { projectPath: string }; ret: EdityConfig | null };
